@@ -35,14 +35,14 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 .pos{color:#3db87a;}.neg{color:#e05555;}.warn{color:#f0a04a;}
 
 /* 메인 그리드 */
-.main-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+.main-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;align-items:start;}
 @media(max-width:900px){.main-grid{grid-template-columns:1fr;}}
 .card{background:#111e2e;border-radius:10px;padding:14px;border:0.5px solid #1e3347;}
 .ctitle{font-size:12px;color:#6b8fa8;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
 .filter-sel{font-size:10px;background:#1a2f44;border:0.5px solid #1e3347;color:#aac4e0;padding:3px 8px;border-radius:5px;}
 
 /* 매장 리스트 */
-.branch-scroll{max-height:280px;overflow-y:auto;padding-right:4px;}
+.branch-scroll{overflow-y:auto;padding-right:4px;}
 .branch-scroll::-webkit-scrollbar{width:3px;}
 .branch-scroll::-webkit-scrollbar-thumb{background:#1e3347;border-radius:2px;}
 .bi{margin-bottom:9px;}
@@ -140,8 +140,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       <div class="cw-sm"><canvas id="growChart" role="img" aria-label="월별 증감률"></canvas></div>
     </div>
     <div class="card">
-      <div class="ctitle">매장별 매출 비중 (상위 15개)</div>
-      <div class="cw-sm"><canvas id="pieChart" role="img" aria-label="매장별 매출 비중"></canvas></div>
+      <div class="ctitle">매장별 평균 매출 순위 (상위 15개)</div>
+      <div id="rankList" style="overflow-y:auto;max-height:150px;padding-right:2px;"></div>
     </div>
   </div>
 
@@ -312,14 +312,25 @@ function renderGrow(data){
 
 function renderPie(data){
   const top=[...data].sort((a,b)=>b.avg-a.avg).slice(0,15);
-  const colors=['#378add','#3db87a','#f0a04a','#e05555','#9360d0','#1d9e75','#d85a30','#185fa5','#854f0b','#0f6e56','#a32d2d','#534ab7','#ba7517','#3b6d11','#993556'];
-  destroyChart('pie');
-  charts.pie=new Chart(document.getElementById('pieChart'),{
-    type:'doughnut',
-    data:{labels:top.map(b=>b.name),datasets:[{data:top.map(b=>b.avg),backgroundColor:colors,borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.parsed)}}}}
-  });
+  const maxVal=top[0]?top[0].avg:1;
+  const el=document.getElementById('rankList');
+  el.innerHTML=top.map((b,i)=>{
+    const pct=Math.round(b.avg/maxVal*100);
+    const ac=b.avg>=GOAL?'#3db87a':b.avg>=GOAL*0.8?'#f0a04a':'#e05555';
+    const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':`<span style="color:#6b8fa8;font-size:10px;">${i+1}</span>`;
+    return `<div style="margin-bottom:6px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+        <div style="display:flex;align-items:center;gap:5px;">
+          <span style="width:16px;text-align:center;font-size:11px;">${medal}</span>
+          <span style="font-size:10px;color:#c8dff0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;">${b.name}</span>
+        </div>
+        <span style="font-size:11px;font-weight:600;color:#e0f0ff;">${fmt(b.avg)}</span>
+      </div>
+      <div style="background:#1a2f44;border-radius:3px;height:4px;">
+        <div style="width:${pct}%;height:4px;border-radius:3px;background:${ac};transition:width .8s ease;"></div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function renderMgr(data){
@@ -386,6 +397,16 @@ function render(){
   renderGrow(data);
   renderPie(data);
   renderMgr(data);
+  // 왼쪽 매장 리스트 높이를 오른쪽 카드에 맞춤
+  requestAnimationFrame(()=>{
+    const rightCard = document.querySelector('.main-grid .card:nth-child(2)');
+    const branchScroll = document.getElementById('branchList');
+    if(rightCard && branchScroll){
+      const rightH = rightCard.getBoundingClientRect().height;
+      const titleH = branchScroll.previousElementSibling ? branchScroll.previousElementSibling.getBoundingClientRect().height : 40;
+      branchScroll.style.maxHeight = (rightH - titleH - 28) + 'px';
+    }
+  });
 }
 
 function loadCSV(text, filename){
