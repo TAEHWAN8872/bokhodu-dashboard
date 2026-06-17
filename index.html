@@ -74,6 +74,30 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 .mgr-bar{background:#1a2f44;height:3px;border-radius:2px;margin-top:5px;}
 .mgr-bf{height:3px;border-radius:2px;background:#378add;transition:width .8s ease;}
 
+/* KPI 클릭 가능 */
+.kpi-click{cursor:pointer;transition:border-color .2s,background .2s;}
+.kpi-click:hover{border-color:#2a5a8a;background:#172840;}
+
+/* KPI 매장 목록 모달 */
+.kpi-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;align-items:center;justify-content:center;}
+.kpi-modal-overlay.open{display:flex;}
+.kpi-modal-box{background:#111e2e;border:0.5px solid #2a5a8a;border-radius:14px;padding:20px;width:92%;max-width:620px;max-height:80vh;display:flex;flex-direction:column;position:relative;}
+.kpi-modal-title{font-size:14px;font-weight:600;color:#e0f0ff;margin-bottom:4px;}
+.kpi-modal-sub{font-size:11px;color:#6b8fa8;margin-bottom:14px;}
+.kpi-modal-close{position:absolute;top:14px;right:16px;background:transparent;border:none;color:#6b8fa8;font-size:18px;cursor:pointer;}
+.kpi-modal-close:hover{color:#aac4e0;}
+.kpi-modal-list{overflow-y:auto;flex:1;}
+.kpi-modal-list::-webkit-scrollbar{width:3px;}
+.kpi-modal-list::-webkit-scrollbar-thumb{background:#1e3347;border-radius:2px;}
+.kml-item{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:7px;margin-bottom:5px;background:#0d1b2a;border:0.5px solid #1a2f44;}
+.kml-left{display:flex;align-items:center;gap:8px;}
+.kml-rank{font-size:10px;color:#6b8fa8;width:18px;text-align:center;}
+.kml-name{font-size:12px;color:#c8dff0;}
+.kml-mgr{font-size:10px;color:#6b8fa8;}
+.kml-right{text-align:right;}
+.kml-val{font-size:12px;font-weight:600;color:#e0f0ff;}
+.kml-rate{font-size:10px;margin-top:1px;}
+
 /* 헤더 월 표시 */
 .month-badge{font-size:10px;background:#1a2f44;color:#6b8fa8;padding:2px 8px;border-radius:4px;}
 
@@ -117,7 +141,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   <div class="kpi-row">
     <div class="kpi"><div class="kl">운영 매장 수</div><div class="kv" id="k1">-</div><div class="ks" style="color:#6b8fa8;" id="k1s">-</div></div>
     <div class="kpi"><div class="kl" id="k2l">최근월 평균 매출</div><div class="kv" id="k2">-</div><div class="ks" id="k2s">-</div></div>
-    <div class="kpi"><div class="kl" id="k3l">전년 동월 대비 5% 목표 달성</div><div class="kv" id="k3">-</div><div class="ks" id="k3s">-</div></div>
+    <div class="kpi kpi-click" id="kpi3" onclick="openKpiModal('over')" title="클릭하여 달성 매장 보기"><div class="kl" id="k3l">전년 동월 대비 5%↑ 목표 달성</div><div class="kv" id="k3">-</div><div class="ks" id="k3s">-</div></div>
+    <div class="kpi kpi-click" id="kpi6" onclick="openKpiModal('stable')" title="클릭하여 매장 보기"><div class="kl" id="k6l">전년비 ±2% 유지 매장</div><div class="kv" id="k6">-</div><div class="ks" id="k6s">-</div></div>
     <div class="kpi"><div class="kl">전월 대비 성장</div><div class="kv" id="k4">-</div><div class="ks" id="k4s">-</div></div>
     <div class="kpi"><div class="kl">최고 매출 매장</div><div class="kv" id="k5" style="font-size:16px;">-</div><div class="ks" id="k5s" style="color:#6b8fa8;">-</div></div>
   </div>
@@ -166,6 +191,16 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     </div>
   </div>
 
+</div>
+
+<!-- KPI 매장 목록 모달 -->
+<div class="kpi-modal-overlay" id="kpiModal">
+  <div class="kpi-modal-box">
+    <button class="kpi-modal-close" onclick="closeKpiModal()">✕</button>
+    <div class="kpi-modal-title" id="kpiModalTitle">-</div>
+    <div class="kpi-modal-sub" id="kpiModalSub">-</div>
+    <div class="kpi-modal-list" id="kpiModalList"></div>
+  </div>
 </div>
 
 <!-- 매장 월별 매출 모달 -->
@@ -523,13 +558,27 @@ function render(){
   const curVals=data.map(b=>b.months[lastIdx]||0).filter(v=>v>0);
   const avgVal=curVals.length?curVals.reduce((s,v)=>s+v,0)/curVals.length:0;
 
-  // 전년 대비 5% 목표 달성 수
-  const over=data.filter(b=>{
+  // 전년 대비 5% 목표 달성 매장 목록 저장
+  const overBranches = data.filter(b=>{
     const cur=b.months[lastIdx]||0;
     const goal=getGoal(b.name,lastIdx);
     return goal>0&&cur>=goal;
-  }).length;
+  });
+  const over = overBranches.length;
   const hasGoal=data.filter(b=>getGoal(b.name,lastIdx)>0).length;
+
+  // 전년 대비 ±2% 유지 매장 (목표 미달성이지만 -2%~+5% 사이, 즉 98%~105% 사이)
+  const stableBranches = data.filter(b=>{
+    const cur=b.months[lastIdx]||0;
+    const v25=get25(b.name,lastIdx);
+    if(!v25||!cur) return false;
+    const rate=(cur-v25)/v25*100;
+    return rate>=-2&&rate<=2; // ±2% 이내 (전년 대비 -2%~+2%)
+  });
+
+  window.__overBranches = overBranches;
+  window.__stableBranches = stableBranches;
+  window.__lastIdx = lastIdx;
 
   // 전월 대비
   const prevIdx=lastIdx>0?lastIdx-1:-1;
@@ -564,6 +613,10 @@ function render(){
   document.getElementById('k3').textContent=`${over}개 (${hasGoal>0?Math.round(over/hasGoal*100):0}%)`;
   document.getElementById('k3s').className='ks '+(over/Math.max(hasGoal,1)>=0.5?'pos':'warn');
   document.getElementById('k3s').textContent='미달 '+(hasGoal-over)+'개';
+  document.getElementById('k6l').textContent=`${monthLabel} 전년비 ±2% 유지`;
+  document.getElementById('k6').textContent=`${stableBranches.length}개`;
+  document.getElementById('k6s').className='ks warn';
+  document.getElementById('k6s').textContent=`전년 대비 -2%~+2% 이내`;
   document.getElementById('k4').textContent=growStr;
   document.getElementById('k4').className='kv '+(growStr.startsWith('+')?'pos':growStr==='-'?'':'neg');
   document.getElementById('k4s').textContent=prevIdx>=0?MONTHS[prevIdx]+'→'+monthLabel:'';
@@ -572,6 +625,7 @@ function render(){
     document.getElementById('k5s').textContent=topBranch.name+' · 26년 '+topMonthLabel;
   }
 
+  buildAllMap();
   renderBranches(lastIdx);
   renderTrend(data);
   renderDist(data, lastIdx);
@@ -594,7 +648,71 @@ function render(){
   });
 }
 
-// 매장 모달: 25년 vs 26년 월별 비교 + 5% 목표선
+// KPI 매장 목록 모달
+function openKpiModal(type){
+  const lastIdx = window.__lastIdx ?? 4;
+  const monthLabel = MONTHS[lastIdx];
+  let branches, title, sub;
+
+  if(type==='over'){
+    branches = (window.__overBranches||[]).map(b=>{
+      const cur=b.months[lastIdx]||0;
+      const v25=get25(b.name,lastIdx);
+      const goal=getGoal(b.name,lastIdx);
+      const rate=v25>0?((cur-v25)/v25*100):null;
+      return {...b, cur, v25, goal, rate};
+    }).sort((a,b)=>b.rate-a.rate);
+    title=`${monthLabel} 전년비 5%↑ 목표 달성 매장`;
+    sub=`총 ${branches.length}개 매장 · 전년 동월 대비 +5% 이상 달성`;
+  } else {
+    branches = (window.__stableBranches||[]).map(b=>{
+      const cur=b.months[lastIdx]||0;
+      const v25=get25(b.name,lastIdx);
+      const rate=v25>0?((cur-v25)/v25*100):null;
+      return {...b, cur, v25, rate};
+    }).sort((a,b)=>b.rate-a.rate);
+    title=`${monthLabel} 전년비 ±2% 유지 매장`;
+    sub=`총 ${branches.length}개 매장 · 전년 대비 ±2% 이내 유지 중`;
+  }
+
+  document.getElementById('kpiModalTitle').textContent=title;
+  document.getElementById('kpiModalSub').textContent=sub;
+  document.getElementById('kpiModal').classList.add('open');
+
+  const el=document.getElementById('kpiModalList');
+  el.innerHTML=branches.map((b,i)=>{
+    const rateTxt=b.rate!==null?(b.rate>=0?'+':'')+b.rate.toFixed(1)+'%':'-%';
+    const rateCls=b.rate>=5?'pos':b.rate>=0?'warn':'neg';
+    return `<div class="kml-item" style="cursor:pointer;" onclick="closeKpiModal();openBranchModal(window.__allMap&&window.__allMap['${b.name}']||${JSON.stringify(b)})">
+      <div class="kml-left">
+        <span class="kml-rank">${i+1}</span>
+        <div>
+          <div class="kml-name">${b.name}</div>
+          <div class="kml-mgr">${b.manager} · ${b.region}</div>
+        </div>
+      </div>
+      <div class="kml-right">
+        <div class="kml-val">${fmt(b.cur)}</div>
+        <div class="kml-rate ${rateCls}">${rateTxt} (전년 ${fmt(b.v25||0)})</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function closeKpiModal(){
+  document.getElementById('kpiModal').classList.remove('open');
+}
+document.getElementById('kpiModal').addEventListener('click',function(e){
+  if(e.target===this) closeKpiModal();
+});
+
+// 매장 모달 열기용 allMap 준비
+function buildAllMap(){
+  window.__allMap={};
+  ALL.forEach(b=>{ window.__allMap[b.name]=b; });
+}
+
+// 매장 월별 매출 모달 -->
 let modalChartInst=null;
 function openBranchModal(b){
   const active26=b.months.map((v,i)=>({v,i})).filter(x=>x.v>0);
