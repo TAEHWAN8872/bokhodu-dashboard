@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>복호두 매출 현황판</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-serif;min-height:100vh;padding:16px;}
@@ -263,6 +264,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 </div>
 
 <script>
+// chartjs-plugin-datalabels 전역 등록 (growChart 전용)
+if(typeof ChartDataLabels !== 'undefined') Chart.register(ChartDataLabels);
 const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 const GOAL_GROWTH = 0.05; // 전년 대비 5% 목표
 let ALL = [];       // 26년 데이터
@@ -449,6 +452,7 @@ function renderTrend(data){
     ]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{
+        datalabels:{display:false},
         legend:{display:true,labels:{color:'#aac4e0',font:{size:11},boxWidth:14,
           generateLabels:chart=>chart.data.datasets.map((ds,i)=>{
             const isBar=ds.type==='bar';
@@ -495,7 +499,7 @@ function renderTrend(data){
         borderWidth:1,borderRadius:3}
     ]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:true,labels:{color:'#aac4e0',font:{size:10},boxWidth:12}},
+      plugins:{datalabels:{display:false},legend:{display:true,labels:{color:'#aac4e0',font:{size:10},boxWidth:12}},
         tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y}개`}}},
       scales:{
         x:{ticks:{color:'#6b8fa8',font:{size:10}},grid:{color:'#1a2f44'}},
@@ -527,7 +531,7 @@ function renderDist(data, lastIdx){
     data:{labels:buckets.map(b=>b.label),
       datasets:[{data:counts,backgroundColor:buckets.map(b=>b.color),borderRadius:5,borderSkipped:false}]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{
+      plugins:{datalabels:{display:false},legend:{display:false},tooltip:{callbacks:{
         title:t=>t[0].label+' 구간',
         label:c=>c.parsed.y+'개 매장'
       }}},
@@ -543,20 +547,51 @@ function renderGrow(data){
   const sums=MONTHS.map((_,i)=>data.reduce((s,b)=>s+(b.months[i]||0),0));
   const active=sums.map((v,i)=>({v,i})).filter(x=>x.v>0);
   if(active.length<2) return;
-  const labels=[],rates=[];
+  const labels=[],rates=[],diffs=[];
   for(let i=1;i<active.length;i++){
     const prev=active[i-1],cur=active[i];
     labels.push(MONTHS[prev.i]+'→'+MONTHS[cur.i]);
     rates.push(prev.v?Math.round((cur.v-prev.v)/prev.v*1000)/10:0);
+    diffs.push(Math.round((cur.v-prev.v)/10000)); // 만원 단위 금액 차이
   }
   destroyChart('grow');
   charts.grow=new Chart(document.getElementById('growChart'),{
     type:'bar',
     data:{labels,datasets:[{data:rates,backgroundColor:rates.map(v=>v>=0?'#0f6e56':'#a32d2d'),borderRadius:4}]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'%'}}},
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{
+          label:c=>{
+            const rate=c.parsed.y;
+            const diff=diffs[c.dataIndex];
+            const sign=diff>=0?'+':'';
+            return [`증감률: ${rate}%`, `증감액: ${sign}${diff.toLocaleString()}만원`];
+          }
+        }},
+        datalabels:{
+          display:true,
+          anchor:ctx=>rates[ctx.dataIndex]>=0?'end':'start',
+          align:ctx=>rates[ctx.dataIndex]>=0?'top':'bottom',
+          formatter:(v,ctx)=>{
+            const sign=v>=0?'+':'';
+            const diff=diffs[ctx.dataIndex];
+            const dsign=diff>=0?'+':'';
+            return [`${sign}${v}%`, `${dsign}${diff.toLocaleString()}만`];
+          },
+          color:ctx=>rates[ctx.dataIndex]>=0?'#3db87a':'#e05555',
+          font:{size:9,weight:'bold'},
+          padding:2,
+          textAlign:'center'
+        }
+      },
       scales:{x:{ticks:{color:'#6b8fa8',font:{size:10}},grid:{display:false}},
-        y:{ticks:{color:'#6b8fa8',font:{size:10},callback:v=>v+'%'},grid:{color:'#1a2f44'}}}}
+        y:{ticks:{color:'#6b8fa8',font:{size:10},callback:v=>v+'%'},grid:{color:'#1a2f44'},
+          afterDataLimits:scale=>{
+            const range=scale.max-scale.min;
+            scale.max+=range*0.35;
+            if(scale.min<0) scale.min+=range*-0.35;
+          }}}}
   });
 }
 
@@ -892,7 +927,7 @@ function openBranchModal(b){
     type:'bar',
     data:{labels,datasets},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:true,labels:{color:'#6b8fa8',font:{size:10},boxWidth:12}},
+      plugins:{datalabels:{display:false},legend:{display:true,labels:{color:'#6b8fa8',font:{size:10},boxWidth:12}},
         tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y!=null?c.parsed.y.toLocaleString()+'만원':'없음')}}},
       scales:{x:{ticks:{color:'#6b8fa8',font:{size:10}},grid:{color:'#1a2f44'}},
         y:{min:Math.max(0,minV-pad),ticks:{color:'#6b8fa8',font:{size:10},callback:v=>{
