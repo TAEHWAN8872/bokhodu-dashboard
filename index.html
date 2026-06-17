@@ -22,9 +22,53 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 
 /* 탭 */
 .tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
-.tab{font-size:11px;padding:5px 12px;border-radius:6px;cursor:pointer;border:0.5px solid #1e3347;color:#6b8fa8;background:transparent;transition:all .2s;}
+.tab{font-size:11px;padding:5px 12px;border-radius:6px;cursor:pointer;border:1px solid #1e3347;color:#6b8fa8;background:transparent;transition:all .2s;font-weight:500;}
 .tab:hover{border-color:#2a5a8a;color:#aac4e0;}
-.tab.active{background:#1a3a5c;color:#7eb8e8;border-color:#2a5a8a;}
+.tab.active{color:#fff;font-weight:700;}
+.tab[data-color="전체"]{border-color:#2a5a8a;color:#7eb8e8;}
+.tab[data-color="전체"].active{background:#1a3a5c;border-color:#2a5a8a;color:#7eb8e8;}
+.tab[data-color="김태환 과장"]{border-color:#22c55e;color:#22c55e;}
+.tab[data-color="김태환 과장"].active{background:rgba(34,197,94,0.25);border-color:#22c55e;color:#22c55e;}
+.tab[data-color="임도형 과장"]{border-color:#ef4444;color:#ef4444;}
+.tab[data-color="임도형 과장"].active{background:rgba(239,68,68,0.25);border-color:#ef4444;color:#ef4444;}
+.tab[data-color="이중섭 대리"]{border-color:#facc15;color:#facc15;}
+.tab[data-color="이중섭 대리"].active{background:rgba(250,204,21,0.25);border-color:#facc15;color:#facc15;}
+.tab[data-color="박영태 대리"]{border-color:#3b82f6;color:#3b82f6;}
+.tab[data-color="박영태 대리"].active{background:rgba(59,130,246,0.25);border-color:#3b82f6;color:#3b82f6;}
+.tab[data-color="강동우 사원"]{border-color:#a855f7;color:#a855f7;}
+.tab[data-color="강동우 사원"].active{background:rgba(168,85,247,0.25);border-color:#a855f7;color:#a855f7;}
+.tab[data-region="서울"].active{background:rgba(59,130,246,0.2);border-color:#3b82f6;color:#3b82f6;}
+.tab[data-region="서울"]:hover{border-color:#3b82f6;color:#3b82f6;}
+.tab[data-region="경기"].active{background:rgba(34,197,94,0.2);border-color:#22c55e;color:#22c55e;}
+.tab[data-region="경기"]:hover{border-color:#22c55e;color:#22c55e;}
+.tab[data-region="인천"].active{background:rgba(6,182,212,0.2);border-color:#06b6d4;color:#06b6d4;}
+.tab[data-region="인천"]:hover{border-color:#06b6d4;color:#06b6d4;}
+.tab[data-region="부산"].active{background:rgba(249,115,22,0.2);border-color:#f97316;color:#f97316;}
+.tab[data-region="부산"]:hover{border-color:#f97316;color:#f97316;}
+.tab[data-region="대구"].active{background:rgba(168,85,247,0.2);border-color:#a855f7;color:#a855f7;}
+.tab[data-region="대구"]:hover{border-color:#a855f7;color:#a855f7;}
+.tab[data-region="광주"].active{background:rgba(236,72,153,0.2);border-color:#ec4899;color:#ec4899;}
+.tab[data-region="광주"]:hover{border-color:#ec4899;color:#ec4899;}
+.tab[data-region="대전"].active{background:rgba(250,204,21,0.2);border-color:#facc15;color:#facc15;}
+.tab[data-region="대전"]:hover{border-color:#facc15;color:#facc15;}
+.tab[data-region="울산"].active{background:rgba(20,184,166,0.2);border-color:#14b8a6;color:#14b8a6;}
+.tab[data-region="울산"]:hover{border-color:#14b8a6;color:#14b8a6;}
+.tab[data-region="세종"].active{background:rgba(132,204,22,0.2);border-color:#84cc16;color:#84cc16;}
+.tab[data-region="세종"]:hover{border-color:#84cc16;color:#84cc16;}
+.tab[data-region="충북"].active{background:rgba(251,146,60,0.2);border-color:#fb923c;color:#fb923c;}
+.tab[data-region="충북"]:hover{border-color:#fb923c;color:#fb923c;}
+.tab[data-region="충남"].active{background:rgba(244,63,94,0.2);border-color:#f43f5e;color:#f43f5e;}
+.tab[data-region="충남"]:hover{border-color:#f43f5e;color:#f43f5e;}
+.tab[data-region="경북"].active{background:rgba(139,92,246,0.2);border-color:#8b5cf6;color:#8b5cf6;}
+.tab[data-region="경북"]:hover{border-color:#8b5cf6;color:#8b5cf6;}
+.tab[data-region="경남"].active{background:rgba(14,165,233,0.2);border-color:#0ea5e9;color:#0ea5e9;}
+.tab[data-region="경남"]:hover{border-color:#0ea5e9;color:#0ea5e9;}
+.tab[data-region="전북"].active{background:rgba(217,70,239,0.2);border-color:#d946ef;color:#d946ef;}
+.tab[data-region="전북"]:hover{border-color:#d946ef;color:#d946ef;}
+.tab[data-region="전남"].active{background:rgba(16,185,129,0.2);border-color:#10b981;color:#10b981;}
+.tab[data-region="전남"]:hover{border-color:#10b981;color:#10b981;}
+.tab[data-region="강원"].active{background:rgba(245,158,11,0.2);border-color:#f59e0b;color:#f59e0b;}
+.tab[data-region="강원"]:hover{border-color:#f59e0b;color:#f59e0b;}
 
 /* KPI */
 .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px;}
@@ -178,8 +222,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   <!-- 하단 -->
   <div class="bot-grid">
     <div class="card">
-      <div class="ctitle" id="distTitle">달성률 구간 분포</div>
-      <div class="cw-sm"><canvas id="distChart" role="img" aria-label="달성률 구간 분포"></canvas></div>
+      <div class="ctitle" id="distTitle">매출 구간 분포</div>
+      <div class="cw-sm"><canvas id="distChart" role="img" aria-label="매출 구간 분포"></canvas></div>
     </div>
     <div class="card">
       <div class="ctitle">월별 증감률</div>
@@ -292,12 +336,16 @@ function setFilter(f){
 }
 
 function renderTabs(){
-  const mgrs=['all',...new Set(ALL.map(b=>b.manager))];
+  const ORDER=['김태환 과장','임도형 과장','이중섭 대리','박영태 대리','강동우 사원'];
+  const existing=new Set(ALL.map(b=>b.manager));
+  const sorted=ORDER.filter(m=>existing.has(m));
+  const others=[...existing].filter(m=>!ORDER.includes(m)).sort();
+  const mgrs=['all',...sorted,...others];
   window.__tabMgrs = mgrs;
   const el=document.getElementById('tabs');
   el.innerHTML=mgrs.map((m,i)=>{
     const label=m==='all'?'전체':m;
-    return `<div class="tab" id="tab-${i}" onclick="setFilter(window.__tabMgrs[${i}])">${label}</div>`;
+    return `<div class="tab" id="tab-${i}" data-color="${label}" onclick="setFilter(window.__tabMgrs[${i}])">${label}</div>`;
   }).join('');
   updateTabActive();
 }
@@ -319,7 +367,7 @@ function renderRegionTabs(){
   const el=document.getElementById('regionTabs');
   el.innerHTML=regions.map((r,i)=>{
     const label=r==='all'?'전체':r;
-    return `<div class="tab" id="rtab-${i}" onclick="setRegion(window.__regionList[${i}])">${label}</div>`;
+    return `<div class="tab" id="rtab-${i}" data-region="${r}" onclick="setRegion(window.__regionList[${i}])">${label}</div>`;
   }).join('');
   updateTabActive();
 }
@@ -369,7 +417,7 @@ function renderTrend(data){
   charts.trend=new Chart(document.getElementById('trendChart'),{
     type:'bar',
     data:{labels,datasets:[
-      // 평균 막대 (배경에 깔림, y2축)
+      // 평균 막대 (배경에 깔림, y2축) — 26년이 뒤에 그려져 앞에 보임
       {type:'bar',label:'25년 평균',data:avg25,
         backgroundColor:'rgba(255,176,50,0.55)',borderColor:'rgba(255,176,50,0.9)',
         borderWidth:1.5,borderRadius:5,yAxisID:'y2',order:4},
@@ -391,14 +439,18 @@ function renderTrend(data){
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{
         legend:{display:true,labels:{color:'#aac4e0',font:{size:11},boxWidth:14,
-          generateLabels:chart=>chart.data.datasets.map((ds,i)=>({
-            text:ds.label,
-            fillStyle:ds.backgroundColor||ds.borderColor,
-            strokeStyle:ds.borderColor,
-            lineWidth:1,
-            hidden:false,
-            datasetIndex:i
-          }))
+          generateLabels:chart=>chart.data.datasets.map((ds,i)=>{
+            const isBar=ds.type==='bar';
+            return {
+              text:ds.label,
+              fillStyle:isBar?(ds.backgroundColor||ds.borderColor):ds.borderColor,
+              strokeStyle:ds.borderColor,
+              lineDash:ds.borderDash||[],
+              lineWidth:isBar?1:2.5,
+              fontColor:'#aac4e0',hidden:false,
+              datasetIndex:i
+            };
+          })
         }},
         tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y.toLocaleString()+'만원'}}
       },
@@ -446,29 +498,32 @@ function renderTrend(data){
 
 // 달성률 분포: 마지막 월 vs 전년 대비 5% 목표 기준
 function renderDist(data, lastIdx){
-  const vals=data.map(b=>{
-    const cur=b.months[lastIdx]||0;
-    const goal=getGoal(b.name, lastIdx);
-    return goal>0 ? cur/goal : (cur>0?1:0);
-  });
+  const vals=data.map(b=>b.months[lastIdx]||0).filter(v=>v>0);
   const buckets=[
-    {label:'~70%',max:0.7,color:'#a32d2d'},
-    {label:'70~90%',max:0.9,color:'#854f0b'},
-    {label:'90~100%',max:1.0,color:'#185fa5'},
-    {label:'100~110%',max:1.1,color:'#0f6e56'},
-    {label:'110%~',max:Infinity,color:'#3db87a'},
+    {label:'~1000만',min:0,      max:10000000, color:'#5b6fa8'},
+    {label:'1000~1500만',min:10000000,max:15000000,color:'#2a5a8a'},
+    {label:'1500~2000만',min:15000000,max:20000000,color:'#185fa5'},
+    {label:'2000~2500만',min:20000000,max:25000000,color:'#1a7fc1'},
+    {label:'2500~3000만',min:25000000,max:30000000,color:'#0f6e8a'},
+    {label:'3000~3500만',min:30000000,max:35000000,color:'#0f8a6e'},
+    {label:'3500~4000만',min:35000000,max:40000000,color:'#0f6e56'},
+    {label:'4000만~',   min:40000000,max:Infinity, color:'#3db87a'},
   ];
-  let prev=0;
-  const counts=buckets.map(b=>{const c=vals.filter(v=>v>=prev&&v<b.max).length;prev=b.max;return c;});
+  const counts=buckets.map(b=>vals.filter(v=>v>=b.min&&v<b.max).length);
   destroyChart('dist');
   charts.dist=new Chart(document.getElementById('distChart'),{
     type:'bar',
     data:{labels:buckets.map(b=>b.label),
-      datasets:[{data:counts,backgroundColor:buckets.map(b=>b.color),borderRadius:4}]},
+      datasets:[{data:counts,backgroundColor:buckets.map(b=>b.color),borderRadius:5,borderSkipped:false}]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'개 매장'}}},
-      scales:{x:{ticks:{color:'#6b8fa8',font:{size:9}},grid:{display:false}},
-        y:{ticks:{color:'#6b8fa8',font:{size:10}},grid:{color:'#1a2f44'}}}}
+      plugins:{legend:{display:false},tooltip:{callbacks:{
+        title:t=>t[0].label+' 구간',
+        label:c=>c.parsed.y+'개 매장'
+      }}},
+      scales:{
+        x:{ticks:{color:'#6b8fa8',font:{size:9},maxRotation:30},grid:{display:false}},
+        y:{ticks:{color:'#6b8fa8',font:{size:10},stepSize:1,callback:v=>Number.isInteger(v)?v+'개':''},grid:{color:'#1a2f44'}}
+      }}
   });
 }
 
@@ -714,7 +769,7 @@ function render(){
   renderPie(data, lastIdx);
   renderMgr(data, lastIdx);
   renderRegionAvg(data, lastIdx);
-  document.getElementById('distTitle').textContent=`달성률 구간 (${monthLabel} 기준)`;
+  document.getElementById('distTitle').textContent=`매출 구간 분포 (${monthLabel} 기준)`;
   document.getElementById('rankTitle').textContent=`${monthLabel} 매출 순위 (상위 15개)`;
 
   requestAnimationFrame(()=>{
