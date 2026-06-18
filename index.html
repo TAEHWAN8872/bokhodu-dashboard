@@ -336,7 +336,11 @@ let currentRegion = 'all';
 let currentSearch = '';
 let charts = {};
 
-function fmt(n){ return Math.round(n/10000).toLocaleString()+'만원'; }
+function fmt(n){
+  const m = Math.round(n/10000);
+  if(m>=10000){ const uk=Math.floor(m/10000),rem=m%10000; return rem>0?`${uk}억 ${rem.toLocaleString()}만원`:`${uk}억`; }
+  return m.toLocaleString()+'만원';
+}
 
 // 26년 데이터에서 마지막 데이터 월 인덱스 (0~11)
 function getLastMonthIdx(data){
@@ -499,12 +503,9 @@ function destroyChart(key){
 function renderTrend(data){
   const fmtDetail=v=>{
     if(v<=0) return '-';
-    if(v>=10000){
-      const uk=Math.floor(v/10000);
-      const rem=v%10000;
-      return rem>0?`${uk}억 ${rem.toLocaleString()}만원`:`${uk}억`;
-    }
-    return v.toLocaleString()+'만원';
+    const m = Math.round(v);
+    if(m>=10000){ const uk=Math.floor(m/10000),rem=m%10000; return rem>0?`${uk}억 ${rem.toLocaleString()}만원`:`${uk}억`; }
+    return m.toLocaleString()+'만원';
   };
   const sums26=MONTHS.map((_,i)=>data.reduce((s,b)=>s+(b.months[i]||0),0));
   const active=sums26.map((v,i)=>({v,i})).filter(x=>x.v>0);
@@ -1223,7 +1224,12 @@ function renderLogChart(){
   if(!data.length) return;
   initLogMonthTabs();
 
-  const fmtM = v => v>0 ? Math.round(v/10000).toLocaleString()+'만원' : '-';
+  const fmtM = v => {
+    if(!v||v<=0) return '-';
+    const m=Math.round(v/10000);
+    if(m>=10000){ const u=Math.floor(m/10000),r=m%10000; return r>0?`${u}억 ${r.toLocaleString()}만원`:`${u}억`; }
+    return m.toLocaleString()+'만원';
+  };
 
   // 각 매장의 해당 월(또는 평균) 비중 계산
   const storeRatios = [];
@@ -1343,7 +1349,12 @@ function renderLogChart(){
 function openLogBucketModal(bk, monthLabel){
   if(!bk||!bk.items||!bk.items.length) return;
   const sorted = [...bk.items].sort((a,b)=>a.ratio-b.ratio);
-  const fmtM = v => v>0 ? Math.round(v/10000).toLocaleString()+'만원' : '-';
+  const fmtM = v => {
+    if(!v||v<=0) return '-';
+    const m=Math.round(v/10000);
+    if(m>=10000){ const u=Math.floor(m/10000),r=m%10000; return r>0?`${u}억 ${r.toLocaleString()}만원`:`${u}억`; }
+    return m.toLocaleString()+'만원';
+  };
   const bc = bk.min<25?'#3db87a':bk.min<40?'#f0a04a':'#e05555';
 
   document.getElementById('logBucketModalTitle').textContent = `${bk.label} 구간 매장 · ${monthLabel}`;
