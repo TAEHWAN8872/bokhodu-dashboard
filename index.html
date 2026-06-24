@@ -336,28 +336,23 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 <div class="modal-overlay" id="cumulModal">
   <div class="modal-box" style="max-width:1100px;">
     <button class="modal-close" onclick="closeCumulModal()">✕</button>
-    <div class="modal-title">📈 누적 매출 현황</div>
+    <div class="modal-title">📈 누적 매출 + 물류 비교</div>
     <div class="modal-sub" id="cumulModalSub">전체 매장 · 현재 필터 기준</div>
 
-    <!-- 누적 매출 꺾은선 차트 -->
-    <div style="margin-bottom:6px;display:flex;align-items:center;gap:8px;">
-      <div style="width:3px;height:14px;background:#38bdf8;border-radius:2px;"></div>
-      <span style="font-size:11px;color:#38bdf8;font-weight:600;">누적 매출 추이 (25년 vs 26년)</span>
+    <!-- 범례 설명 -->
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;font-size:10px;color:#6b8fa8;">
+      <span><span style="color:#38bdf8;font-weight:700;">━━</span> 26년 누적매출 (좌축)</span>
+      <span><span style="color:#f59e0b;font-weight:700;">╌╌</span> 25년 누적매출 (좌축)</span>
+      <span><span style="display:inline-block;width:10px;height:10px;background:rgba(168,85,247,0.7);border-radius:2px;vertical-align:middle;"></span> 물류 누적 (우축)</span>
     </div>
-    <div style="position:relative;height:260px;margin-bottom:14px;">
-      <canvas id="cumulSalesChart"></canvas>
-    </div>
-    <div id="cumulSalesSummary" style="overflow-x:auto;margin-bottom:20px;"></div>
 
-    <!-- 누적 물류 막대 차트 -->
-    <div style="margin-bottom:6px;display:flex;align-items:center;gap:8px;">
-      <div style="width:3px;height:14px;background:#a78bfa;border-radius:2px;"></div>
-      <span style="font-size:11px;color:#a78bfa;font-weight:600;">월별 물류 누적 (VAT포함 공급가)</span>
+    <!-- 통합 차트 -->
+    <div style="position:relative;height:300px;margin-bottom:16px;">
+      <canvas id="cumulComboChart"></canvas>
     </div>
-    <div style="position:relative;height:220px;margin-bottom:14px;">
-      <canvas id="cumulLogChart"></canvas>
-    </div>
-    <div id="cumulLogSummary" style="overflow-x:auto;"></div>
+
+    <!-- 통합 수치 테이블 -->
+    <div id="cumulComboSummary" style="overflow-x:auto;"></div>
   </div>
 </div>
 
@@ -1308,11 +1303,9 @@ function openCumulModal(){
   const data = filtered();
   const LOGISTICS = window.LOGISTICS || {};
 
-  // 데이터 있는 월 인덱스
   const activeIdxs = MONTHS.map((_,i)=>i).filter(i=>data.some(b=>b.months[i]>0));
   if(!activeIdxs.length) return;
 
-  // 필터 설명
   const filterDesc = currentFilter==='all'?'전체':currentFilter;
   const regionDesc = currentRegion==='all'?'전체 지역':currentRegion;
   document.getElementById('cumulModalSub').textContent =
@@ -1321,31 +1314,23 @@ function openCumulModal(){
   document.getElementById('cumulModal').classList.add('open');
 
   // 월별 합산
-  const sums26 = MONTHS.map((_,i)=>data.reduce((s,b)=>s+(b.months[i]||0),0));
-  const sums25 = MONTHS.map((_,i)=>data.reduce((s,b)=>s+(get25(b.name,i)||0),0));
+  const sums26  = MONTHS.map((_,i)=>data.reduce((s,b)=>s+(b.months[i]||0),0));
+  const sums25  = MONTHS.map((_,i)=>data.reduce((s,b)=>s+(get25(b.name,i)||0),0));
   const sumsLog = MONTHS.map((_,i)=>data.reduce((s,b)=>{
-    const logArr=LOGISTICS[b.name];
-    return s+(logArr?logArr[i]||0:0);
+    const logArr=LOGISTICS[b.name]; return s+(logArr?logArr[i]||0:0);
   },0));
 
-  // 누적 계산 (데이터 없는 월은 null)
+  // 누적 계산
   const cumul26=[]; let acc26=0;
   const cumul25=[]; let acc25=0;
   const cumulLog=[]; let accLog=0;
   const labels=[];
   MONTHS.forEach((_,i)=>{
-    const has26 = sums26[i]>0;
-    const has25 = sums25[i]>0;
-    const hasLog = sumsLog[i]>0;
-    if(has26||has25||hasLog){
-      labels.push(MONTHS[i]);
-      if(has26){ acc26+=sums26[i]; cumul26.push(Math.round(acc26/10000)); }
-      else cumul26.push(acc26>0?Math.round(acc26/10000):null);
-      if(has25){ acc25+=sums25[i]; cumul25.push(Math.round(acc25/10000)); }
-      else cumul25.push(acc25>0?Math.round(acc25/10000):null);
-      if(hasLog){ accLog+=sumsLog[i]; cumulLog.push(Math.round(accLog/10000)); }
-      else cumulLog.push(accLog>0?Math.round(accLog/10000):null);
-    }
+    if(!(sums26[i]>0||sums25[i]>0||sumsLog[i]>0)) return;
+    labels.push(MONTHS[i]);
+    acc26 += sums26[i]||0; cumul26.push(Math.round(acc26/10000));
+    acc25 += sums25[i]||0; cumul25.push(acc25>0?Math.round(acc25/10000):null);
+    accLog+= sumsLog[i]||0; cumulLog.push(accLog>0?Math.round(accLog/10000):null);
   });
 
   const fmtV = v => {
@@ -1354,158 +1339,131 @@ function openCumulModal(){
     return v.toLocaleString()+'만원';
   };
 
-  // 차트 destroy 후 재생성
+  // 차트 destroy
   Object.values(cumulCharts).forEach(c=>{ try{c.destroy();}catch(e){} });
   cumulCharts = {};
 
-  // ① 누적 매출 꺾은선
-  const allSalesVals=[...cumul26,...cumul25].filter(v=>v!=null&&v>0);
-  const salesMax=allSalesVals.length?Math.max(...allSalesVals):1;
-  const salesMin=allSalesVals.length?Math.min(...allSalesVals):0;
-  const salesPad=Math.round((salesMax-salesMin)*0.1)||Math.round(salesMax*0.05)||1000;
+  // ── 스케일 범위 ──
+  const salesVals = [...cumul26,...cumul25.filter(v=>v!=null)];
+  const salesMax  = salesVals.length ? Math.max(...salesVals) : 1;
+  const salesMin  = salesVals.length ? Math.min(...salesVals) : 0;
+  const salesPad  = Math.round((salesMax-salesMin)*0.12)||Math.round(salesMax*0.05)||1000;
 
-  cumulCharts.sales = new Chart(document.getElementById('cumulSalesChart'),{
-    type:'line',
+  const logVals  = cumulLog.filter(v=>v!=null&&v>0);
+  const logMax   = logVals.length ? Math.max(...logVals) : 1;
+  const logPad   = Math.round(logMax*0.18)||500;
+
+  // ── 통합 차트 ──
+  cumulCharts.combo = new Chart(document.getElementById('cumulComboChart'),{
+    type:'bar',
     data:{labels, datasets:[
-      {label:'25년 누적',data:cumul25,
-        borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.06)',
-        fill:true,tension:0.35,pointRadius:5,pointStyle:'triangle',
-        pointBackgroundColor:'#f59e0b',pointBorderColor:'#0d1b2a',pointBorderWidth:2,
-        borderWidth:2,borderDash:[5,3]},
-      {label:'26년 누적',data:cumul26,
-        borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,0.08)',
-        fill:true,tension:0.35,pointRadius:6,
-        pointBackgroundColor:'#38bdf8',pointBorderColor:'#0d1b2a',pointBorderWidth:2,
-        borderWidth:2.5},
+      // 물류 누적 막대 (뒤에 깔림, 우축)
+      {type:'bar', label:'물류 누적',  data:cumulLog,
+        backgroundColor:'rgba(168,85,247,0.35)', borderColor:'rgba(168,85,247,0.8)',
+        borderWidth:1.5, borderRadius:5, yAxisID:'yLog', order:3},
+      // 25년 누적 꺾은선 (좌축)
+      {type:'line', label:'25년 누적매출', data:cumul25,
+        borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0.04)',
+        fill:false, tension:0.35,
+        pointRadius:5, pointStyle:'triangle',
+        pointBackgroundColor:'#f59e0b', pointBorderColor:'#0d1b2a', pointBorderWidth:2,
+        borderWidth:2, borderDash:[6,3], yAxisID:'ySales', order:2},
+      // 26년 누적 꺾은선 (좌축)
+      {type:'line', label:'26년 누적매출', data:cumul26,
+        borderColor:'#38bdf8', backgroundColor:'rgba(56,189,248,0.07)',
+        fill:true, tension:0.35,
+        pointRadius:6,
+        pointBackgroundColor:'#38bdf8', pointBorderColor:'#0d1b2a', pointBorderWidth:2,
+        borderWidth:2.5, yAxisID:'ySales', order:1},
     ]},
-    options:{responsive:true,maintainAspectRatio:false,
+    options:{responsive:true, maintainAspectRatio:false,
       plugins:{
         datalabels:{display:false},
-        legend:{display:true,labels:{color:'#aac4e0',font:{size:11},boxWidth:14}},
-        tooltip:{mode:'index',intersect:false,callbacks:{
-          label:c=>{
-            const v=c.parsed.y; if(v==null) return null;
-            const lbl=c.dataset.label;
-            if(lbl==='26년 누적'){
-              const v25=cumul25[c.dataIndex];
+        legend:{display:true, labels:{color:'#aac4e0', font:{size:11}, boxWidth:14,
+          generateLabels: chart => chart.data.datasets.map((ds,i)=>({
+            text: ds.label,
+            fillStyle: ds.type==='bar' ? ds.backgroundColor : ds.borderColor,
+            strokeStyle: ds.borderColor,
+            lineDash: ds.borderDash||[],
+            lineWidth: ds.type==='bar' ? 1 : 2.5,
+            fontColor:'#aac4e0', hidden:false, datasetIndex:i
+          }))
+        }},
+        tooltip:{mode:'index', intersect:false, callbacks:{
+          label: c => {
+            const v = c.parsed.y; if(v==null) return null;
+            const lbl = c.dataset.label;
+            if(lbl==='26년 누적매출'){
+              const v25 = cumul25[c.dataIndex];
               if(v25>0){
-                const diff=v-v25;
-                const rate=((diff/v25)*100).toFixed(1);
-                const sign=diff>=0?'+':'-';
-                return [`${lbl}: ${fmtV(v)}`,`전년비: ${diff>=0?'+':''}${rate}%  (${sign}${fmtV(Math.abs(diff))})`];
+                const diff=v-v25, rate=((diff/v25)*100).toFixed(1);
+                return [`26년 누적매출: ${fmtV(v)}`, `전년비: ${diff>=0?'+':''}${rate}%  (${diff>=0?'+':'-'}${fmtV(Math.abs(diff))})`];
               }
+            }
+            if(lbl==='물류 누적'){
+              const s26 = cumul26[c.dataIndex]||0;
+              const ratio = s26>0?(v/s26*100).toFixed(1):null;
+              return [`물류 누적: ${fmtV(v)}`, ratio!=null?`매출 대비: ${ratio}%`:null].filter(Boolean);
             }
             return `${lbl}: ${fmtV(v)}`;
           }
         }}
       },
       scales:{
-        x:{ticks:{color:'#6b8fa8',font:{size:11}},grid:{color:'#1a2f44'}},
-        y:{min:Math.max(0,salesMin-salesPad),
-          ticks:{color:'#38bdf8',font:{size:10},callback:v=>{
+        x:{ticks:{color:'#6b8fa8',font:{size:11}}, grid:{color:'#1a2f44'}},
+        ySales:{position:'left', min:Math.max(0,salesMin-salesPad),
+          title:{display:true, text:'누적 매출', color:'#38bdf8', font:{size:10}},
+          ticks:{color:'#38bdf8', font:{size:10}, callback:v=>{
             if(v>=10000) return (v/10000).toFixed(1)+'억';
             return v.toLocaleString()+'만';
-          }},grid:{color:'#1a2f44'}}
+          }}, grid:{color:'#1a2f44'}},
+        yLog:{position:'right', min:0, max:logMax+logPad,
+          title:{display:true, text:'물류 누적', color:'#a78bfa', font:{size:10}},
+          ticks:{color:'#a78bfa', font:{size:10}, callback:v=>{
+            if(v>=10000) return (v/10000).toFixed(1)+'억';
+            return v.toLocaleString()+'만';
+          }}, grid:{display:false}}
       }}
   });
 
-  // ① 수치 요약 테이블
-  const salesRows = labels.map((lbl,i)=>{
-    const v26=cumul26[i]??0, v25=cumul25[i]??0;
-    const diff=v26-v25;
-    const rate=v25>0?((diff/v25)*100).toFixed(1):null;
-    const rateStr=rate!=null?(parseFloat(rate)>=0?`<span style="color:#3db87a">▲${rate}%</span>`:`<span style="color:#e05555">▼${Math.abs(rate)}%</span>`):'<span style="color:#6b8fa8">-</span>';
-    const diffStr=diff>0?`<span style="color:#3db87a">+${fmtV(diff)}</span>`:diff<0?`<span style="color:#e05555">-${fmtV(Math.abs(diff))}</span>`:'<span style="color:#6b8fa8">-</span>';
+  // ── 통합 수치 테이블 ──
+  const comboRows = labels.map((lbl,i)=>{
+    const v26  = cumul26[i]||0;
+    const v25  = cumul25[i]||0;
+    const vLog = cumulLog[i]||0;
+    const diff = v26-v25;
+    const rate = v25>0?((diff/v25)*100).toFixed(1):null;
+    const rateStr = rate!=null
+      ?(parseFloat(rate)>=0?`<span style="color:#3db87a">▲${rate}%</span>`:`<span style="color:#e05555">▼${Math.abs(rate)}%</span>`)
+      :'<span style="color:#6b8fa8">-</span>';
+    const diffStr = diff>0?`<span style="color:#3db87a">+${fmtV(diff)}</span>`
+      :diff<0?`<span style="color:#e05555">-${fmtV(Math.abs(diff))}</span>`
+      :'<span style="color:#6b8fa8">0</span>';
+    // 물류비중: 누적물류 / 26년누적매출
+    const logRatio = v26>0&&vLog>0?(vLog/v26*100).toFixed(1):null;
+    const logColor = logRatio==null?'#6b8fa8':parseFloat(logRatio)>=35?'#e05555':parseFloat(logRatio)>=25?'#f0a04a':'#3db87a';
     return `<tr>
-      <td style="padding:5px 8px;color:#6b8fa8;font-size:10px;border-bottom:0.5px solid #1a2f44;">${lbl}</td>
+      <td style="padding:5px 8px;color:#6b8fa8;font-size:10px;border-bottom:0.5px solid #1a2f44;white-space:nowrap;">${lbl}</td>
       <td style="padding:5px 8px;text-align:right;color:#38bdf8;font-size:10px;border-bottom:0.5px solid #1a2f44;">${fmtV(v26)}</td>
       <td style="padding:5px 8px;text-align:right;color:#f59e0b;font-size:10px;border-bottom:0.5px solid #1a2f44;">${v25>0?fmtV(v25):'-'}</td>
       <td style="padding:5px 8px;text-align:center;font-size:10px;border-bottom:0.5px solid #1a2f44;">${rateStr}</td>
       <td style="padding:5px 8px;text-align:right;font-size:10px;border-bottom:0.5px solid #1a2f44;">${diffStr}</td>
+      <td style="padding:5px 8px;text-align:right;color:#a78bfa;font-size:10px;border-bottom:0.5px solid #1a2f44;">${vLog>0?fmtV(vLog):'-'}</td>
+      <td style="padding:5px 8px;text-align:center;font-size:10px;border-bottom:0.5px solid #1a2f44;"><span style="color:${logColor}">${logRatio!=null?logRatio+'%':'-'}</span></td>
     </tr>`;
   });
-  document.getElementById('cumulSalesSummary').innerHTML=`
-<table style="width:100%;border-collapse:collapse;min-width:300px;">
+  document.getElementById('cumulComboSummary').innerHTML=`
+<table style="width:100%;border-collapse:collapse;min-width:400px;">
   <thead><tr style="background:#0d1b2a;">
     <th style="padding:5px 8px;text-align:left;font-size:10px;color:#6b8fa8;font-weight:500;">월</th>
     <th style="padding:5px 8px;text-align:right;font-size:10px;color:#38bdf8;font-weight:500;">26년 누적</th>
     <th style="padding:5px 8px;text-align:right;font-size:10px;color:#f59e0b;font-weight:500;">25년 누적</th>
     <th style="padding:5px 8px;text-align:center;font-size:10px;color:#aac4e0;font-weight:500;">전년비</th>
     <th style="padding:5px 8px;text-align:right;font-size:10px;color:#aac4e0;font-weight:500;">증감액</th>
+    <th style="padding:5px 8px;text-align:right;font-size:10px;color:#a78bfa;font-weight:500;">물류 누적</th>
+    <th style="padding:5px 8px;text-align:center;font-size:10px;color:#c4b5fd;font-weight:500;">물류비중</th>
   </tr></thead>
-  <tbody>${salesRows.join('')}</tbody>
-</table>`;
-
-  // ② 누적 물류 막대
-  // 월별(비누적) 물류도 같이 표시
-  const monthlyLog = MONTHS.map((_,i)=>{
-    const v=sumsLog[i]; return v>0?Math.round(v/10000):null;
-  }).filter((_,i)=>labels.includes(MONTHS[i]));
-
-  const logMax=cumulLog.filter(v=>v!=null&&v>0);
-  const logMaxVal=logMax.length?Math.max(...logMax):1;
-
-  cumulCharts.log = new Chart(document.getElementById('cumulLogChart'),{
-    type:'bar',
-    data:{labels, datasets:[
-      {type:'bar',label:'월별 물류',data:monthlyLog,
-        backgroundColor:'rgba(168,85,247,0.45)',borderColor:'rgba(168,85,247,0.85)',
-        borderWidth:1,borderRadius:4,yAxisID:'y2',order:2},
-      {type:'line',label:'누적 물류',data:cumulLog,
-        borderColor:'#a78bfa',backgroundColor:'rgba(168,85,247,0.06)',
-        fill:true,tension:0.35,pointRadius:5,
-        pointBackgroundColor:'#a78bfa',pointBorderColor:'#0d1b2a',pointBorderWidth:2,
-        borderWidth:2.5,yAxisID:'y',order:1},
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{
-        datalabels:{display:false},
-        legend:{display:true,labels:{color:'#aac4e0',font:{size:11},boxWidth:14}},
-        tooltip:{mode:'index',intersect:false,callbacks:{
-          label:c=>`${c.dataset.label}: ${c.parsed.y!=null?fmtV(c.parsed.y):'-'}`
-        }}
-      },
-      scales:{
-        x:{ticks:{color:'#6b8fa8',font:{size:11}},grid:{color:'#1a2f44'}},
-        y:{position:'left',
-          title:{display:true,text:'누적 물류',color:'#a78bfa',font:{size:10}},
-          ticks:{color:'#a78bfa',font:{size:10},callback:v=>{
-            if(v>=10000) return (v/10000).toFixed(1)+'억';
-            return v.toLocaleString()+'만';
-          }},grid:{color:'#1a2f44'}},
-        y2:{position:'right',
-          title:{display:true,text:'월별 물류',color:'rgba(168,85,247,0.8)',font:{size:10}},
-          ticks:{color:'rgba(168,85,247,0.7)',font:{size:10},callback:v=>{
-            if(v>=10000) return (v/10000).toFixed(1)+'억';
-            return v.toLocaleString()+'만';
-          }},grid:{display:false}}
-      }}
-  });
-
-  // ② 물류 수치 요약
-  const logRows = labels.map((lbl,i)=>{
-    const cumV=cumulLog[i]??0;
-    const monV=monthlyLog[i]??0;
-    // 해당 월 매출 합산 (물류비중 계산용)
-    const salesV=sums26[MONTHS.indexOf(lbl)]||0;
-    const ratio=salesV>0&&sumsLog[MONTHS.indexOf(lbl)]>0?(sumsLog[MONTHS.indexOf(lbl)]/salesV*100).toFixed(1):null;
-    const ratioColor=ratio==null?'#6b8fa8':parseFloat(ratio)>=35?'#e05555':parseFloat(ratio)>=25?'#f0a04a':'#3db87a';
-    return `<tr>
-      <td style="padding:5px 8px;color:#6b8fa8;font-size:10px;border-bottom:0.5px solid #1a2f44;">${lbl}</td>
-      <td style="padding:5px 8px;text-align:right;color:#a78bfa;font-size:10px;border-bottom:0.5px solid #1a2f44;">${monV>0?fmtV(monV):'-'}</td>
-      <td style="padding:5px 8px;text-align:right;color:#c4b5fd;font-size:10px;border-bottom:0.5px solid #1a2f44;">${cumV>0?fmtV(cumV):'-'}</td>
-      <td style="padding:5px 8px;text-align:center;font-size:10px;border-bottom:0.5px solid #1a2f44;"><span style="color:${ratioColor}">${ratio!=null?ratio+'%':'-'}</span></td>
-    </tr>`;
-  });
-  document.getElementById('cumulLogSummary').innerHTML=`
-<table style="width:100%;border-collapse:collapse;min-width:300px;">
-  <thead><tr style="background:#0d1b2a;">
-    <th style="padding:5px 8px;text-align:left;font-size:10px;color:#6b8fa8;font-weight:500;">월</th>
-    <th style="padding:5px 8px;text-align:right;font-size:10px;color:#a78bfa;font-weight:500;">월별 물류</th>
-    <th style="padding:5px 8px;text-align:right;font-size:10px;color:#c4b5fd;font-weight:500;">누적 물류</th>
-    <th style="padding:5px 8px;text-align:center;font-size:10px;color:#aac4e0;font-weight:500;">물류비중(당월)</th>
-  </tr></thead>
-  <tbody>${logRows.join('')}</tbody>
+  <tbody>${comboRows.join('')}</tbody>
 </table>`;
 }
 
