@@ -2136,14 +2136,16 @@ function renderMenuRegionView() {
     const regionMap = {};
     data.forEach(r => {
       const reg = getRegionForStore(r.매장);
-      if (!regionMap[reg]) regionMap[reg] = { qty: 0, amt: 0, stores: new Set(), 호두과자: 0, 답례품: 0, 사이드: 0 };
+      if (!regionMap[reg]) regionMap[reg] = { qty: 0, amt: 0, stores: new Set(), 호두과자: 0, 답례품: 0, 사이드: 0, 호두과자Amt: 0, 답례품Amt: 0, 사이드Amt: 0 };
       const price = PRICE_MAP[r.상품명] || 0;
       const qty = r.수량 || 0;
+      const amt = qty * price;
       const cat = getCategory(r.상품명);
       regionMap[reg].qty += qty;
-      regionMap[reg].amt += qty * price;
+      regionMap[reg].amt += amt;
       regionMap[reg].stores.add(r.매장);
       regionMap[reg][cat] = (regionMap[reg][cat] || 0) + qty;
+      regionMap[reg][cat+'Amt'] = (regionMap[reg][cat+'Amt'] || 0) + amt;
     });
     const totalQty = Object.values(regionMap).reduce((s, r) => s + r.qty, 0);
     const totalAmt = Object.values(regionMap).reduce((s, r) => s + r.amt, 0);
@@ -2174,9 +2176,9 @@ function renderMenuRegionView() {
           <tbody>
           ${sorted.map(([reg, v]) => {
             const color = REGION_COLORS_MAP[reg] || '#6b8fa8';
-            const hPct = v.qty ? (v.호두과자/v.qty*100).toFixed(0) : 0;
-            const gPct = v.qty ? (v.답례품/v.qty*100).toFixed(0) : 0;
-            const sPct = v.qty ? (v.사이드/v.qty*100).toFixed(0) : 0;
+            const hPct = v.amt ? (v.호두과자Amt/v.amt*100).toFixed(0) : 0;
+            const gPct = v.amt ? (v.답례품Amt/v.amt*100).toFixed(0) : 0;
+            const sPct = v.amt ? (v.사이드Amt/v.amt*100).toFixed(0) : 0;
             const pct = totalAmt ? (v.amt/totalAmt*100).toFixed(1) : '0.0';
             return `<tr style="cursor:pointer;" onclick="selectMenuRegion('${reg}')"
               onmouseover="this.style.background='#172840'" onmouseout="this.style.background=''">
@@ -2215,13 +2217,14 @@ function renderMenuRegionView() {
   const storeMap = {};
   filteredData.forEach(r => {
     const s = r.매장;
-    if (!storeMap[s]) storeMap[s] = { totalQty: 0, totalAmt: 0, 호두과자: 0, 답례품: 0, 사이드: 0, menus: {} };
+    if (!storeMap[s]) storeMap[s] = { totalQty: 0, totalAmt: 0, 호두과자: 0, 답례품: 0, 사이드: 0, 호두과자Amt: 0, 답례품Amt: 0, 사이드Amt: 0, menus: {} };
     const cat = getCategory(r.상품명);
     const qty = r.수량 || 0;
     const amt = qty * (PRICE_MAP[r.상품명] || 0);
     storeMap[s].totalQty += qty;
     storeMap[s].totalAmt += amt;
     storeMap[s][cat] = (storeMap[s][cat] || 0) + qty;
+    storeMap[s][cat+'Amt'] = (storeMap[s][cat+'Amt'] || 0) + amt;
     if (!storeMap[s].menus[r.상품명]) storeMap[s].menus[r.상품명] = { cat, qty: 0, amt: 0 };
     storeMap[s].menus[r.상품명].qty += qty;
     storeMap[s].menus[r.상품명].amt += amt;
@@ -2249,9 +2252,9 @@ function renderMenuRegionView() {
   const storeRows = Object.entries(storeMap)
     .sort((a, b) => b[1].totalAmt - a[1].totalAmt)
     .map(([storeName, v]) => {
-      const hPct = v.totalQty ? (v.호두과자/v.totalQty*100).toFixed(0) : 0;
-      const gPct = v.totalQty ? (v.답례품/v.totalQty*100).toFixed(0) : 0;
-      const sPct = v.totalQty ? (v.사이드/v.totalQty*100).toFixed(0) : 0;
+      const hPct = v.totalAmt ? (v.호두과자Amt/v.totalAmt*100).toFixed(0) : 0;
+      const gPct = v.totalAmt ? (v.답례품Amt/v.totalAmt*100).toFixed(0) : 0;
+      const sPct = v.totalAmt ? (v.사이드Amt/v.totalAmt*100).toFixed(0) : 0;
       const menusJson = encodeURIComponent(JSON.stringify({ storeName, menus: v.menus, totalQty: v.totalQty, totalAmt: v.totalAmt }));
       return `<tr style="cursor:pointer;" onclick="openMenuRegionStoreModal('${storeName}', ${v.totalQty}, ${v.totalAmt}, decodeURIComponent('${menusJson}'))"
         onmouseover="this.style.background='#172840'" onmouseout="this.style.background=''">
@@ -2474,14 +2477,17 @@ function renderMenuManagerView() {
   const storeMap = {};
   filteredData.forEach(r => {
     const s = r.매장;
-    if (!storeMap[s]) storeMap[s] = { 호두과자: 0, 답례품: 0, 사이드: 0, totalQty: 0, totalAmt: 0, menus: {} };
+    if (!storeMap[s]) storeMap[s] = { 호두과자: 0, 답례품: 0, 사이드: 0, 호두과자Amt: 0, 답례품Amt: 0, 사이드Amt: 0, totalQty: 0, totalAmt: 0, menus: {} };
     const cat = getCategory(r.상품명);
-    storeMap[s][cat] = (storeMap[s][cat] || 0) + (r.수량 || 0);
-    storeMap[s].totalQty += r.수량 || 0;
-    storeMap[s].totalAmt += (r.수량 || 0) * (PRICE_MAP[r.상품명] || 0);
+    const qty = r.수량 || 0;
+    const amt = qty * (PRICE_MAP[r.상품명] || 0);
+    storeMap[s][cat] = (storeMap[s][cat] || 0) + qty;
+    storeMap[s][cat+'Amt'] = (storeMap[s][cat+'Amt'] || 0) + amt;
+    storeMap[s].totalQty += qty;
+    storeMap[s].totalAmt += amt;
     if (!storeMap[s].menus[r.상품명]) storeMap[s].menus[r.상품명] = { 분류: r.상품분류, 수량: 0, 금액: 0 };
-    storeMap[s].menus[r.상품명].수량 += r.수량 || 0;
-    storeMap[s].menus[r.상품명].금액 += (r.수량 || 0) * (PRICE_MAP[r.상품명] || 0);
+    storeMap[s].menus[r.상품명].수량 += qty;
+    storeMap[s].menus[r.상품명].금액 += amt;
   });
 
   const mgrTotalQty = Object.values(storeMap).reduce((s,v) => s+v.totalQty, 0);
@@ -2490,9 +2496,9 @@ function renderMenuManagerView() {
   const storeRows = Object.entries(storeMap)
     .sort((a,b) => b[1].totalAmt - a[1].totalAmt)
     .map(([storeName, v]) => {
-      const hPct = v.totalQty ? (v.호두과자/v.totalQty*100).toFixed(0) : 0;
-      const gPct = v.totalQty ? (v.답례품/v.totalQty*100).toFixed(0) : 0;
-      const sPct = v.totalQty ? (v.사이드/v.totalQty*100).toFixed(0) : 0;
+      const hPct = v.totalAmt ? (v.호두과자Amt/v.totalAmt*100).toFixed(0) : 0;
+      const gPct = v.totalAmt ? (v.답례품Amt/v.totalAmt*100).toFixed(0) : 0;
+      const sPct = v.totalAmt ? (v.사이드Amt/v.totalAmt*100).toFixed(0) : 0;
       const menusJson = encodeURIComponent(JSON.stringify({ storeName, menus: v.menus, totalQty: v.totalQty, totalAmt: v.totalAmt }));
       return `<tr style="cursor:pointer;" onclick="openMenuStoreModal('${storeName}', ${v.totalQty}, ${v.totalAmt}, decodeURIComponent('${menusJson}'))"
         onmouseover="this.style.background='#172840'" onmouseout="this.style.background=''">
