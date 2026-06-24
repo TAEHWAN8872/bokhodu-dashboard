@@ -369,6 +369,42 @@ function branchLastIdx(b){
   return -1;
 }
 
+// ── 평균 모드 헬퍼 ──────────────────────────────────────────
+// 매장의 유효 월 평균 매출 (평균 탭용)
+function getBranchAvg(b){
+  const vals = b.months.filter(v=>v>0);
+  return vals.length ? Math.round(vals.reduce((s,v)=>s+v,0)/vals.length) : 0;
+}
+// 평균 탭일 때 매장의 "대표값" 반환 (단일월이면 그 월값, 평균이면 평균)
+function getBranchVal(b, lastIdx){
+  if(lastIdx === -2) return getBranchAvg(b); // -2 = 평균 모드 신호
+  return b.months[lastIdx]||0;
+}
+// 평균 탭일 때 전년 비교값: 유효 월 평균
+function get25Avg(name){
+  const d = ALL25[name];
+  if(!d) return 0;
+  const vals = d.filter(v=>v>0);
+  return vals.length ? Math.round(vals.reduce((s,v)=>s+v,0)/vals.length) : 0;
+}
+function get25Val(name, lastIdx){
+  if(lastIdx === -2) return get25Avg(name);
+  return get25(name, lastIdx);
+}
+// 목표값 (전년+5%)
+function getGoalVal(name, lastIdx){
+  if(lastIdx === -2){
+    const v25 = get25Avg(name);
+    return v25 > 0 ? Math.round(v25 * (1 + GOAL_GROWTH)) : 0;
+  }
+  return getGoal(name, lastIdx);
+}
+// 현재 선택된 모드의 표시 라벨
+function getMonthLabel(lastIdx){
+  if(lastIdx === -2) return '평균';
+  return MONTHS[lastIdx];
+}
+
 // 25년 동일 월 매출 조회
 function get25(name, monthIdx){
   const d = ALL25[name];
@@ -472,7 +508,7 @@ function renderMonthTabs(){
   if(!el) return;
   // "최신" 탭 + 각 월 탭
   const tabs = [
-    `<div class="tab month-tab" id="mtab-auto" data-midx="-1" onclick="setMonth(-1)">당월</div>`,
+    `<div class="tab month-tab" id="mtab-auto" data-midx="-1" onclick="setMonth(-1)">평균</div>`,
     ...availableIdx.map(i =>
       `<div class="tab month-tab" id="mtab-${i}" data-midx="${i}" onclick="setMonth(${i})">${MONTHS[i]}</div>`
     )
@@ -729,9 +765,9 @@ function renderTrend(data){
   document.getElementById('storeSummary').innerHTML=`<div style="display:flex;gap:5px;flex-wrap:wrap;">${storeCols.join('')}</div>`;
 }
 
-// 달성률 분포: 마지막 월 vs 전년 대비 5% 목표 기준
+// 달성률 분포: 선택 월 또는 평균 기준
 function renderDist(data, lastIdx){
-  const vals=data.map(b=>b.months[lastIdx]||0).filter(v=>v>0);
+  const vals=data.map(b=>getBranchVal(b,lastIdx)).filter(v=>v>0);
   const buckets=[
     {label:'~1000만',min:0,      max:10000000, color:'#5b6fa8'},
     {label:'1000~1500만',min:10000000,max:15000000,color:'#2a5a8a'},
@@ -813,14 +849,14 @@ function renderGrow(data){
   });
 }
 
-// 순위: 마지막 월 실매출 기준
+// 순위: 선택 월 또는 평균 실매출 기준
 function renderPie(data, lastIdx){
-  const withVal=data.map(b=>({...b,lastVal:b.months[lastIdx]||0})).filter(b=>b.lastVal>0);
+  const withVal=data.map(b=>({...b,lastVal:getBranchVal(b,lastIdx)})).filter(b=>b.lastVal>0);
   const top=[...withVal].sort((a,b)=>b.lastVal-a.lastVal).slice(0,15);
   const maxVal=top[0]?top[0].lastVal:1;
   const el=document.getElementById('rankList');
   el.innerHTML=top.map((b,i)=>{
-    const goal=getGoal(b.name, lastIdx);
+    const goal=getGoalVal(b.name, lastIdx);
     const pct=Math.round(b.lastVal/maxVal*100);
     const ac=goal>0?(b.lastVal>=goal?'#3db87a':b.lastVal>=goal*0.9?'#f0a04a':'#e05555'):'#378add';
     const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':`<span style="color:#6b8fa8;font-size:10px;">${i+1}</span>`;
@@ -843,7 +879,7 @@ function renderMgr(data, lastIdx){
   const mgrs={};
   data.forEach(b=>{
     const k=b.manager;
-    const v=b.months[lastIdx]||0;
+    const v=getBranchVal(b,lastIdx);
     if(v<=0) return;
     if(!mgrs[k]) mgrs[k]={sum:0,cnt:0};
     mgrs[k].sum+=v; mgrs[k].cnt++;
@@ -866,7 +902,7 @@ function renderMgr(data, lastIdx){
 function renderRegionAvg(data, lastIdx){
   const map={};
   data.forEach(b=>{
-    const v=b.months[lastIdx]||0;
+    const v=getBranchVal(b,lastIdx);
     if(v<=0) return;
     if(!map[b.region]) map[b.region]={sum:0,cnt:0};
     map[b.region].sum+=v; map[b.region].cnt++;
@@ -890,26 +926,26 @@ function renderRegionAvg(data, lastIdx){
   }).join('');
 }
 
-// 매장 리스트: 마지막 월 매출 vs 전년 동월 대비 5% 목표
+// 매장 리스트: 마지막 월 또는 평균 매출 vs 전년 대비 5% 목표
 function renderBranches(lastIdx){
   const data=[...filtered()];
   const sort=document.getElementById('sortSel').value;
-  if(sort==='avg_desc') data.sort((a,b)=>(b.months[lastIdx]||0)-(a.months[lastIdx]||0));
-  else if(sort==='avg_asc') data.sort((a,b)=>(a.months[lastIdx]||0)-(b.months[lastIdx]||0));
+  if(sort==='avg_desc') data.sort((a,b)=>getBranchVal(b,lastIdx)-getBranchVal(a,lastIdx));
+  else if(sort==='avg_asc') data.sort((a,b)=>getBranchVal(a,lastIdx)-getBranchVal(b,lastIdx));
   else if(sort==='yoy_desc') data.sort((a,b)=>{
-    const ra = (()=>{ const c=a.months[lastIdx]||0, v=get25(a.name,lastIdx); return v>0?(c-v)/v*100:-999; })();
-    const rb = (()=>{ const c=b.months[lastIdx]||0, v=get25(b.name,lastIdx); return v>0?(c-v)/v*100:-999; })();
+    const ra=(()=>{ const c=getBranchVal(a,lastIdx), v=get25Val(a.name,lastIdx); return v>0?(c-v)/v*100:-999; })();
+    const rb=(()=>{ const c=getBranchVal(b,lastIdx), v=get25Val(b.name,lastIdx); return v>0?(c-v)/v*100:-999; })();
     return rb-ra;
   });
   else data.sort((a,b)=>a.name.localeCompare(b.name,'ko'));
 
-  const monthLabel=MONTHS[lastIdx];
+  const monthLabel=getMonthLabel(lastIdx);
   document.getElementById('branchListTitle').textContent=`매장별 ${monthLabel} 매출 · 전년 대비 5%↑ 목표`;
   const el=document.getElementById('branchList');
   el.innerHTML=data.map((b,idx)=>{
-    const cur=b.months[lastIdx]||0;
-    const goal=getGoal(b.name, lastIdx);
-    const v25=get25(b.name, lastIdx);
+    const cur=getBranchVal(b,lastIdx);
+    const goal=getGoalVal(b.name, lastIdx);
+    const v25=get25Val(b.name, lastIdx);
     let r=0, cls='fl', lbl='목표없음', bc='#6b8fa8';
     if(goal>0){
       r=Math.round(cur/goal*100);
@@ -951,37 +987,39 @@ function render(){
   if(!data.length) return;
   const autoIdx=getLastMonthIdx(data);
   if(autoIdx<0) return;
-  const lastIdx = (selectedMonthIdx>=0) ? selectedMonthIdx : autoIdx;
-  const monthLabel=MONTHS[lastIdx];
+  // selectedMonthIdx: -1=평균 탭, >=0=특정 월
+  // lastIdx: -2=평균 모드(내부 신호), >=0=특정 월 인덱스
+  const lastIdx = (selectedMonthIdx>=0) ? selectedMonthIdx : -2;
+  const monthLabel = getMonthLabel(lastIdx);
 
-  // KPI 계산: 마지막 월 기준
-  const curVals=data.map(b=>b.months[lastIdx]||0).filter(v=>v>0);
-  const avgVal=curVals.length?curVals.reduce((s,v)=>s+v,0)/curVals.length:0;
+  // KPI 계산: 평균 또는 특정월 기준
+  const curVals = data.map(b => getBranchVal(b, lastIdx)).filter(v=>v>0);
+  const avgVal = curVals.length ? curVals.reduce((s,v)=>s+v,0)/curVals.length : 0;
 
   // 전년 대비 5% 목표 달성 매장 목록 저장
   const overBranches = data.filter(b=>{
-    const cur=b.months[lastIdx]||0;
-    const goal=getGoal(b.name,lastIdx);
-    return goal>0&&cur>=goal;
+    const cur = getBranchVal(b, lastIdx);
+    const goal = getGoalVal(b.name, lastIdx);
+    return goal>0 && cur>=goal;
   });
   const over = overBranches.length;
-  const hasGoal=data.filter(b=>getGoal(b.name,lastIdx)>0).length;
+  const hasGoal = data.filter(b=>getGoalVal(b.name, lastIdx)>0).length;
 
-  // 전년 대비 ±2% 유지 매장 (목표 미달성이지만 -2%~+5% 사이, 즉 98%~105% 사이)
+  // 전년 대비 ±2% 유지 매장
   const stableBranches = data.filter(b=>{
-    const cur=b.months[lastIdx]||0;
-    const v25=get25(b.name,lastIdx);
+    const cur = getBranchVal(b, lastIdx);
+    const v25 = get25Val(b.name, lastIdx);
     if(!v25||!cur) return false;
     const rate=(cur-v25)/v25*100;
-    return rate>=-2&&rate<=2; // ±2% 이내 (전년 대비 -2%~+2%)
+    return rate>=-2&&rate<=2;
   });
 
   window.__overBranches = overBranches;
   window.__stableBranches = stableBranches;
   window.__lastIdx = lastIdx;
 
-  // 전월 대비
-  const prevIdx=lastIdx>0?lastIdx-1:-1;
+  // 전월 대비 (평균 탭이면 표시 안 함)
+  const prevIdx = lastIdx>=1 ? lastIdx-1 : -1;
   let growStr='-',growCls='';
   if(prevIdx>=0){
     const sumCur=data.reduce((s,b)=>s+(b.months[lastIdx]||0),0);
@@ -1001,12 +1039,12 @@ function render(){
     });
   });
 
-  const activeCount=data.filter(b=>(b.months[lastIdx]||0)>0).length;
+  const activeCount=data.filter(b=>getBranchVal(b,lastIdx)>0).length;
   document.getElementById('k1').textContent=activeCount+'개';
-  document.getElementById('k1s').textContent='전체 '+ALL.filter(b=>(b.months[lastIdx]||0)>0).length+'개 중';
+  document.getElementById('k1s').textContent='전체 '+ALL.filter(b=>(getBranchVal(b,lastIdx))>0).length+'개 중';
   document.getElementById('k2l').textContent=monthLabel+' 평균 매출';
   document.getElementById('k2').textContent=fmt(avgVal);
-  const avgGoal=data.reduce((s,b)=>s+getGoal(b.name,lastIdx),0)/data.length;
+  const avgGoal=data.reduce((s,b)=>s+getGoalVal(b.name,lastIdx),0)/data.length;
   const d2=avgGoal>0?((avgVal-avgGoal)/avgGoal*100).toFixed(1):null;
   document.getElementById('k2s').className='ks '+(d2!==null&&parseFloat(d2)>=0?'pos':'neg');
   document.getElementById('k2s').textContent=d2!==null?`목표 대비 ${parseFloat(d2)>=0?'+':''}${d2}%`:'';
@@ -1053,15 +1091,15 @@ function render(){
 
 // KPI 매장 목록 모달
 function openKpiModal(type){
-  const lastIdx = window.__lastIdx ?? 4;
-  const monthLabel = MONTHS[lastIdx];
+  const lastIdx = window.__lastIdx ?? -2;
+  const monthLabel = getMonthLabel(lastIdx);
   let branches, title, sub;
 
   if(type==='over'){
     branches = (window.__overBranches||[]).map(b=>{
-      const cur=b.months[lastIdx]||0;
-      const v25=get25(b.name,lastIdx);
-      const goal=getGoal(b.name,lastIdx);
+      const cur=getBranchVal(b,lastIdx);
+      const v25=get25Val(b.name,lastIdx);
+      const goal=getGoalVal(b.name,lastIdx);
       const rate=v25>0?((cur-v25)/v25*100):null;
       return {...b, cur, v25, goal, rate};
     }).sort((a,b)=>b.rate-a.rate);
@@ -1069,8 +1107,8 @@ function openKpiModal(type){
     sub=`총 ${branches.length}개 매장 · 전년 동월 대비 +5% 이상 달성`;
   } else {
     branches = (window.__stableBranches||[]).map(b=>{
-      const cur=b.months[lastIdx]||0;
-      const v25=get25(b.name,lastIdx);
+      const cur=getBranchVal(b,lastIdx);
+      const v25=get25Val(b.name,lastIdx);
       const rate=v25>0?((cur-v25)/v25*100):null;
       return {...b, cur, v25, rate};
     }).sort((a,b)=>b.rate-a.rate);
