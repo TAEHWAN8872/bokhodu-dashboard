@@ -2781,27 +2781,15 @@ const REGION_PATH_MAP = {
   '광주':'gwangju','제주':'jeju'
 };
 
-// 탭별 색상 스펙트럼
+// 탭별 색상 스펙트럼 (밝은 지도 배경에 어울리도록 투명도를 낮추고 화사하게 변경)
 function getColor(ratio, tab){
   // ratio: 0~1
   if(tab==='count'){
-    // 보라 계열
-    const r = Math.round(80 + ratio*120);
-    const g = Math.round(30 + ratio*60);
-    const b = Math.round(180 + ratio*75);
-    return `rgb(${r},${g},${b})`;
+    return `rgba(34, 197, 94, ${0.15 + ratio*0.75})`; // 초록 계열
   } else if(tab==='total'){
-    // 청록 계열
-    const r = Math.round(10 + ratio*40);
-    const g = Math.round(100 + ratio*150);
-    const b = Math.round(160 + ratio*90);
-    return `rgb(${r},${g},${b})`;
+    return `rgba(59, 130, 246, ${0.15 + ratio*0.75})`; // 파랑 계열
   } else {
-    // 평균: 파랑 계열
-    const r = Math.round(20 + ratio*50);
-    const g = Math.round(100 + ratio*130);
-    const b = Math.round(200 + ratio*55);
-    return `rgb(${r},${g},${b})`;
+    return `rgba(168, 85, 247, ${0.15 + ratio*0.75})`; // 보라 계열 (평균)
   }
 }
 
@@ -2847,11 +2835,9 @@ function renderMap(){
 
   const vals = values.map(v=>v.value);
   const maxVal = Math.max(...vals) || 1;
-  const minVal = Math.min(...vals.filter(v=>v>0)) || 0;
 
   // 순위 패널
   const titles = {avg:'평균 매출 순위', count:'매장 수 순위', total:'총 매출 순위'};
-  const units = {avg:'만원', count:'개점', total:''};
   document.getElementById('rankPanelTitle').textContent = titles[tab];
 
   const rankColors = ['#fbbf24','#94a3b8','#cd7f32','#7eb8e8'];
@@ -2864,7 +2850,11 @@ function renderMap(){
     else displayVal = fmtAmt2(item.total);
 
     const ratio = maxVal>0 ? item.value/maxVal : 0;
-    const barColor = getColor(ratio, tab);
+    let barColor;
+    if(tab==='count') barColor = `rgb(${Math.round(80+ratio*120)},${Math.round(30+ratio*60)},${Math.round(180+ratio*75)})`;
+    else if(tab==='total') barColor = `rgb(${Math.round(10+ratio*40)},${Math.round(100+ratio*150)},${Math.round(160+ratio*90)})`;
+    else barColor = `rgb(${Math.round(20+ratio*50)},${Math.round(100+ratio*130)},${Math.round(200+ratio*55)})`;
+    
     const barW = Math.max(4, Math.round(ratio*100));
 
     return `<div style="margin-bottom:10px;">
@@ -2882,21 +2872,17 @@ function renderMap(){
     </div>`;
   }).join('');
 
-  // SVG 지도 렌더링
+  // SVG 지도 렌더링 (배경을 두 번째 이미지처럼 깔끔한 하얀색으로 변경)
   const container = document.getElementById('mapContainer');
   const valueMap = {};
   values.forEach(v=>{ valueMap[v.region] = v; });
 
   container.innerHTML = `
 <svg viewBox="0 0 560 680" xmlns="http://www.w3.org/2000/svg"
-  style="width:100%;height:100%;max-height:600px;">
+  style="width:100%;height:100%;max-height:600px; background-color: #fafafa; border-radius: 12px; box-shadow: inset 0 0 10px rgba(0,0,0,0.05);">
   <defs>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
     <filter id="shadow">
-      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.4"/>
+      <feDropShadow dx="1" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.1"/>
     </filter>
   </defs>
   ${buildKoreaMapPaths(valueMap, maxVal, tab)}
@@ -2904,114 +2890,35 @@ function renderMap(){
 }
 
 function buildKoreaMapPaths(valueMap, maxVal, tab){
-  // 한국 행정구역 SVG 경로 (실제 행정 경계 기반, viewBox 0 0 560 680)
+  // 한국 행정구역 SVG 경로 (제주도가 박스 안 우측 하단으로 정렬됨)
   const regions = [
-    // ── 강원도 (우상단, 큰 면적) ──
-    {id:'gangwon', name:'강원',
-     path:`M 248 62 L 262 58 L 278 55 L 300 57 L 320 62 L 338 70 L 352 82 L 358 98 L 355 116
-           L 348 132 L 338 148 L 325 160 L 310 168 L 295 172 L 280 168 L 265 158 L 252 145
-           L 240 130 L 235 112 L 236 94 L 240 78 Z`,
-     labelX:295, labelY:115, fontSize:11},
-
-    // ── 경기도 (중서부, 서울 감싸는 형태) ──
-    {id:'gyeonggi', name:'경기',
-     path:`M 148 88 L 165 80 L 185 75 L 205 76 L 225 82 L 240 92 L 248 105 L 250 120
-           L 245 135 L 235 148 L 220 158 L 202 163 L 182 162 L 162 155 L 148 142
-           L 138 128 L 135 112 L 138 98 Z`,
-     labelX:192, labelY:122, fontSize:10},
-
-    // ── 서울특별시 (경기도 내부) ──
-    {id:'seoul', name:'서울',
-     path:`M 178 100 L 194 96 L 208 100 L 214 112 L 210 124 L 196 130 L 182 128 L 172 118 Z`,
-     labelX:193, labelY:114, fontSize:8},
-
-    // ── 인천광역시 (서쪽 해안) ──
-    {id:'incheon', name:'인천',
-     path:`M 132 106 L 148 100 L 160 108 L 162 122 L 154 132 L 138 134 L 128 124 Z`,
-     labelX:146, labelY:117, fontSize:8},
-
-    // ── 충청북도 (중부 내륙) ──
-    {id:'chungbuk', name:'충북',
-     path:`M 202 165 L 230 158 L 255 162 L 268 175 L 270 194 L 262 212 L 244 222
-           L 222 224 L 202 216 L 190 200 L 190 182 Z`,
-     labelX:230, labelY:193, fontSize:10},
-
-    // ── 충청남도 (서부 해안) ──
-    {id:'chungnam', name:'충남',
-     path:`M 115 148 L 142 140 L 165 142 L 180 155 L 186 172 L 182 192 L 168 208
-           L 148 218 L 125 220 L 105 210 L 95 193 L 98 172 L 106 158 Z`,
-     labelX:140, labelY:182, fontSize:10},
-
-    // ── 세종특별자치시 ──
-    {id:'sejong', name:'세종',
-     path:`M 180 192 L 196 188 L 204 198 L 200 212 L 186 216 L 176 208 Z`,
-     labelX:190, labelY:203, fontSize:7},
-
-    // ── 대전광역시 ──
-    {id:'daejeon', name:'대전',
-     path:`M 180 215 L 200 210 L 210 222 L 205 234 L 188 238 L 175 230 Z`,
-     labelX:192, labelY:224, fontSize:7},
-
-    // ── 경상북도 (동부 내륙, 가장 큰 면적 중 하나) ──
-    {id:'gyeongbuk', name:'경북',
-     path:`M 265 160 L 295 155 L 322 162 L 342 178 L 352 200 L 350 224
-           L 338 245 L 318 260 L 295 265 L 270 260 L 252 245 L 242 225
-           L 242 205 L 248 185 L 255 170 Z`,
-     labelX:298, labelY:212, fontSize:11},
-
-    // ── 대구광역시 (경북 내부) ──
-    {id:'daegu', name:'대구',
-     path:`M 272 252 L 296 248 L 310 260 L 306 276 L 288 282 L 270 274 L 264 260 Z`,
-     labelX:288, labelY:266, fontSize:8},
-
-    // ── 전라북도 (서남부) ──
-    {id:'jeonbuk', name:'전북',
-     path:`M 120 222 L 148 216 L 172 218 L 192 228 L 205 245 L 208 265
-           L 198 282 L 176 292 L 150 292 L 126 280 L 108 262 L 108 242 Z`,
-     labelX:158, labelY:257, fontSize:10},
-
-    // ── 경상남도 (남동부) ──
-    {id:'gyeongnam', name:'경남',
-     path:`M 250 268 L 276 262 L 308 268 L 330 282 L 340 305 L 332 328
-           L 310 342 L 284 346 L 258 334 L 240 315 L 238 292 Z`,
-     labelX:290, labelY:308, fontSize:10},
-
-    // ── 울산광역시 ──
-    {id:'ulsan', name:'울산',
-     path:`M 330 255 L 354 248 L 368 262 L 364 282 L 344 290 L 326 280 Z`,
-     labelX:348, labelY:270, fontSize:8},
-
-    // ── 부산광역시 ──
-    {id:'busan', name:'부산',
-     path:`M 318 330 L 345 322 L 360 336 L 356 356 L 334 362 L 314 350 Z`,
-     labelX:337, labelY:343, fontSize:8},
-
-    // ── 전라남도 (남서부, 해안) ──
-    {id:'jeonnam', name:'전남',
-     path:`M 108 292 L 140 286 L 170 290 L 195 305 L 210 328 L 210 355
-           L 195 375 L 168 385 L 138 382 L 110 365 L 92 342 L 88 315 Z`,
-     labelX:150, labelY:338, fontSize:10},
-
-    // ── 광주광역시 (전남 내부) ──
-    {id:'gwangju', name:'광주',
-     path:`M 154 308 L 178 304 L 190 318 L 184 334 L 162 338 L 148 324 Z`,
-     labelX:170, labelY:321, fontSize:8},
-
-    // ── 제주특별자치도 ──
-    {id:'jeju', name:'제주',
-     path:`M 96 530 L 140 518 L 185 516 L 220 524 L 234 542 L 224 562
-           L 195 574 L 155 578 L 112 568 L 90 550 Z`,
-     labelX:162, labelY:548, fontSize:10},
+    {id:'gangwon', name:'강원', path:`M 248 62 L 262 58 L 278 55 L 300 57 L 320 62 L 338 70 L 352 82 L 358 98 L 355 116 L 348 132 L 338 148 L 325 160 L 310 168 L 295 172 L 280 168 L 265 158 L 252 145 L 240 130 L 235 112 L 236 94 L 240 78 Z`, labelX:295, labelY:115, fontSize:13},
+    {id:'gyeonggi', name:'경기', path:`M 148 88 L 165 80 L 185 75 L 205 76 L 225 82 L 240 92 L 248 105 L 250 120 L 245 135 L 235 148 L 220 158 L 202 163 L 182 162 L 162 155 L 148 142 L 138 128 L 135 112 L 138 98 Z`, labelX:192, labelY:122, fontSize:13},
+    {id:'seoul', name:'서울', path:`M 178 100 L 194 96 L 208 100 L 214 112 L 210 124 L 196 130 L 182 128 L 172 118 Z`, labelX:193, labelY:114, fontSize:11},
+    {id:'incheon', name:'인천', path:`M 132 106 L 148 100 L 160 108 L 162 122 L 154 132 L 138 134 L 128 124 Z`, labelX:146, labelY:117, fontSize:11},
+    {id:'chungbuk', name:'충북', path:`M 202 165 L 230 158 L 255 162 L 268 175 L 270 194 L 262 212 L 244 222 L 222 224 L 202 216 L 190 200 L 190 182 Z`, labelX:230, labelY:193, fontSize:13},
+    {id:'chungnam', name:'충남', path:`M 115 148 L 142 140 L 165 142 L 180 155 L 186 172 L 182 192 L 168 208 L 148 218 L 125 220 L 105 210 L 95 193 L 98 172 L 106 158 Z`, labelX:140, labelY:182, fontSize:13},
+    {id:'sejong', name:'세종', path:`M 180 192 L 196 188 L 204 198 L 200 212 L 186 216 L 176 208 Z`, labelX:190, labelY:203, fontSize:10},
+    {id:'daejeon', name:'대전', path:`M 180 215 L 200 210 L 210 222 L 205 234 L 188 238 L 175 230 Z`, labelX:192, labelY:224, fontSize:10},
+    {id:'gyeongbuk', name:'경북', path:`M 265 160 L 295 155 L 322 162 L 342 178 L 352 200 L 350 224 L 338 245 L 318 260 L 295 265 L 270 260 L 252 245 L 242 225 L 242 205 L 248 185 L 255 170 Z`, labelX:298, labelY:212, fontSize:13},
+    {id:'daegu', name:'대구', path:`M 272 252 L 296 248 L 310 260 L 306 276 L 288 282 L 270 274 L 264 260 Z`, labelX:288, labelY:266, fontSize:11},
+    {id:'jeonbuk', name:'전북', path:`M 120 222 L 148 216 L 172 218 L 192 228 L 205 245 L 208 265 L 198 282 L 176 292 L 150 292 L 126 280 L 108 262 L 108 242 Z`, labelX:158, labelY:257, fontSize:13},
+    {id:'gyeongnam', name:'경남', path:`M 250 268 L 276 262 L 308 268 L 330 282 L 340 305 L 332 328 L 310 342 L 284 346 L 258 334 L 240 315 L 238 292 Z`, labelX:290, labelY:308, fontSize:13},
+    {id:'ulsan', name:'울산', path:`M 330 255 L 354 248 L 368 262 L 364 282 L 344 290 L 326 280 Z`, labelX:348, labelY:270, fontSize:11},
+    {id:'busan', name:'부산', path:`M 318 330 L 345 322 L 360 336 L 356 356 L 334 362 L 314 350 Z`, labelX:337, labelY:343, fontSize:11},
+    {id:'jeonnam', name:'전남', path:`M 108 292 L 140 286 L 170 290 L 195 305 L 210 328 L 210 355 L 195 375 L 168 385 L 138 382 L 110 365 L 92 342 L 88 315 Z`, labelX:150, labelY:338, fontSize:13},
+    {id:'gwangju', name:'광주', path:`M 154 308 L 178 304 L 190 318 L 184 334 L 162 338 L 148 324 Z`, labelX:170, labelY:321, fontSize:11},
+    
+    // 제주도 좌표 수정 (우측 하단 분리 배치)
+    {id:'jeju', name:'제주', path:`M 386 520 L 430 508 L 475 506 L 510 514 L 524 532 L 514 552 L 485 564 L 445 568 L 402 558 L 380 540 Z`, labelX:452, labelY:542, fontSize:13}
   ];
 
-  // 툴팁 생성 함수
   function makeTooltip(name, stat){
     if(tab==='count') return `${name}: ${stat.count}개점`;
     if(tab==='avg') return `${name}: ${fmtAmt2(stat.avg)} (${stat.count}개점)`;
     return `${name}: ${fmtAmt2(stat.total)} (${stat.count}개점)`;
   }
 
-  // 표시값 생성
   function makeDisplayVal(stat){
     if(!stat.count) return '';
     if(tab==='count') return stat.count+'개';
@@ -3019,50 +2926,62 @@ function buildKoreaMapPaths(valueMap, maxVal, tab){
     return m>=10000 ? Math.floor(m/10000)+'억' : m.toLocaleString()+'만';
   }
 
-  // 범례 색상 스케일 바 (우하단)
+  // 외곽선 구분 상자 추가 (이미지 스타일 구현)
+  let svgContent = `
+    <rect x="50" y="80" width="50" height="50" fill="none" stroke="#cbd5e1" stroke-width="1.2" rx="4"/>
+    <path d="M 65 95 L 75 90 L 80 100 L 70 105 Z" fill="#e2e8f0" stroke="#475569" stroke-width="1"/>
+    <path d="M 60 110 L 68 112 L 65 118 Z" fill="#e2e8f0" stroke="#475569" stroke-width="1"/>
+
+    <rect x="440" y="150" width="80" height="60" fill="none" stroke="#cbd5e1" stroke-width="1.2" rx="4"/>
+    <path d="M 455 165 L 475 160 L 485 175 L 465 180 Z" fill="#e2e8f0" stroke="#475569" stroke-width="1"/>
+    <path d="M 495 185 L 505 183 L 508 190 L 498 192 Z" fill="#e2e8f0" stroke="#475569" stroke-width="1"/>
+
+    <rect x="370" y="490" width="165" height="90" fill="none" stroke="#94a3b8" stroke-width="1.5" rx="4" stroke-dasharray="2 2"/>
+    <text x="515" y="515" font-size="11" fill="#64748b" font-weight="700" font-family="'Pretendard','Noto Sans KR',sans-serif">제주</text>
+  `;
+
+  // 범례(Legend) 스타일 변경
   const legendSvg = `
     <g transform="translate(30, 630)">
-      <text x="0" y="0" font-size="9" fill="#6b8fa8" font-family="sans-serif">낮음</text>
+      <text x="0" y="0" font-size="11" fill="#475569" font-weight="700" font-family="'Pretendard','Noto Sans KR',sans-serif">낮음</text>
       <defs>
         <linearGradient id="legendGrad" x1="0" x2="1" y1="0" y2="0">
-          <stop offset="0%" stop-color="#1a3a5c"/>
-          <stop offset="50%" stop-color="${tab==='count'?'#22c55e':tab==='avg'?'#38bdf8':'#a78bfa'}"/>
-          <stop offset="100%" stop-color="${tab==='count'?'#86efac':tab==='avg'?'#7dd3fc':'#e879f9'}"/>
+          <stop offset="0%" stop-color="#f8fafc"/>
+          <stop offset="50%" stop-color="${tab==='count'?'#86efac':tab==='avg'?'#93c5fd':'#d8b4fe'}"/>
+          <stop offset="100%" stop-color="${tab==='count'?'#22c55e':tab==='avg'?'#3b82f6':'#a855f7'}"/>
         </linearGradient>
       </defs>
-      <rect x="28" y="-10" width="120" height="10" rx="3" fill="url(#legendGrad)" opacity="0.85"/>
-      <text x="154" y="0" font-size="9" fill="#6b8fa8" font-family="sans-serif">높음</text>
+      <rect x="35" y="-10" width="120" height="12" rx="3" fill="url(#legendGrad)" stroke="#cbd5e1" stroke-width="0.5"/>
+      <text x="163" y="0" font-size="11" fill="#475569" font-weight="700" font-family="'Pretendard','Noto Sans KR',sans-serif">높음</text>
     </g>`;
 
-  return regions.map(r=>{
+  // 각 지역 채우기 및 텍스트 짙게 표기
+  svgContent += regions.map(r=>{
     const stat = valueMap[r.name] || {value:0, count:0, avg:0, total:0};
     const rawVal = tab==='avg' ? stat.avg : tab==='count' ? stat.count : stat.total;
     const ratio = maxVal>0 ? rawVal/maxVal : 0;
-    const fill = stat.count>0 ? getColor(ratio, tab) : '#152236';
-    // 데이터 있는 지역: 투명도 완전히 제거, 선명하게
-    const opacity = stat.count>0 ? 1 : 0.4;
+
+    const fill = stat.count>0 ? getColor(ratio, tab) : '#f8fafc';
     const strokeW = stat.count>0 ? 1.5 : 1;
-    const isSmall = ['세종','서울','인천','대전','광주','울산','대구','부산'].includes(r.name);
     const tooltip = makeTooltip(r.name, stat);
     const displayVal = makeDisplayVal(stat);
-    const fs = r.fontSize || (isSmall ? 8 : 10);
 
     return `
-    <g class="region-path" style="opacity:${opacity};" onclick="onRegionClick('${r.name}')">
+    <g class="region-path" onclick="onRegionClick('${r.name}')" style="cursor:pointer;">
       <title>${tooltip}</title>
-      <path d="${r.path}" fill="${fill}" stroke="#0d1e30" stroke-width="${strokeW}"
-        ${stat.count>0?'filter="url(#shadow)"':''}/>
-      ${stat.count>0 ? `<path d="${r.path}" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="0.8"/>` : ''}
-      <text x="${r.labelX}" y="${r.labelY - (displayVal?6:0)}" text-anchor="middle"
-        font-size="${fs}" fill="${stat.count>0?'#ffffff':'#4a6a8a'}"
-        font-weight="700" font-family="'Noto Sans KR',sans-serif"
-        style="text-shadow:0 1px 3px rgba(0,0,0,0.9);">${r.name}</text>
-      ${displayVal ? `<text x="${r.labelX}" y="${r.labelY + 8}" text-anchor="middle"
-        font-size="${Math.max(fs-2,7)}" fill="rgba(255,255,255,0.9)"
-        font-weight="600" font-family="sans-serif"
-        style="text-shadow:0 1px 2px rgba(0,0,0,0.9);">${displayVal}</text>` : ''}
+      <path d="${r.path}" fill="${fill}" stroke="#1e293b" stroke-width="${strokeW}" 
+            ${stat.count>0?'filter="url(#shadow)"':''} 
+            style="transition: fill 0.15s;" onmouseover="this.setAttribute('fill', '#e2e8f0')" onmouseout="this.setAttribute('fill', '${fill}')"/>
+      <text x="${r.labelX}" y="${r.labelY - (displayVal?5:0)}" text-anchor="middle"
+        font-size="${r.fontSize}" fill="#0f172a"
+        font-weight="800" font-family="'Pretendard','Noto Sans KR',sans-serif">${r.name}</text>
+      ${displayVal ? `<text x="${r.labelX}" y="${r.labelY + 9}" text-anchor="middle"
+        font-size="${Math.max(r.fontSize-3, 10)}" fill="#334155"
+        font-weight="700" font-family="'Pretendard','Noto Sans KR',sans-serif">${displayVal}</text>` : ''}
     </g>`;
   }).join('') + legendSvg;
+
+  return svgContent;
 }
 
 function onRegionClick(regionName){
