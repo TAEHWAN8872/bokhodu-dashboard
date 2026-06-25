@@ -2063,7 +2063,18 @@ let menuSearchQuery = '';
 
 function onMenuSearch(val) {
   menuSearchQuery = val.trim().toLowerCase();
-  renderMenuRegionView();
+  if (currentMenuSubtab === 'manager') renderMenuManagerView();
+  else renderMenuRegionView();
+}
+
+function onMgrStoreSearch(val) {
+  menuStoreSearchQuery = val.trim().toLowerCase();
+  renderMenuManagerView();
+}
+
+function clearMgrStoreSearch() {
+  menuStoreSearchQuery = '';
+  renderMenuManagerView();
 }
 
 function clearMenuSearch() {
@@ -2092,6 +2103,7 @@ function onMenuMonthClick(monthIdx) {
   }
   currentMenuMonth = monthIdx;
   menuSearchQuery = '';
+  menuStoreSearchQuery = '';
   const sInp = document.getElementById('menuSearchInput');
   if (sInp) sInp.value = '';
   document.getElementById('menuPanelTitle').textContent = `${monthIdx}월 메뉴별 판매 현황`;
@@ -2172,7 +2184,11 @@ function selectMenuRegion(reg) {
 
 function renderMenuRegionView() {
   renderMenuRegionTabs();
-  const data = MENU_DATA_BY_MONTH[currentMenuMonth] || [];
+  const rawData = MENU_DATA_BY_MONTH[currentMenuMonth] || [];
+  // 담당자 필터 적용 (전체면 그대로)
+  const data = currentMenuManager === '전체'
+    ? rawData
+    : rawData.filter(r => getManagerForStore(r.매장) === currentMenuManager);
   const q = menuSearchQuery; // 상품명 전용 검색
 
   // ── 공통 헬퍼: 상품명 검색 필터된 데이터 ──
@@ -2643,6 +2659,7 @@ document.getElementById('menuRegionStoreModal').addEventListener('click', functi
 // ─── 담당자별 뷰 ───
 // 담당자별 메뉴 탭 현재 선택
 let currentMenuManager = '전체';
+let menuStoreSearchQuery = ''; // 담당자별 탭 매장명 검색
 
 function renderMenuManagerTabs() {
   const el = document.getElementById('menuManagerTabs');
@@ -2668,16 +2685,9 @@ function renderMenuManagerTabs() {
 function selectMenuManager(mgr) {
   currentMenuManager = mgr;
   renderMenuManagerTabs();
-  // 전체: 지역별/담당자별 서브탭 표시 / 담당자: 서브탭 숨기고 담당자뷰 강제
-  if (mgr === '전체') {
-    document.getElementById('menuSubtabRow').style.display = '';
-    switchMenuSubtab(currentMenuSubtab || 'region');
-  } else {
-    document.getElementById('menuSubtabRow').style.display = 'none';
-    document.getElementById('menuRegionView').style.display = 'none';
-    document.getElementById('menuManagerView').style.display = '';
-    renderMenuManagerView();
-  }
+  // 담당자 관계없이 서브탭 항상 표시
+  document.getElementById('menuSubtabRow').style.display = '';
+  switchMenuSubtab(currentMenuSubtab || 'region');
 }
 
 function renderMenuManagerView() {
@@ -2689,11 +2699,14 @@ function renderMenuManagerView() {
     '강동우 사원':'#a855f7','임시매장':'#6b7280'
   };
 
+  const q = menuSearchQuery;
+
   // ── 전체 선택 시: 메뉴별 요약 테이블만 ──
   if (currentMenuManager === '전체') {
     const menuMap = {};
     data.forEach(r => {
       const nm = r.상품명;
+      if (q && !nm.toLowerCase().includes(q)) return;
       if (!menuMap[nm]) menuMap[nm] = { 분류: r.상품분류, 수량: 0, 금액: 0 };
       menuMap[nm].수량 += r.수량 || 0;
       menuMap[nm].금액 += (r.수량 || 0) * (PRICE_MAP[nm] || 0);
@@ -2739,7 +2752,11 @@ function renderMenuManagerView() {
   }
 
   // ── 담당자 선택 시: 매장별 테이블 (호두% / 답례% / 사이드% / 총금액) ──
-  const filteredData = data.filter(r => getManagerForStore(r.매장) === currentMenuManager);
+  const filteredData = data.filter(r => {
+    if (getManagerForStore(r.매장) !== currentMenuManager) return false;
+    if (q && !r.상품명.toLowerCase().includes(q)) return false;
+    return true;
+  });
   const color = mgrColors[currentMenuManager] || '#6b8fa8';
 
   // 매장별 집계
@@ -2762,8 +2779,11 @@ function renderMenuManagerView() {
   const mgrTotalQty = Object.values(storeMap).reduce((s,v) => s+v.totalQty, 0);
   const mgrTotalAmt = Object.values(storeMap).reduce((s,v) => s+v.totalAmt, 0);
 
-  const storeRows = Object.entries(storeMap)
-    .sort((a,b) => b[1].totalAmt - a[1].totalAmt)
+  // 매출 기준 정렬
+  const filteredStoreEntries = Object.entries(storeMap)
+    .sort((a,b) => b[1].totalAmt - a[1].totalAmt);
+
+  const storeRows = filteredStoreEntries
     .map(([storeName, v]) => {
       const hPct = v.totalAmt ? (v.호두과자Amt/v.totalAmt*100).toFixed(0) : 0;
       const gPct = v.totalAmt ? (v.답례품Amt/v.totalAmt*100).toFixed(0) : 0;
@@ -2785,6 +2805,10 @@ function renderMenuManagerView() {
       </tr>`;
     }).join('');
 
+  const noStoreMsg = filteredStoreEntries.length === 0
+    ? `<tr><td colspan="5" style="text-align:center;color:#4a6a8a;padding:20px;">검색 결과가 없습니다</td></tr>`
+    : '';
+
   document.getElementById('menuManagerList').innerHTML = `
     <div style="display:flex;gap:10px;margin-bottom:12px;">
       <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid ${color}44;flex:1;">
@@ -2800,7 +2824,9 @@ function renderMenuManagerView() {
         <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(mgrTotalAmt)}</div>
       </div>
     </div>
-    <div style="font-size:11px;color:#6b8fa8;margin-bottom:6px;">매장별 판매 현황 <span style="font-size:10px;color:#4a6a8a;">(클릭 시 메뉴 상세)</span></div>
+    <div style="font-size:11px;color:#6b8fa8;margin-bottom:8px;">
+      매장별 판매 현황 <span style="font-size:10px;color:#4a6a8a;">(클릭 시 메뉴 상세)</span>
+    </div>
     <div style="overflow-x:auto;">
       <table class="menu-tbl">
         <thead><tr>
