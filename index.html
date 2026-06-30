@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>복호두 매출 현황판</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
@@ -3275,9 +3278,13 @@ function renderD3Map(containerId, tab, rankListId, rankTitleId, onClickRegion){
           // 서로 겹치므로, 지도 위에 직접 쓰지 않고 인출선(leader line)으로 빼서 표시한다.
           smallLabels.push({ name: regionName, centroid, fill, displayVal, hasData: stat.count>0 });
         } else {
-          const fs = 13;
+          const fs = 11;
+          const LABEL_OFFSET = { '경기': {x:-5, y:25}, '전남': {x:0, y:14} };
+          const TIGHT_GAP = ['경기'];
+          const off = LABEL_OFFSET[regionName] || {x:0,y:0};
+          const gap = TIGHT_GAP.includes(regionName) ? {name:-4, val:5} : {name:-6, val:9};
           gEl.append('text')
-            .attr('x',centroid[0]).attr('y',centroid[1]-(displayVal?6:0))
+            .attr('x',centroid[0]+off.x).attr('y',centroid[1]+off.y+(displayVal?gap.name:0))
             .attr('text-anchor','middle').attr('font-size',fs)
             .attr('fill',stat.count>0?'#fff':'#4a6a8a')
             .attr('font-weight','700').attr('font-family',"'Noto Sans KR',sans-serif")
@@ -3285,7 +3292,7 @@ function renderD3Map(containerId, tab, rankListId, rankTitleId, onClickRegion){
             .text(regionName);
           if(displayVal){
             gEl.append('text')
-              .attr('x',centroid[0]).attr('y',centroid[1]+9)
+              .attr('x',centroid[0]+off.x).attr('y',centroid[1]+off.y+gap.val)
               .attr('text-anchor','middle').attr('font-size',Math.max(fs-3,8))
               .attr('fill','rgba(255,255,255,0.9)').attr('font-weight','600')
               .attr('font-family','sans-serif').attr('pointer-events','none')
@@ -3321,27 +3328,29 @@ function renderD3Map(containerId, tab, rankListId, rankTitleId, onClickRegion){
     const leftItems = smallLabels.filter(it=>it.centroid[0] < midX).sort((a,b)=>a.centroid[1]-b.centroid[1]);
     const rightItems = smallLabels.filter(it=>it.centroid[0] >= midX).sort((a,b)=>a.centroid[1]-b.centroid[1]);
     const leaderG = g.append('g').attr('class','leader-labels');
-    const BW = 42, BH = 20, FS_NAME = 11, FS_VAL = 8.5;
+    const BW = 58, BH = 28, FS_NAME = 13, FS_VAL = 10;
 
     function layoutSide(items, side){
       if(!items.length) return;
       // 라벨 칼럼 x : 해당 그룹의 평균 위치에서 살짝 바깥쪽으로
       const avgX = d3.mean(items, it=>it.centroid[0]);
-      let colX = side==='left' ? Math.max(BW/2+6, avgX - 92) : Math.min(w-BW/2-6, avgX + 92);
+      let colX = side==='left' ? Math.max(BW/2+6, avgX - 138) : Math.min(w-BW/2-6, avgX + 138);
       // 세로 간격: 겹치지 않도록 그룹 내에서 균등 분배 (가능하면 실제 y 근처 유지)
-      const minGap = BH + 10;
+      const minGap = BH + 12;
       const ys = items.map(it=>it.centroid[1]);
-      const top = Math.max(16, Math.min(...ys) - (items.length-1)*minGap/2);
+      const top = Math.max(18, Math.min(...ys) - (items.length-1)*minGap/2);
       items.forEach((item, i)=>{
         const ly = top + i*minGap;
-        const lx = colX;
+        // 한 줄로 딱 붙어 보이지 않도록 살짝 지그재그로 어긋나게 배치
+        const stagger = (i % 2 === 0) ? 0 : (side==='left' ? -14 : 14);
+        const lx = colX + stagger;
         const labelLeftX = side==='left' ? lx - BW/2 : lx - BW/2;
         const connectFromX = side==='left' ? lx + BW/2 : lx - BW/2;
 
         // 인출선: 지역 중심점 → 라벨
         const bendX = side==='left'
-          ? Math.max(item.centroid[0] - 45, connectFromX)
-          : Math.min(item.centroid[0] + 45, connectFromX);
+          ? Math.max(item.centroid[0] - 60, connectFromX)
+          : Math.min(item.centroid[0] + 60, connectFromX);
         leaderG.append('path')
           .attr('d', `M${item.centroid[0]},${item.centroid[1]} L${bendX},${ly} L${connectFromX},${ly}`)
           .attr('fill','none')
@@ -3461,13 +3470,13 @@ function _buildLegacyKoreaPaths(valueMap, maxVal, tab){
     {id:'seoul', name:'서울',
      path:`M 178 96 L 196 90 L 212 96 L 218 110 L 214 124 L 200 132
            L 184 130 L 172 120 Z`,
-     labelX:196, labelY:112, fontSize:8},
+     labelX:196, labelY:112, fontSize:8, leaderX:150, leaderY:78},
 
     // ── 인천광역시 (경기 서쪽 해안) ──
     {id:'incheon', name:'인천',
      path:`M 116 106 L 136 98 L 152 104 L 158 118 L 152 132 L 136 138
            L 120 132 L 110 120 Z`,
-     labelX:136, labelY:118, fontSize:8},
+     labelX:136, labelY:118, fontSize:8, leaderX:74, leaderY:114},
 
     // ── 충청북도 (내륙, 바다 없음) ──
     {id:'chungbuk', name:'충북',
@@ -3486,12 +3495,12 @@ function _buildLegacyKoreaPaths(valueMap, maxVal, tab){
     // ── 세종특별자치시 (충남·충북 경계) ──
     {id:'sejong', name:'세종',
      path:`M 188 216 L 206 210 L 216 222 L 212 238 L 196 244 L 182 236 Z`,
-     labelX:200, labelY:228, fontSize:7},
+     labelX:200, labelY:228, fontSize:7, leaderX:240, leaderY:202},
 
     // ── 대전광역시 (세종 아래) ──
     {id:'daejeon', name:'대전',
      path:`M 182 248 L 204 242 L 216 256 L 210 272 L 192 278 L 176 268 Z`,
-     labelX:198, labelY:260, fontSize:7},
+     labelX:198, labelY:260, fontSize:7, leaderX:130, leaderY:258},
 
     // ── 경상북도 (동부 내륙, 한반도에서 가장 넓은 도) ──
     {id:'gyeongbuk', name:'경북',
@@ -3504,7 +3513,7 @@ function _buildLegacyKoreaPaths(valueMap, maxVal, tab){
     {id:'daegu', name:'대구',
      path:`M 312 286 L 340 278 L 358 292 L 356 316 L 334 326 L 312 316
            L 304 300 Z`,
-     labelX:334, labelY:304, fontSize:8},
+     labelX:334, labelY:304, fontSize:8, leaderX:400, leaderY:340},
 
     // ── 전라북도 (서남부 내륙+해안) ──
     {id:'jeonbuk', name:'전북',
@@ -3524,12 +3533,12 @@ function _buildLegacyKoreaPaths(valueMap, maxVal, tab){
     {id:'ulsan', name:'울산',
      path:`M 384 272 L 412 262 L 430 278 L 428 304 L 406 316 L 384 306
            L 376 290 Z`,
-     labelX:406, labelY:290, fontSize:8},
+     labelX:406, labelY:290, fontSize:8, leaderX:460, leaderY:270},
 
     // ── 부산광역시 (최남단 동해안) ──
     {id:'busan', name:'부산',
      path:`M 362 388 L 392 378 L 412 394 L 410 418 L 386 428 L 360 416 Z`,
-     labelX:388, labelY:404, fontSize:8},
+     labelX:388, labelY:404, fontSize:8, leaderX:455, leaderY:430},
 
     // ── 전라남도 (남서부, 다도해 복잡 해안) ──
     {id:'jeonnam', name:'전남',
@@ -3542,7 +3551,7 @@ function _buildLegacyKoreaPaths(valueMap, maxVal, tab){
     {id:'gwangju', name:'광주',
      path:`M 148 370 L 174 364 L 188 380 L 184 400 L 162 408 L 142 394
            L 138 376 Z`,
-     labelX:166, labelY:388, fontSize:8},
+     labelX:166, labelY:388, fontSize:8, leaderX:96, leaderY:430},
 
     // ── 제주특별자치도 (본토 남쪽 섬) ──
     {id:'jeju', name:'제주',
