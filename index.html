@@ -160,6 +160,18 @@ body.hide-names .store-name:hover{
 .kml-name{font-size:12px;color:#c8dff0;}
 .kml-mgr{font-size:10px;color:#6b8fa8;}
 .kml-right{text-align:right;}
+
+/* 지역 클릭 팝업: 화살표 + 슬라이드 인 애니메이션 */
+@keyframes regionPopIn{
+  0%{opacity:0;transform:translateY(18px) scale(0.96);}
+  100%{opacity:1;transform:translateY(0) scale(1);}
+}
+.region-modal-box{animation:regionPopIn .25s ease-out;border-color:#3b82f6;}
+.region-arrow{display:inline-block;margin-right:6px;color:#3b82f6;animation:regionArrowMove .9s ease-in-out infinite;}
+@keyframes regionArrowMove{
+  0%,100%{transform:translateX(0);}
+  50%{transform:translateX(5px);}
+}
 .kml-val{font-size:12px;font-weight:600;color:#e0f0ff;}
 .kml-rate{font-size:10px;margin-top:1px;}
 
@@ -452,6 +464,17 @@ body.hide-names .store-name:hover{
     <div class="kpi-modal-list" id="kpiModalList"></div>
   </div>
 </div>
+
+<!-- 지역 클릭 시 매장 리스트 팝업 -->
+<div class="kpi-modal-overlay" id="regionModal" style="z-index:3500;">
+  <div class="kpi-modal-box region-modal-box">
+    <button class="kpi-modal-close" onclick="closeRegionModal()">✕</button>
+    <div class="kpi-modal-title" id="regionModalTitle">-</div>
+    <div class="kpi-modal-sub" id="regionModalSub">-</div>
+    <div class="kpi-modal-list" id="regionModalList"></div>
+  </div>
+</div>
+
 
 <!-- 매장 월별 매출 모달 -->
 <div class="modal-overlay" id="branchModal">
@@ -1437,6 +1460,57 @@ function closeKpiModal(){
 }
 document.getElementById('kpiModal').addEventListener('click',function(e){
   if(e.target===this) closeKpiModal();
+});
+
+// ── 지역 클릭 시 매장 리스트 팝업 ──
+function openRegionModal(regionName){
+  const lastIdx = window.__lastIdx ?? -2;
+  const monthLabel = getMonthLabel(lastIdx);
+  const data = (ALL||[]).filter(b=>(b.region||'기타')===regionName);
+
+  const branches = data.map(b=>{
+    const cur = getBranchVal(b, lastIdx);
+    const v25 = get25Val(b.name, lastIdx);
+    const rate = v25>0 ? ((cur-v25)/v25*100) : null;
+    return {...b, cur, v25, rate};
+  }).sort((a,b)=>b.cur-a.cur);
+
+  const total = branches.reduce((s,b)=>s+b.cur,0);
+
+  document.getElementById('regionModalTitle').innerHTML = `<span class="region-arrow">➜</span>${regionName} 매장 리스트`;
+  document.getElementById('regionModalSub').textContent = `${monthLabel} 기준 · 총 ${branches.length}개 매장 · 합계 ${fmt(total)}`;
+
+  const el = document.getElementById('regionModalList');
+  if(!branches.length){
+    el.innerHTML = `<div style="text-align:center;color:#6b8fa8;font-size:12px;padding:20px;">이 지역에 등록된 매장이 없습니다.</div>`;
+  } else {
+    el.innerHTML = branches.map((b,i)=>{
+      const rateTxt = b.rate!==null ? (b.rate>=0?'+':'')+b.rate.toFixed(1)+'%' : '-%';
+      const rateCls = b.rate>=5?'pos':b.rate>=0?'warn':'neg';
+      return `<div class="kml-item" style="cursor:pointer;" onclick="closeRegionModal();openBranchModal(window.__allMap&&window.__allMap['${b.name}']||${JSON.stringify(b)})">
+        <div class="kml-left">
+          <span class="kml-rank">${i+1}</span>
+          <div>
+            <div class="kml-name store-name">${b.name}</div>
+            <div class="kml-mgr">${b.manager}</div>
+          </div>
+        </div>
+        <div class="kml-right">
+          <div class="kml-val">${fmt(b.cur)}</div>
+          <div class="kml-rate ${rateCls}">${rateTxt} (전년 ${fmt(b.v25||0)})</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('regionModal').classList.add('open');
+}
+
+function closeRegionModal(){
+  document.getElementById('regionModal').classList.remove('open');
+}
+document.getElementById('regionModal').addEventListener('click',function(e){
+  if(e.target===this) closeRegionModal();
 });
 
 // 매장 모달 열기용 allMap 준비
@@ -3367,7 +3441,9 @@ function renderD3Map(containerId, tab, rankListId, rankTitleId, onClickRegion){
           .attr('pointer-events','none');
 
         // 라벨 배지
-        const badge = leaderG.append('g').attr('pointer-events','none');
+        const badge = leaderG.append('g')
+          .attr('pointer-events','all').style('cursor','pointer')
+          .on('click', ()=>{ if(onClickRegion) onClickRegion(item.name); });
         badge.append('rect')
           .attr('x', labelLeftX).attr('y', ly-BH/2).attr('width', BW).attr('height', BH)
           .attr('rx', 4).attr('fill','rgba(13,30,48,0.92)')
@@ -3376,14 +3452,14 @@ function renderD3Map(containerId, tab, rankListId, rankTitleId, onClickRegion){
           .attr('x', lx).attr('y', ly - (item.displayVal? 2 : -3.5))
           .attr('text-anchor','middle').attr('font-size', FS_NAME)
           .attr('fill','#fff').attr('font-weight','700')
-          .attr('font-family',"'Noto Sans KR',sans-serif")
+          .attr('font-family',"'Noto Sans KR',sans-serif").attr('pointer-events','none')
           .text(item.name);
         if(item.displayVal){
           badge.append('text')
             .attr('x', lx).attr('y', ly + 8)
             .attr('text-anchor','middle').attr('font-size', FS_VAL)
             .attr('fill','rgba(255,255,255,0.9)').attr('font-weight','600')
-            .attr('font-family','sans-serif')
+            .attr('font-family','sans-serif').attr('pointer-events','none')
             .text(item.displayVal);
         }
       });
@@ -3425,9 +3501,7 @@ function mapZoomReset(){
 // ── 모달 지도 렌더링 ──
 function renderMap(){
   renderD3Map('mapContainer', currentMapTab, 'mapRankList', 'rankPanelTitle', (regionName)=>{
-    closeMapModal();
-    const regions = window.__regionList || [];
-    if(regions.indexOf(regionName)>=0){ setRegion(regionName); updateTabActive(); }
+    openRegionModal(regionName);
   });
 }
 
