@@ -1988,7 +1988,8 @@ document.getElementById('fileInput').addEventListener('change',function(e){
   renderRegionTabs();
   renderMonthTabs();
   render();
-  document.getElementById('lastUpdate').textContent='26년(1~5월) + 25년 연간 데이터 · '+ALL.length+'개 매장';
+  const _now = new Date();
+  document.getElementById('lastUpdate').textContent='26년(1~5월) + 25년 연간 데이터 · '+ALL.length+'개 매장 · '+_now.toLocaleDateString('ko-KR')+' '+_now.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+' 기준';
 })();
 
 
