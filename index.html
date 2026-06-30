@@ -241,7 +241,7 @@ body.hide-names .store-name:hover{
         <input type="file" id="fileInput" accept=".csv">
       </label>
       <button class="upload-btn" onclick="openMapModal()" style="border-color:#a78bfa;color:#a78bfa;cursor:pointer;">
-        🗺️ 그래프 만들기
+        🗺️ 지도
       </button>
       <button class="upload-btn" id="maskBtn" onclick="toggleMaskNames()" style="border-color:#6b8fa8;color:#6b8fa8;cursor:pointer;">
         👁️ 매장명 가리기
@@ -2066,7 +2066,7 @@ document.getElementById('fileInput').addEventListener('change',function(e){
   renderRegionTabs();
   renderMonthTabs();
   render();
-  const LAST_EDITED = '2026-06-30 15:41';
+  const LAST_EDITED = '2026-06-30 15:43';
   document.getElementById('lastUpdate').textContent='26년(1~5월) + 25년 연간 데이터 · '+ALL.length+'개 매장 · '+LAST_EDITED+' 수정';
 })();
 
