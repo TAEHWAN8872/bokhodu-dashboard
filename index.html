@@ -1623,9 +1623,8 @@ function openBranchModal(b){
     const logRows = MONTHS.map((mon,i)=>{
       const lv = logData[i]||0;
       const sv = b.months[i]||0;
-      if(lv===0 && sv===0) return null;
       const ratio = (sv>0 && lv>0) ? (lv/sv*100).toFixed(1) : null;
-      const lvStr = lv>0 ? fmtD(Math.round(lv/10000)) : '-';
+      const lvStr = fmtD(Math.round(lv/10000));
       const ratioColor = ratio==null ? '#6b8fa8' : parseFloat(ratio)>=30 ? '#e05555' : parseFloat(ratio)>=20 ? '#f0a04a' : '#3db87a';
       const ratioStr = ratio!=null ? ratio+'%' : '-';
       return `<div style="min-width:80px;flex:1;background:#0a1220;border-radius:7px;padding:7px 8px;border:0.5px solid #1a2f44;text-align:center;">
