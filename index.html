@@ -2348,24 +2348,47 @@ function selectMenuRegion(reg) {
 }
 
 // ── 공통: 카테고리 비율 바 HTML 생성 ──
-function makeCatRatioBar(rows, totalAmt) {
-  // rows: [{상품명, 수량, ...}] 또는 [{nm, qty, amt, cat}] 형태 모두 지원
-  // 직접 호두/답례/사이드 Amt 집계
+// rows: [{상품명, 수량, ...}] 또는 [{nm, qty, amt, cat}] 형태 모두 지원
+// modalTitle을 넘기면 카드 클릭 시 전체 상품 목록 모달이 뜬다.
+function makeCatRatioBar(rows, totalAmt, modalTitle) {
   let hAmt = 0, gAmt = 0, sAmt = 0;
+  const prodMap = {};
   rows.forEach(r => {
-    const cat = r.cat !== undefined ? r.cat : getCategory(r.상품명 || r.nm || '');
+    const nm = r.nm || r.상품명 || '';
+    const cat = r.cat !== undefined ? r.cat : getCategory(nm);
     const amt = r.amt !== undefined ? r.amt : (r.금액 !== undefined ? r.금액 : 0);
+    const qty = r.qty !== undefined ? r.qty : (r.수량 || 0);
     if (cat === '호두과자') hAmt += amt;
     else if (cat === '답례품') gAmt += amt;
     else sAmt += amt;
+    if (nm) {
+      if (!prodMap[nm]) prodMap[nm] = { cat, qty: 0, amt: 0 };
+      prodMap[nm].qty += qty;
+      prodMap[nm].amt += amt;
+    }
   });
   const base = totalAmt || (hAmt + gAmt + sAmt);
   if (!base) return '';
   const hPct = (hAmt / base * 100).toFixed(1);
   const gPct = (gAmt / base * 100).toFixed(1);
   const sPct = (sAmt / base * 100).toFixed(1);
+
+  // 클릭 시 전체 상품 모달을 띄우기 위한 데이터 (상품명이 있는 경우에만)
+  const hasProducts = Object.keys(prodMap).length > 0;
+  let clickAttr = '', hint = '';
+  if (hasProducts) {
+    const totalQty = Object.values(prodMap).reduce((s, v) => s + v.qty, 0);
+    const payload = encodeURIComponent(JSON.stringify({
+      title: modalTitle || '전체 상품 현황',
+      totalQty, totalAmt: base, products: prodMap
+    }));
+    clickAttr = ` onclick="openAllProductsModal(decodeURIComponent('${payload}'))"`;
+    hint = `<div style="font-size:9px;color:#4a6a8a;margin-top:6px;">🔍 클릭 시 전체 상품 보기</div>`;
+  }
+
   return `
-    <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid #1e3347;flex:1;min-width:200px;">
+    <div class="cat-ratio-card"${clickAttr} style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid #1e3347;flex:1;min-width:200px;${hasProducts ? 'cursor:pointer;transition:background .15s,border-color .15s;' : ''}"
+      ${hasProducts ? `onmouseover="this.style.background='#132436';this.style.borderColor='#2a5a8a'" onmouseout="this.style.background='#0d1b2a';this.style.borderColor='#1e3347'"` : ''}>
       <div style="font-size:10px;color:#6b8fa8;margin-bottom:6px;">카테고리 비율</div>
       <div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-bottom:6px;">
         <div style="width:${hPct}%;background:#4ade80;" title="호두과자"></div>
@@ -2377,7 +2400,49 @@ function makeCatRatioBar(rows, totalAmt) {
         <span style="font-size:10px;"><span style="color:#facc15;">■</span> 답례품 <span style="color:#e0f0ff;font-weight:600;">${gPct}%</span></span>
         <span style="font-size:10px;"><span style="color:#60a5fa;">■</span> 사이드 <span style="color:#e0f0ff;font-weight:600;">${sPct}%</span></span>
       </div>
+      ${hint}
     </div>`;
+}
+
+// ── 카테고리 비율 카드 클릭 → 전체 상품 목록 모달 (기존 미사용 menuRegionModal 재사용) ──
+function openAllProductsModal(jsonStr) {
+  let data;
+  try { data = JSON.parse(jsonStr); } catch (e) { return; }
+  const products = data.products || {};
+  const totalAmt = data.totalAmt || 0;
+
+  document.getElementById('menuRegionModalTitle').textContent = (data.title || '전체 상품 현황');
+  document.getElementById('menuRegionModalSub').textContent =
+    `총 ${(data.totalQty || 0).toLocaleString()}개 · ${fmtAmt(totalAmt)} · 상품 ${Object.keys(products).length}종`;
+
+  const rows = Object.entries(products)
+    .sort((a, b) => b[1].amt - a[1].amt)
+    .map(([nm, v]) => {
+      const cls = v.cat === '호두과자' ? 'cat-walnut' : v.cat === '답례품' ? 'cat-gift' : 'cat-side';
+      const pct = totalAmt ? (v.amt / totalAmt * 100).toFixed(1) : '0.0';
+      return `<tr>
+        <td style="min-width:160px;">${nm}</td>
+        <td><span class="menu-cat-badge ${cls}">${v.cat}</span></td>
+        <td class="val" style="min-width:70px;">${v.qty.toLocaleString()}</td>
+        <td class="pct" style="min-width:55px;">${pct}%</td>
+        <td class="amt" style="min-width:90px;">${fmtAmt(v.amt)}</td>
+      </tr>`;
+    }).join('');
+
+  document.getElementById('menuRegionModalBody').innerHTML = `
+    <div style="overflow-x:auto;">
+      <table class="menu-tbl">
+        <thead><tr>
+          <th style="min-width:160px;">상품명</th>
+          <th style="min-width:60px;">분류</th>
+          <th style="text-align:right;min-width:70px;">수량</th>
+          <th style="text-align:right;min-width:55px;">매출비율</th>
+          <th style="text-align:right;min-width:90px;">금액</th>
+        </tr></thead>
+        <tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#4a6a8a;padding:16px;">데이터 없음</td></tr>'}</tbody>
+      </table>
+    </div>`;
+  document.getElementById('menuRegionModal').classList.add('open');
 }
 
 function renderMenuRegionView() {
@@ -2525,7 +2590,7 @@ function renderMenuRegionView() {
           <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 매출금액</div>
           <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(regTotalAmt)}</div>
         </div>
-        ${makeCatRatioBar(baseData.map(r=>({cat:getCategory(r.상품명),amt:(r.수량||0)*(PRICE_MAP[r.상품명]||0)})), regTotalAmt)}
+        ${makeCatRatioBar(baseData.map(r=>({nm:r.상품명,cat:getCategory(r.상품명),qty:r.수량||0,amt:(r.수량||0)*(PRICE_MAP[r.상품명]||0)})), regTotalAmt, `${currentMenuRegion} — 전체 상품 현황`)}
       </div>
       ${prodAnalysis}
       <div style="font-size:11px;color:#6b8fa8;margin-bottom:6px;">
@@ -2616,7 +2681,7 @@ function renderMenuRegionView() {
           <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 매출금액</div>
           <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(grandTotal)}</div>
         </div>
-        ${makeCatRatioBar(filteredData.map(r=>({cat:getCategory(r.상품명),amt:(r.수량||0)*(PRICE_MAP[r.상품명]||0)})), grandTotal)}
+        ${makeCatRatioBar(filteredData.map(r=>({nm:r.상품명,cat:getCategory(r.상품명),qty:r.수량||0,amt:(r.수량||0)*(PRICE_MAP[r.상품명]||0)})), grandTotal, '전체 지역 — 전체 상품 현황')}
       </div>
       ${prodAnalysis}
       <div style="font-size:11px;color:#6b8fa8;margin-bottom:8px;">
@@ -2778,7 +2843,7 @@ function renderMenuRegionView() {
         <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 매출금액</div>
         <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(regTotalAmt)}</div>
       </div>
-      ${makeCatRatioBar(baseData.map(r=>({cat:getCategory(r.상품명),amt:(r.수량||0)*(PRICE_MAP[r.상품명]||0)})), regTotalAmt)}
+      ${makeCatRatioBar(baseData.map(r=>({nm:r.상품명,cat:getCategory(r.상품명),qty:r.수량||0,amt:(r.수량||0)*(PRICE_MAP[r.상품명]||0)})), regTotalAmt, `${currentMenuRegion} — 전체 상품 현황`)}
     </div>
     ${prodAnalysis}
     ${!q ? `<div style="font-size:11px;color:#6b8fa8;margin-bottom:6px;">메뉴별 판매 현황</div>
@@ -2939,7 +3004,7 @@ function renderMenuManagerView() {
           <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 매출금액</div>
           <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(totalAmt)}</div>
         </div>
-        ${makeCatRatioBar(Object.entries(menuMap).map(([nm,v])=>({cat:v.분류==='호두과자'?'호두과자':v.분류==='답례품'?'답례품':'사이드',amt:v.금액})), totalAmt)}
+        ${makeCatRatioBar(Object.entries(menuMap).map(([nm,v])=>({nm,cat:v.분류==='호두과자'?'호두과자':v.분류==='답례품'?'답례품':'사이드',qty:v.수량,amt:v.금액})), totalAmt, '전체 상품 현황')}
       </div>
       <div style="font-size:11px;color:#6b8fa8;margin-bottom:6px;">메뉴별 판매 현황</div>
       <div style="overflow-x:auto;">
@@ -3029,7 +3094,7 @@ function renderMenuManagerView() {
         <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 매출금액</div>
         <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(mgrTotalAmt)}</div>
       </div>
-      ${makeCatRatioBar(filteredData.map(r=>({cat:getCategory(r.상품명),amt:(r.수량||0)*(PRICE_MAP[r.상품명]||0)})), mgrTotalAmt)}
+      ${makeCatRatioBar(filteredData.map(r=>({nm:r.상품명,cat:getCategory(r.상품명),qty:r.수량||0,amt:(r.수량||0)*(PRICE_MAP[r.상품명]||0)})), mgrTotalAmt, `${currentMenuManager} — 전체 상품 현황`)}
     </div>
     <div style="font-size:11px;color:#6b8fa8;margin-bottom:8px;">
       매장별 판매 현황 <span style="font-size:10px;color:#4a6a8a;">(클릭 시 메뉴 상세)</span>
