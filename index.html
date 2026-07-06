@@ -143,6 +143,9 @@ body.hide-names .store-name:hover{
 /* KPI 클릭 가능 */
 .kpi-click{cursor:pointer;transition:border-color .2s,background .2s;}
 .kpi-click:hover{border-color:#2a5a8a;background:#172840;}
+.analysis-tab{font-size:10px;padding:4px 10px;border-radius:6px;border:0.5px solid #2a5a8a;color:#7eb8e8;cursor:pointer;background:transparent;white-space:nowrap;}
+.analysis-tab:hover{background:#172840;}
+.analysis-tab.active{background:rgba(56,189,248,0.2);border-color:#38bdf8;color:#38bdf8;font-weight:700;}
 
 /* KPI 매장 목록 모달 */
 .kpi-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;align-items:center;justify-content:center;}
@@ -238,7 +241,7 @@ body.hide-names .store-name:hover{
     <div class="top-right">
       <span class="last-update" id="lastUpdate">데이터 로딩 중...</span>
       <button class="upload-btn" onclick="openCumulModal()" style="border-color:#38bdf8;color:#38bdf8;cursor:pointer;">
-        📊 매출 분석
+        📈 누적
       </button>
       <button class="upload-btn" onclick="openMapModal()" style="border-color:#a78bfa;color:#a78bfa;cursor:pointer;">
         🗺️ 지도
@@ -347,6 +350,15 @@ body.hide-names .store-name:hover{
     <div class="kpi kpi-click" id="kpi3" onclick="openKpiModal('over')" title="클릭하여 달성 매장 보기"><div class="kl" id="k3l">전년 동월 대비 5%↑ 목표 달성</div><div class="kv" id="k3">-</div><div class="ks" id="k3s">-</div></div>
     <div class="kpi kpi-click" id="kpi6" onclick="openKpiModal('stable')" title="클릭하여 매장 보기"><div class="kl" id="k6l">전년비 ±2% 유지 매장</div><div class="kv" id="k6">-</div><div class="ks" id="k6s">-</div></div>
     <div class="kpi"><div class="kl">전월 대비 성장</div><div class="kv" id="k4">-</div><div class="ks" id="k4s">-</div></div>
+    <div class="kpi" style="border-color:#38bdf8;">
+      <div class="kl" style="color:#38bdf8;margin-bottom:8px;">📊 매출 분석</div>
+      <div style="display:flex;gap:4px;margin-bottom:8px;">
+        <div class="analysis-tab active" data-atab="cumul" onclick="setAnalysisTab('cumul', true)">누적</div>
+        <div class="analysis-tab" data-atab="walnut" onclick="setAnalysisTab('walnut', true)">호두과자</div>
+        <div class="analysis-tab" data-atab="gift" onclick="setAnalysisTab('gift', true)">답례품</div>
+      </div>
+      <div id="analysisTabContent"></div>
+    </div>
     <div class="kpi"><div class="kl">최고 매출 매장</div><div class="kv" id="k5" style="font-size:16px;">-</div><div class="ks" id="k5s" style="color:#6b8fa8;">-</div></div>
   </div>
 
@@ -1649,6 +1661,22 @@ document.getElementById('cumulModal').addEventListener('click',function(e){
   if(e.target===this) closeCumulModal();
 });
 
+function setAnalysisTab(tab, userClick){
+  document.querySelectorAll('.analysis-tab').forEach(t=>{
+    t.classList.toggle('active', t.dataset.atab===tab);
+  });
+  const el = document.getElementById('analysisTabContent');
+  if(!el) return;
+  if(tab==='cumul'){
+    el.innerHTML = `<div class="ks" style="color:#6b8fa8;">클릭하여 자세히 보기</div>`;
+    if(userClick) openCumulModal();
+  } else if(tab==='walnut'){
+    el.innerHTML = `<div class="ks" style="color:#6b8fa8;">호두과자 매출 분석은 준비 중입니다.</div>`;
+  } else if(tab==='gift'){
+    el.innerHTML = `<div class="ks" style="color:#6b8fa8;">답례품 매출 분석은 준비 중입니다.</div>`;
+  }
+}
+
 function openCumulModal(){
   const data = filtered();
   const LOGISTICS = window.LOGISTICS || {};
@@ -2047,6 +2075,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   renderRegionTabs();
   renderMonthTabs();
   render();
+  setAnalysisTab('cumul');
   const LAST_EDITED = '2026-07-03';
   document.getElementById('lastUpdate').textContent='26년(1~6월) + 25년 연간 데이터 · '+ALL.length+'개 매장 · '+LAST_EDITED+' 수정';
 })();
