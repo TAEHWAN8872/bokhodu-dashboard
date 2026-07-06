@@ -23,7 +23,6 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 .last-update{font-size:11px;color:#6b8fa8;}
 .upload-btn{font-size:11px;padding:5px 12px;background:#1a3a5c;border:0.5px solid #2a5a8a;color:#7eb8e8;border-radius:6px;cursor:pointer;}
 .upload-btn:hover{background:#1e4a70;}
-#fileInput{display:none;}
 /* 매장명 가리기 */
 body.hide-names .store-name{
   filter:blur(5px);
@@ -238,10 +237,9 @@ body.hide-names .store-name:hover{
     <div class="brand"><span class="dot"></span><span>복호두 매출 현황판</span></div>
     <div class="top-right">
       <span class="last-update" id="lastUpdate">데이터 로딩 중...</span>
-      <label class="upload-btn">
-        📂 CSV 업데이트
-        <input type="file" id="fileInput" accept=".csv">
-      </label>
+      <button class="upload-btn" onclick="openCumulModal()" style="border-color:#38bdf8;color:#38bdf8;cursor:pointer;">
+        📊 매출 분석
+      </button>
       <button class="upload-btn" onclick="openMapModal()" style="border-color:#a78bfa;color:#a78bfa;cursor:pointer;">
         🗺️ 지도
       </button>
@@ -609,27 +607,6 @@ function getGoal(name, monthIdx){
   return v25 > 0 ? Math.round(v25 * (1 + GOAL_GROWTH)) : 0;
 }
 
-// CSV 파싱 (26년 데이터용)
-function parseCSV(text){
-  const lines = text.trim().split('\n');
-  const result = [];
-  for(let i=1;i<lines.length;i++){
-    const cols = lines[i].split(',');
-    if(cols.length < 4) continue;
-    const months = cols.slice(3,15).map(v=>parseInt(v)||0);
-    const vals = months.filter(v=>v>0);
-    if(!vals.length) continue;
-    result.push({
-      no: parseInt(cols[0])||i,
-      manager: cols[1].trim(),
-      name: cols[2].trim(),
-      region: cols.length>15 ? cols[3].trim() : '기타',
-      months: months
-    });
-  }
-  return result;
-}
-
 function filtered(){
   let d = currentFilter==='all' ? ALL : ALL.filter(b=>b.manager===currentFilter);
   if(currentRegion!=='all') d = d.filter(b=>b.region===currentRegion);
@@ -697,10 +674,9 @@ function renderMonthTabs(){
   window.__monthIdxList = availableIdx;
   const el = document.getElementById('monthTabs');
   if(!el) return;
-  // "평균" 탭 + "누적" 탭 + 각 월 탭
+  // "평균" 탭 + 각 월 탭 (누적은 상단 "매출 분석" 카드로 이동)
   const tabs = [
     `<div class="tab month-tab" id="mtab-auto" data-midx="-1" onclick="setMonth(-1)">평균</div>`,
-    `<div class="tab month-tab" id="mtab-cumul" data-midx="-3" onclick="openCumulModal()" style="border-color:#a78bfa;color:#a78bfa;">누적 📊</div>`,
     ...availableIdx.map(i =>
       `<div class="tab month-tab" id="mtab-${i}" data-midx="${i}" onclick="setMonth(${i})">${MONTHS[i]}</div>`
     )
@@ -2050,33 +2026,6 @@ function openLogBucketModal(bk, monthLabel){
 }
 document.getElementById('logBucketModal').addEventListener('click',function(e){
   if(e.target===this) this.classList.remove('open');
-});
-
-function loadCSV(text, filename){
-  const parsed=parseCSV(text);
-  if(!parsed.length){ alert('CSV 파싱 실패'); return; }
-  ALL=parsed;
-  currentFilter='all';
-  currentSearch='';
-  selectedMonthIdx=-1;
-  document.getElementById('branchSearch').value='';
-  document.getElementById('searchClear').style.display='none';
-  renderTabs();
-  renderRegionTabs();
-  renderMonthTabs();
-  render();
-  const now=new Date();
-  document.getElementById('lastUpdate').textContent=
-    `${filename} · ${now.toLocaleDateString('ko-KR')} ${now.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})} 업데이트`;
-}
-
-document.getElementById('fileInput').addEventListener('change',function(e){
-  const file=e.target.files[0];
-  if(!file) return;
-  const reader=new FileReader();
-  reader.onload=ev=>loadCSV(ev.target.result, file.name);
-  reader.readAsText(file,'UTF-8');
-  e.target.value='';
 });
 
 // ===== 내장 데이터 =====
