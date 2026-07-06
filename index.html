@@ -2416,6 +2416,7 @@ function openAllProductsModal(jsonStr) {
     `총 ${(data.totalQty || 0).toLocaleString()}개 · ${fmtAmt(totalAmt)} · 상품 ${Object.keys(products).length}종`;
 
   const rows = Object.entries(products)
+    .filter(([nm, v]) => nm && (v.qty || 0) > 0)
     .sort((a, b) => b[1].amt - a[1].amt)
     .map(([nm, v]) => {
       const cls = v.cat === '호두과자' ? 'cat-walnut' : v.cat === '답례품' ? 'cat-gift' : 'cat-side';
@@ -2567,7 +2568,7 @@ function renderMenuRegionView() {
             <th style="text-align:right;">비율</th>
             <th style="text-align:right;">금액</th>
           </tr></thead>
-          <tbody>${Object.entries(prodMap).sort((a,b)=>b[1].amt-a[1].amt).map(([nm,v])=>{
+          <tbody>${Object.entries(prodMap).filter(([nm,v])=>nm&&(v.qty||0)>0).sort((a,b)=>b[1].amt-a[1].amt).map(([nm,v])=>{
             const cls = v.cat==='호두과자'?'cat-walnut':v.cat==='답례품'?'cat-gift':'cat-side';
             const pct = prodTotal?(v.amt/prodTotal*100).toFixed(1):'0.0';
             return `<tr><td>${nm}</td><td><span class="menu-cat-badge ${cls}">${v.cat}</span></td>
@@ -2662,7 +2663,7 @@ function renderMenuRegionView() {
         <div style="font-size:10px;color:#6b8fa8;margin-bottom:6px;">상품별 분석</div>
         <table class="menu-tbl" style="font-size:11px;">
           <thead><tr><th>상품명</th><th>분류</th><th style="text-align:right;">수량</th><th style="text-align:right;">비율</th><th style="text-align:right;">금액</th></tr></thead>
-          <tbody>${Object.entries(prodMap).sort((a,b)=>b[1].amt-a[1].amt).map(([nm,v])=>{
+          <tbody>${Object.entries(prodMap).filter(([nm,v])=>nm&&(v.qty||0)>0).sort((a,b)=>b[1].amt-a[1].amt).map(([nm,v])=>{
             const cls=v.cat==='호두과자'?'cat-walnut':v.cat==='답례품'?'cat-gift':'cat-side';
             const pct=prodTotal?(v.amt/prodTotal*100).toFixed(1):'0.0';
             return `<tr><td>${nm}</td><td><span class="menu-cat-badge ${cls}">${v.cat}</span></td>
@@ -2770,7 +2771,7 @@ function renderMenuRegionView() {
     storeMap[s].menus[r.상품명].amt+=amt;
   });
 
-  const menuRows = Object.entries(menuMap).sort((a,b)=>b[1].amt-a[1].amt).map(([nm,v])=>{
+  const menuRows = Object.entries(menuMap).filter(([nm,v])=>nm&&(v.qty||0)>0).sort((a,b)=>b[1].amt-a[1].amt).map(([nm,v])=>{
     const cls=v.cat==='호두과자'?'cat-walnut':v.cat==='답례품'?'cat-gift':'cat-side';
     const pct=menuTotal?(v.amt/menuTotal*100).toFixed(1):'0.0';
     return `<tr><td>${nm}</td><td><span class="menu-cat-badge ${cls}">${v.cat}</span></td>
@@ -2881,6 +2882,7 @@ function openMenuRegionStoreModal(storeName, totalQty, totalAmt, menusJsonStr) {
     `총 ${totalQty.toLocaleString()}개 · ${fmtAmt(totalAmt)}`;
 
   const rows = Object.entries(menus)
+    .filter(([nm, v]) => nm && (v.qty || 0) > 0)
     .sort((a, b) => b[1].amt - a[1].amt)
     .map(([nm, v]) => {
       const cat = v.cat || getCategory(nm);
@@ -2983,7 +2985,7 @@ function renderMenuManagerView() {
     });
     const totalQty = Object.values(menuMap).reduce((s,v) => s+v.수량, 0);
     const totalAmt = Object.values(menuMap).reduce((s,v) => s+v.금액, 0);
-    const rows = Object.entries(menuMap).sort((a,b) => b[1].금액-a[1].금액).map(([nm,v]) => {
+    const rows = Object.entries(menuMap).filter(([nm,v])=>nm&&(v.수량||0)>0).sort((a,b) => b[1].금액-a[1].금액).map(([nm,v]) => {
       const catClass = v.분류==='호두과자'?'cat-walnut':v.분류==='답례품'?'cat-gift':'cat-side';
       const pct = totalAmt ? (v.금액/totalAmt*100).toFixed(1) : '0.0';
       return `<tr>
@@ -3124,6 +3126,7 @@ function openMenuStoreModal(storeName, totalQty, totalAmt, menusJsonStr) {
     `총 ${totalQty.toLocaleString()}개 · ${fmtAmt(totalAmt)}`;
 
   const rows = Object.entries(menus)
+    .filter(([nm, v]) => nm && ((v.수량 !== undefined ? v.수량 : (v.qty || 0)) > 0))
     .sort((a,b) => (b[1].금액||b[1].amt||0)-(a[1].금액||a[1].amt||0))
     .map(([nm, v]) => {
       const cat = v.분류 || v.cat || getCategory(nm);
