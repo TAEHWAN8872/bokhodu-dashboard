@@ -821,6 +821,9 @@ function renderTrend(data){
     const avgMin=avgVals.length?Math.min(...avgVals):0;
     const avgMax=avgVals.length?Math.max(...avgVals):1;
     const avgPad=Math.round((avgMax-avgMin)*0.2)||500;
+    // 최소값 대비 살짝 낮은 값으로 축 하단을 잡아, 매출이 낮은 달도 막대가 조금이라도 보이게 함
+    const avgMinPad = Math.max(Math.round(avgMin*0.1), 200);
+    const y2Min = Math.max(0, avgMin - avgMinPad);
 
     charts.trend=new Chart(document.getElementById('trendChart'),{
       type:'bar',
@@ -890,7 +893,7 @@ function renderTrend(data){
               if(v>=10000) return (v/10000).toFixed(1)+'억';
               return v.toLocaleString()+'만';
             }},grid:{color:'#1a2f44'}},
-          y2:{position:'right',min:2000,max:avgMax+avgPad,
+          y2:{position:'right',min:y2Min,max:avgMax+avgPad,
             title:{display:false},
             ticks:{color:'#fbbf24',font:{size:10},callback:v=>{
               if(v>=10000) return (v/10000).toFixed(1)+'억';
