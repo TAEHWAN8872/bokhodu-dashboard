@@ -53,6 +53,8 @@ body.hide-names .store-name:hover{
 .tab[data-color="박영태 대리"].active{background:rgba(59,130,246,0.25);border-color:#3b82f6;color:#3b82f6;}
 .tab[data-color="강동우 사원"]{border-color:#a855f7;color:#a855f7;}
 .tab[data-color="강동우 사원"].active{background:rgba(168,85,247,0.25);border-color:#a855f7;color:#a855f7;}
+.tab[data-color="이현민 사원"]{border-color:#f472b6;color:#f472b6;}
+.tab[data-color="이현민 사원"].active{background:rgba(244,114,182,0.25);border-color:#f472b6;color:#f472b6;}
 .tab[data-region="서울"].active{background:rgba(59,130,246,0.2);border-color:#3b82f6;color:#3b82f6;}
 .tab[data-region="서울"]:hover{border-color:#3b82f6;color:#3b82f6;}
 .tab[data-region="경기"].active{background:rgba(34,197,94,0.2);border-color:#22c55e;color:#22c55e;}
@@ -641,7 +643,7 @@ function setFilter(f){
 }
 
 function renderTabs(){
-  const ORDER=['김태환 과장','임도형 과장','이중섭 대리','박영태 대리','강동우 사원'];
+  const ORDER=['김태환 과장','임도형 과장','이중섭 대리','박영태 대리','강동우 사원','이현민 사원'];
   const existing=new Set(ALL.map(b=>b.manager));
   const sorted=ORDER.filter(m=>existing.has(m));
   const others=[...existing].filter(m=>!ORDER.includes(m)).sort();
@@ -2949,7 +2951,7 @@ function renderMenuManagerTabs() {
   const mgrColors = {
     '김태환 과장':'#22c55e','임도형 과장':'#ef4444',
     '이중섭 대리':'#facc15','박영태 대리':'#3b82f6',
-    '강동우 사원':'#a855f7','이현민 사원':'#6b7280'
+    '강동우 사원':'#a855f7','이현민 사원':'#f472b6'
   };
   el.innerHTML = ORDER.map(mgr => {
     const color = mgr === '전체' ? '#7eb8e8' : (mgrColors[mgr] || '#6b8fa8');
@@ -2977,7 +2979,7 @@ function renderMenuManagerView() {
   const mgrColors = {
     '김태환 과장':'#22c55e','임도형 과장':'#ef4444',
     '이중섭 대리':'#facc15','박영태 대리':'#3b82f6',
-    '강동우 사원':'#a855f7','이현민 사원':'#6b7280'
+    '강동우 사원':'#a855f7','이현민 사원':'#f472b6'
   };
 
   const q = menuSearchQuery;
