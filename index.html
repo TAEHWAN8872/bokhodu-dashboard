@@ -1777,8 +1777,10 @@ function openWalnutModal(){
   }).join('');
   const totalStore25 = storeCount25[storeCount25.length-1] || 0;
   const totalStore26 = storeCount26[storeCount26.length-1] || 0;
-  const totalAvg25 = totalStore25 ? (total25/totalStore25) : 0;
-  const totalAvg26 = totalStore26 ? (total26/totalStore26) : 0;
+  const storeMonths25 = storeCount25.reduce((a,b)=>a+b,0);
+  const storeMonths26 = storeCount26.reduce((a,b)=>a+b,0);
+  const totalAvg25 = storeMonths25 ? (total25/storeMonths25) : 0;
+  const totalAvg26 = storeMonths26 ? (total26/storeMonths26) : 0;
   const totalAvgDiff = totalAvg26 - totalAvg25;
   const totalAvgDiffPct = totalAvg25 ? ((totalAvgDiff/totalAvg25)*100).toFixed(1) : '-';
   const totalAvgDiffColor = totalAvg26>=totalAvg25 ? '#4ade80' : '#f87171';
