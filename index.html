@@ -1775,8 +1775,8 @@ function openWalnutModal(){
       <td style="padding:5px 10px;text-align:right;color:${avgDiffColor};">${avgDiffPct}%</td>
     </tr>`;
   }).join('');
-  const totalStore25 = storeCount25.reduce((a,b)=>a+b,0);
-  const totalStore26 = storeCount26.reduce((a,b)=>a+b,0);
+  const totalStore25 = storeCount25[storeCount25.length-1] || 0;
+  const totalStore26 = storeCount26[storeCount26.length-1] || 0;
   const totalAvg25 = totalStore25 ? (total25/totalStore25) : 0;
   const totalAvg26 = totalStore26 ? (total26/totalStore26) : 0;
   const totalAvgDiff = totalAvg26 - totalAvg25;
