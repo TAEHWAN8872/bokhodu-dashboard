@@ -3016,8 +3016,13 @@ function renderMenuRegionView() {
     const sorted = Object.entries(regionMap).sort((a,b)=>b[1].amt-a[1].amt);
 
     // 검색 시 전체(필터 전) 매출 대비 비율 계산용
+    // "/"가 포함된 상품명(콤보 상품)은 절반 금액만 반영해서 % 계산 (전국 분석 카드 전용)
+    const adjustedProdTotal = Object.entries(prodMap).reduce((s,[nm,v]) => s + (nm.includes('/') ? v.amt/2 : v.amt), 0);
     const overallTotalAmt = q ? data.reduce((s,r)=>s+(r.수량||0)*(PRICE_MAP[r.상품명]||0), 0) : 0;
-    const overallPct = q && overallTotalAmt ? (grandTotal/overallTotalAmt*100).toFixed(1) : null;
+    // 전국 분석 카드용 (콤보상품 보정 비율)
+    const overallPct = q && overallTotalAmt ? (adjustedProdTotal/overallTotalAmt*100).toFixed(1) : null;
+    // 상단 요약 카드용 (보정 없이 검색된 금액 그대로의 비율)
+    const plainPct = q && overallTotalAmt ? (grandTotal/overallTotalAmt*100).toFixed(1) : null;
 
     // 검색 시 상단 상품 분석
     const prodAnalysis = q ? `
@@ -3053,7 +3058,7 @@ function renderMenuRegionView() {
         </div>
         <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid #1e3347;flex:1;">
           <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 매출금액</div>
-          <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(grandTotal)}${overallPct!==null ? `<span style="font-size:11px;color:#a0d0a0;font-weight:600;margin-left:6px;">/ 전체 매출 ${overallPct}%</span>` : ''}</div>
+          <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(grandTotal)}${plainPct!==null ? `<span style="font-size:11px;color:#a0d0a0;font-weight:600;margin-left:6px;">/ 전체 매출 ${plainPct}%</span>` : ''}</div>
         </div>
         ${makeCatRatioBar(filteredData.map(r=>({nm:r.상품명,cat:getCategory(r.상품명),qty:r.수량||0,amt:(r.수량||0)*(PRICE_MAP[r.상품명]||0)})), grandTotal, '전체 지역 — 전체 상품 현황')}
       </div>
