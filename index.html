@@ -148,7 +148,7 @@ body.hide-names .store-name:hover{
 .kpi-click:hover{border-color:#2a5a8a;background:#172840;}
 .analysis-tab{font-size:10px;padding:4px 10px;border-radius:6px;border:0.5px solid #2a5a8a;color:#7eb8e8;cursor:pointer;background:transparent;white-space:nowrap;}
 .analysis-tab:hover{background:#172840;}
-#walnutSummary table th, #walnutSummary table td{text-align:center !important;}
+#walnutSummary table th, #walnutSummary table td, #giftSummary table th, #giftSummary table td{text-align:center !important;}
 .analysis-tab.active{background:rgba(56,189,248,0.2);border-color:#38bdf8;color:#38bdf8;font-weight:700;}
 
 /* KPI 매장 목록 모달 */
@@ -349,7 +349,7 @@ body.hide-names .store-name:hover{
     <div class="kpi kpi-click" id="kpi6" onclick="openKpiModal('stable')" title="클릭하여 매장 보기"><div class="kl" id="k6l">전년비 ±2% 유지 매장</div><div class="kv" id="k6">-</div><div class="ks" id="k6s">-</div></div>
     <div class="kpi"><div class="kl">전월 대비 성장</div><div class="kv" id="k4">-</div><div class="ks" id="k4s">-</div></div>
     <div class="kpi"><div class="kl">최고 매출 매장</div><div class="kv" id="k5" style="font-size:16px;">-</div><div class="ks" id="k5s" style="color:#6b8fa8;">-</div></div>
-    <div class="kpi" style="border-color:#38bdf8;">
+    <div class="kpi" style="border-color:#38bdf8;display:flex;flex-direction:column;">
       <div class="kl" style="color:#38bdf8;margin-bottom:8px;">📊 매출 분석</div>
       <div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;">
         <div class="analysis-tab active" data-atab="cumul" onclick="setAnalysisTab('cumul', true)">누적</div>
@@ -357,7 +357,7 @@ body.hide-names .store-name:hover{
         <div class="analysis-tab" data-atab="gift" onclick="setAnalysisTab('gift', true)">답례품</div>
         <div class="analysis-tab" data-atab="map" onclick="setAnalysisTab('map', true)">🗺️ 지도</div>
       </div>
-      <div id="analysisTabContent"></div>
+      <div id="analysisTabContent" style="flex:1;display:flex;flex-direction:column;justify-content:center;"></div>
     </div>
   </div>
 
