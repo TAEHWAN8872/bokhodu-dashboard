@@ -547,6 +547,28 @@ body.hide-names .store-name:hover{
   </div>
 </div>
 
+<div class="modal-overlay" id="giftModal">
+  <div class="modal-box" style="max-width:900px;">
+    <button class="modal-close" onclick="closeGiftModal()">✕</button>
+    <div class="modal-title">🎁 답례품 25년 vs 26년 비교</div>
+    <div class="modal-sub">월별 판매 수량 비교 · 전 매장 기준</div>
+
+    <!-- 범례 설명 -->
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;font-size:10px;color:#6b8fa8;">
+      <span><span style="display:inline-block;width:10px;height:10px;background:rgba(245,158,11,0.7);border-radius:2px;vertical-align:middle;"></span> 25년 판매 수량</span>
+      <span><span style="display:inline-block;width:10px;height:10px;background:rgba(250,204,21,0.7);border-radius:2px;vertical-align:middle;"></span> 26년 판매 수량</span>
+    </div>
+
+    <!-- 비교 차트 -->
+    <div style="position:relative;height:300px;margin-bottom:16px;">
+      <canvas id="giftChart"></canvas>
+    </div>
+
+    <!-- 수치 테이블 -->
+    <div id="giftSummary" style="overflow-x:auto;"></div>
+  </div>
+</div>
+
 <script>
 // chartjs-plugin-datalabels 전역 등록 (growChart 전용)
 if(typeof ChartDataLabels !== 'undefined') Chart.register(ChartDataLabels);
@@ -1827,6 +1849,151 @@ function openWalnutModal(){
   `;
 }
 
+let giftChartInst = null;
+
+function closeGiftModal(){
+  document.getElementById('giftModal').classList.remove('open');
+  if(giftChartInst){ try{giftChartInst.destroy();}catch(e){} giftChartInst=null; }
+}
+document.getElementById('giftModal').addEventListener('click',function(e){
+  if(e.target===this) closeGiftModal();
+});
+
+function openGiftModal(){
+  document.getElementById('giftModal').classList.add('open');
+
+  const monthly26 = getGiftMonthlyQty();
+  const labels = [1,2,3,4,5,6].map(m=>`${m}월`);
+  const data25 = [1,2,3,4,5,6].map(m=>GIFT_2025_MONTHLY[m]||0);
+  const data26 = [1,2,3,4,5,6].map(m=>monthly26[m]||0);
+  const diffPcts = [1,2,3,4,5,6].map(m=>{
+    const v25 = GIFT_2025_MONTHLY[m]||0, v26 = monthly26[m]||0;
+    return v25 ? ((v26-v25)/v25*100) : null;
+  });
+
+  // 매장수 (25년: ALL25 기준, 26년: ALL 기준)
+  const storeCount25 = [1,2,3,4,5,6].map(m=>Object.values(ALL25).filter(arr=>(arr[m-1]||0)>0).length);
+  const storeCount26 = [1,2,3,4,5,6].map(m=>ALL.filter(b=>(b.months[m-1]||0)>0).length);
+
+  if(giftChartInst){ try{giftChartInst.destroy();}catch(e){} }
+  giftChartInst = new Chart(document.getElementById('giftChart'),{
+    type:'bar',
+    data:{ labels, datasets:[
+      {label:'25년', data:data25, backgroundColor:'rgba(245,158,11,0.7)', borderRadius:5,
+        datalabels:{ color:'#fde68a', anchor:'end', align:'top', font:{size:11,weight:'700'},
+          formatter:v=>v.toLocaleString() } },
+      {label:'26년', data:data26, backgroundColor:'rgba(250,204,21,0.7)', borderRadius:5,
+        datalabels:{ color:'#fef08a', anchor:'end', align:'top', font:{size:11,weight:'700'},
+          formatter:(v,ctx)=>{
+            const p = diffPcts[ctx.dataIndex];
+            const sign = p!=null && p>=0 ? '+' : '';
+            return p!=null ? `${v.toLocaleString()}\n(${sign}${p.toFixed(1)}%)` : v.toLocaleString();
+          } } }
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      layout:{ padding:{ top:24 } },
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y.toLocaleString()}개`}} },
+      scales:{
+        x:{ ticks:{color:'#9fc1de'}, grid:{color:'#1e3347'} },
+        y:{ ticks:{color:'#9fc1de', callback:v=>v.toLocaleString()}, grid:{color:'#1e3347'} }
+      }
+    }
+  });
+
+  const rows = [1,2,3,4,5,6].map(m=>{
+    const v25 = GIFT_2025_MONTHLY[m]||0;
+    const v26 = monthly26[m]||0;
+    const diff = v26 - v25;
+    const diffPct = v25 ? ((diff/v25)*100).toFixed(1) : '-';
+    const diffColor = v26>=v25 ? '#4ade80' : '#f87171';
+    const diffSign = diff>=0 ? '+' : '';
+    return `<tr>
+      <td style="padding:5px 10px;color:#9fc1de;">${m}월</td>
+      <td style="padding:5px 10px;text-align:right;color:#f59e0b;">${v25.toLocaleString()}개</td>
+      <td style="padding:5px 10px;text-align:right;color:#facc15;">${v26.toLocaleString()}개</td>
+      <td style="padding:5px 10px;text-align:right;color:${diffColor};">${diffSign}${diff.toLocaleString()}개</td>
+      <td style="padding:5px 10px;text-align:right;color:${diffColor};">${diffPct}%</td>
+    </tr>`;
+  }).join('');
+  const total25 = data25.reduce((a,b)=>a+b,0);
+  const total26 = data26.reduce((a,b)=>a+b,0);
+  const totalDiff = total26 - total25;
+  const totalDiffPct = total25 ? ((totalDiff/total25)*100).toFixed(1) : '-';
+  const totalColor = total26>=total25 ? '#4ade80' : '#f87171';
+  const totalDiffSign = totalDiff>=0 ? '+' : '';
+
+  // 매장당 평균 판매량 (해당 월 총 수량 ÷ 해당 월 운영 매장수)
+  const avgRows = [1,2,3,4,5,6].map(m=>{
+    const v25 = GIFT_2025_MONTHLY[m]||0;
+    const v26 = monthly26[m]||0;
+    const s25 = storeCount25[m-1], s26 = storeCount26[m-1];
+    const avg25 = s25 ? (v25/s25) : 0;
+    const avg26 = s26 ? (v26/s26) : 0;
+    const avgDiff = avg26 - avg25;
+    const avgDiffPct = avg25 ? ((avgDiff/avg25)*100).toFixed(1) : '-';
+    const avgDiffColor = avg26>=avg25 ? '#4ade80' : '#f87171';
+    const avgDiffSign = avgDiff>=0 ? '+' : '';
+    return `<tr>
+      <td style="padding:5px 10px;color:#9fc1de;">${m}월</td>
+      <td style="padding:5px 10px;text-align:right;color:#f59e0b;">${s25}개 매장 · 평균 ${avg25.toFixed(1)}개</td>
+      <td style="padding:5px 10px;text-align:right;color:#facc15;">${s26}개 매장 · 평균 ${avg26.toFixed(1)}개</td>
+      <td style="padding:5px 10px;text-align:right;color:${avgDiffColor};">${avgDiffSign}${avgDiff.toFixed(1)}개</td>
+      <td style="padding:5px 10px;text-align:right;color:${avgDiffColor};">${avgDiffPct}%</td>
+    </tr>`;
+  }).join('');
+  const totalStore25 = storeCount25[storeCount25.length-1] || 0;
+  const totalStore26 = storeCount26[storeCount26.length-1] || 0;
+  const storeMonths25 = storeCount25.reduce((a,b)=>a+b,0);
+  const storeMonths26 = storeCount26.reduce((a,b)=>a+b,0);
+  const totalAvg25 = storeMonths25 ? (total25/storeMonths25) : 0;
+  const totalAvg26 = storeMonths26 ? (total26/storeMonths26) : 0;
+  const totalAvgDiff = totalAvg26 - totalAvg25;
+  const totalAvgDiffPct = totalAvg25 ? ((totalAvgDiff/totalAvg25)*100).toFixed(1) : '-';
+  const totalAvgDiffColor = totalAvg26>=totalAvg25 ? '#4ade80' : '#f87171';
+  const totalAvgDiffSign = totalAvgDiff>=0 ? '+' : '';
+
+  document.getElementById('giftSummary').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:18px;">
+      <thead><tr style="border-bottom:1px solid #2a5a8a;">
+        <th style="padding:5px 10px;text-align:left;color:#6b8fa8;">월</th>
+        <th style="padding:5px 10px;text-align:right;color:#6b8fa8;">25년</th>
+        <th style="padding:5px 10px;text-align:right;color:#6b8fa8;">26년</th>
+        <th style="padding:5px 10px;text-align:right;color:#6b8fa8;">차이(개수)</th>
+        <th style="padding:5px 10px;text-align:right;color:#6b8fa8;">증감률</th>
+      </tr></thead>
+      <tbody>${rows}
+        <tr style="border-top:1px solid #2a5a8a;font-weight:700;">
+          <td style="padding:6px 10px;color:#e0f0ff;">전체</td>
+          <td style="padding:6px 10px;text-align:right;color:#f59e0b;">${total25.toLocaleString()}개</td>
+          <td style="padding:6px 10px;text-align:right;color:#facc15;">${total26.toLocaleString()}개</td>
+          <td style="padding:6px 10px;text-align:right;color:${totalColor};">${totalDiffSign}${totalDiff.toLocaleString()}개</td>
+          <td style="padding:6px 10px;text-align:right;color:${totalColor};">${totalDiffPct}%</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="ks" style="color:#6b8fa8;margin-bottom:6px;">매장당 평균 판매량 (해당 월 총 수량 ÷ 운영 매장수)</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr style="border-bottom:1px solid #2a5a8a;">
+        <th style="padding:5px 10px;text-align:left;color:#6b8fa8;">월</th>
+        <th style="padding:5px 10px;text-align:right;color:#6b8fa8;">25년</th>
+        <th style="padding:5px 10px;text-align:right;color:#6b8fa8;">26년</th>
+        <th style="padding:5px 10px;text-align:right;color:#6b8fa8;">차이</th>
+        <th style="padding:5px 10px;text-align:right;color:#6b8fa8;">증감률</th>
+      </tr></thead>
+      <tbody>${avgRows}
+        <tr style="border-top:1px solid #2a5a8a;font-weight:700;">
+          <td style="padding:6px 10px;color:#e0f0ff;">전체 평균</td>
+          <td style="padding:6px 10px;text-align:right;color:#f59e0b;">${totalStore25}개 매장 · 평균 ${totalAvg25.toFixed(1)}개</td>
+          <td style="padding:6px 10px;text-align:right;color:#facc15;">${totalStore26}개 매장 · 평균 ${totalAvg26.toFixed(1)}개</td>
+          <td style="padding:6px 10px;text-align:right;color:${totalAvgDiffColor};">${totalAvgDiffSign}${totalAvgDiff.toFixed(1)}개</td>
+          <td style="padding:6px 10px;text-align:right;color:${totalAvgDiffColor};">${totalAvgDiffPct}%</td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+}
+
 const WALNUT_2025_MONTHLY = {
   1: 270626+18300,
   2: 238875+16969,
@@ -1841,6 +2008,24 @@ function getWalnutMonthlyQty(){
   for(let m=1; m<=6; m++){
     const rows = MENU_DATA_BY_MONTH[m] || [];
     result[m] = rows.filter(r => r['상품분류']==='호두과자').reduce((s,r)=> s+(r['수량']||0), 0);
+  }
+  return result;
+}
+
+const GIFT_2025_MONTHLY = {
+  1: 101521,
+  2: 114915,
+  3: 142070,
+  4: 115448,
+  5: 129911,
+  6: 105668
+};
+
+function getGiftMonthlyQty(){
+  const result = {};
+  for(let m=1; m<=6; m++){
+    const rows = MENU_DATA_BY_MONTH[m] || [];
+    result[m] = rows.filter(r => r['상품분류']==='답례품').reduce((s,r)=> s+(r['수량']||0), 0);
   }
   return result;
 }
@@ -1866,7 +2051,16 @@ function setAnalysisTab(tab, userClick){
     `;
     if(userClick) openWalnutModal();
   } else if(tab==='gift'){
-    el.innerHTML = `<div class="ks" style="color:#6b8fa8;">답례품 매출 분석은 준비 중입니다.</div>`;
+    const monthly26 = getGiftMonthlyQty();
+    const total26 = Object.values(monthly26).reduce((a,b)=>a+b, 0);
+    const total25 = Object.values(GIFT_2025_MONTHLY).reduce((a,b)=>a+b, 0);
+    const totalDiffPct = total25 ? (((total26-total25)/total25)*100).toFixed(1) : '-';
+    el.innerHTML = `
+      <div class="kv" style="font-size:15px;">26년 전체: ${total26.toLocaleString()}개 <span style="font-size:11px;color:${total26>=total25?'#4ade80':'#f87171'};">(${totalDiffPct}%)</span></div>
+      <div class="ks" style="color:#6b8fa8;">25년 전체: ${total25.toLocaleString()}개</div>
+      <div class="ks" style="color:#6b8fa8;margin-top:2px;">클릭하여 자세히 보기</div>
+    `;
+    if(userClick) openGiftModal();
   } else if(tab==='map'){
     el.innerHTML = `<div class="ks" style="color:#6b8fa8;">클릭하여 지도 보기</div>`;
     if(userClick) openMapModal();
