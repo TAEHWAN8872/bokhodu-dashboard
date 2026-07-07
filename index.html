@@ -1659,6 +1659,15 @@ document.getElementById('cumulModal').addEventListener('click',function(e){
   if(e.target===this) closeCumulModal();
 });
 
+function getWalnutMonthlyQty(){
+  const result = {};
+  for(let m=1; m<=6; m++){
+    const rows = MENU_DATA_BY_MONTH[m] || [];
+    result[m] = rows.filter(r => r['상품분류']==='호두과자').reduce((s,r)=> s+(r['수량']||0), 0);
+  }
+  return result;
+}
+
 function setAnalysisTab(tab, userClick){
   document.querySelectorAll('.analysis-tab').forEach(t=>{
     t.classList.toggle('active', t.dataset.atab===tab);
@@ -1669,7 +1678,16 @@ function setAnalysisTab(tab, userClick){
     el.innerHTML = `<div class="ks" style="color:#6b8fa8;">클릭하여 자세히 보기</div>`;
     if(userClick) openCumulModal();
   } else if(tab==='walnut'){
-    el.innerHTML = `<div class="ks" style="color:#6b8fa8;">호두과자 매출 분석은 준비 중입니다.</div>`;
+    const monthly = getWalnutMonthlyQty();
+    const total = Object.values(monthly).reduce((a,b)=>a+b, 0);
+    const rows = [1,2,3,4,5,6].map(m =>
+      `<div style="display:flex;justify-content:space-between;font-size:11px;color:#9fc1de;padding:1px 0;"><span>${m}월</span><span>${monthly[m].toLocaleString()}개</span></div>`
+    ).join('');
+    el.innerHTML = `
+      <div class="kv" style="font-size:15px;">26년 전체: ${total.toLocaleString()}개</div>
+      <div style="margin-top:6px;">${rows}</div>
+      <div class="ks" style="color:#6b8fa8;margin-top:4px;">25년 비교 데이터는 추가 예정</div>
+    `;
   } else if(tab==='gift'){
     el.innerHTML = `<div class="ks" style="color:#6b8fa8;">답례품 매출 분석은 준비 중입니다.</div>`;
   } else if(tab==='map'){
