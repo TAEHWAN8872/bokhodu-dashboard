@@ -2926,11 +2926,7 @@ function renderMenuRegionView() {
           </div>
           <div style="background:#0d1b2a;border-radius:8px;padding:8px 14px;border:0.5px solid #2a5a8a44;flex:1;min-width:100px;">
             <div style="font-size:9px;color:#6b8fa8;margin-bottom:2px;">총 매출금액</div>
-            <div style="font-size:16px;font-weight:700;color:#7eb8e8;">${fmtAmt(prodTotal)}</div>
-          </div>
-          <div style="background:#0d1b2a;border-radius:8px;padding:8px 14px;border:0.5px solid #2a5a8a44;flex:1;min-width:100px;">
-            <div style="font-size:9px;color:#6b8fa8;margin-bottom:2px;">지역 매출 비율</div>
-            <div style="font-size:16px;font-weight:700;color:#a0d0a0;">${regTotalAmt?(prodTotal/regTotalAmt*100).toFixed(1):0}%</div>
+            <div style="font-size:16px;font-weight:700;color:#7eb8e8;">${fmtAmt(prodTotal)}${regTotalAmt ? `<span style="font-size:10px;color:#a0d0a0;font-weight:600;margin-left:6px;">/ 전체 매출 ${(prodTotal/regTotalAmt*100).toFixed(1)}%</span>` : ''}</div>
           </div>
         </div>
         <div style="font-size:10px;color:#6b8fa8;margin-bottom:6px;">상품별 분석</div>
@@ -3019,6 +3015,10 @@ function renderMenuRegionView() {
     const grandQty = Object.values(regionMap).reduce((s,r)=>s+r.qty,0);
     const sorted = Object.entries(regionMap).sort((a,b)=>b[1].amt-a[1].amt);
 
+    // 검색 시 전체(필터 전) 매출 대비 비율 계산용
+    const overallTotalAmt = q ? data.reduce((s,r)=>s+(r.수량||0)*(PRICE_MAP[r.상품명]||0), 0) : 0;
+    const overallPct = q && overallTotalAmt ? (grandTotal/overallTotalAmt*100).toFixed(1) : null;
+
     // 검색 시 상단 상품 분석
     const prodAnalysis = q ? `
       <div style="background:#0a1828;border:1px solid #2a5a8a55;border-radius:10px;padding:14px;margin-bottom:14px;">
@@ -3030,7 +3030,7 @@ function renderMenuRegionView() {
           </div>
           <div style="background:#0d1b2a;border-radius:8px;padding:8px 14px;border:0.5px solid #2a5a8a44;flex:1;min-width:100px;">
             <div style="font-size:9px;color:#6b8fa8;margin-bottom:2px;">총 매출금액</div>
-            <div style="font-size:16px;font-weight:700;color:#7eb8e8;">${fmtAmt(prodTotal)}</div>
+            <div style="font-size:16px;font-weight:700;color:#7eb8e8;">${fmtAmt(prodTotal)}${overallPct!==null ? `<span style="font-size:10px;color:#a0d0a0;font-weight:600;margin-left:6px;">/ 전체 매출 ${overallPct}%</span>` : ''}</div>
           </div>
         </div>
         <div style="font-size:10px;color:#6b8fa8;margin-bottom:6px;">상품별 분석</div>
@@ -3053,7 +3053,7 @@ function renderMenuRegionView() {
         </div>
         <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid #1e3347;flex:1;">
           <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 매출금액</div>
-          <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(grandTotal)}</div>
+          <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(grandTotal)}${overallPct!==null ? `<span style="font-size:11px;color:#a0d0a0;font-weight:600;margin-left:6px;">/ 전체 매출 ${overallPct}%</span>` : ''}</div>
         </div>
         ${makeCatRatioBar(filteredData.map(r=>({nm:r.상품명,cat:getCategory(r.상품명),qty:r.수량||0,amt:(r.수량||0)*(PRICE_MAP[r.상품명]||0)})), grandTotal, '전체 지역 — 전체 상품 현황')}
       </div>
@@ -3194,11 +3194,7 @@ function renderMenuRegionView() {
         </div>
         <div style="background:#0d1b2a;border-radius:8px;padding:8px 14px;border:0.5px solid #2a5a8a44;flex:1;min-width:100px;">
           <div style="font-size:9px;color:#6b8fa8;margin-bottom:2px;">검색 상품 매출</div>
-          <div style="font-size:16px;font-weight:700;color:#7eb8e8;">${fmtAmt(menuTotal)}</div>
-        </div>
-        <div style="background:#0d1b2a;border-radius:8px;padding:8px 14px;border:0.5px solid #2a5a8a44;flex:1;min-width:100px;">
-          <div style="font-size:9px;color:#6b8fa8;margin-bottom:2px;">지역 매출 비율</div>
-          <div style="font-size:16px;font-weight:700;color:#a0d0a0;">${regTotalAmt?(menuTotal/regTotalAmt*100).toFixed(1):0}%</div>
+          <div style="font-size:16px;font-weight:700;color:#7eb8e8;">${fmtAmt(menuTotal)}${regTotalAmt ? `<span style="font-size:10px;color:#a0d0a0;font-weight:600;margin-left:6px;">/ 전체 매출 ${(menuTotal/regTotalAmt*100).toFixed(1)}%</span>` : ''}</div>
         </div>
       </div>
       <table class="menu-tbl" style="font-size:11px;">
@@ -3358,6 +3354,9 @@ function renderMenuManagerView() {
     });
     const totalQty = Object.values(menuMap).reduce((s,v) => s+v.수량, 0);
     const totalAmt = Object.values(menuMap).reduce((s,v) => s+v.금액, 0);
+    // 검색 시 전체(필터 전) 매출 대비 비율 계산용
+    const grandTotalAmt = q ? data.reduce((s,r) => s + (r.수량||0)*(PRICE_MAP[r.상품명]||0), 0) : 0;
+    const grandPct = q && grandTotalAmt ? (totalAmt/grandTotalAmt*100).toFixed(1) : null;
     const rows = Object.entries(menuMap).filter(([nm,v])=>nm&&(v.수량||0)>0).sort((a,b) => b[1].금액-a[1].금액).map(([nm,v]) => {
       const catClass = v.분류==='호두과자'?'cat-walnut':v.분류==='답례품'?'cat-gift':'cat-side';
       const pct = totalAmt ? (v.금액/totalAmt*100).toFixed(1) : '0.0';
@@ -3377,7 +3376,7 @@ function renderMenuManagerView() {
         </div>
         <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid #1e3347;flex:1;">
           <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 매출금액</div>
-          <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(totalAmt)}</div>
+          <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(totalAmt)}${grandPct!==null ? `<span style="font-size:11px;color:#a0d0a0;font-weight:600;margin-left:6px;">/ 전체 매출 ${grandPct}%</span>` : ''}</div>
         </div>
         ${makeCatRatioBar(Object.entries(menuMap).map(([nm,v])=>({nm,cat:v.분류==='호두과자'?'호두과자':v.분류==='답례품'?'답례품':'사이드',qty:v.수량,amt:v.금액})), totalAmt, '전체 상품 현황')}
       </div>
@@ -3425,6 +3424,11 @@ function renderMenuManagerView() {
   const mgrTotalQty = Object.values(storeMap).reduce((s,v) => s+v.totalQty, 0);
   const mgrTotalAmt = Object.values(storeMap).reduce((s,v) => s+v.totalAmt, 0);
 
+  // 검색 시 해당 담당자의 전체(필터 전) 매출 대비 비율 계산용
+  const mgrOverallAmt = q ? data.filter(r => getManagerForStore(r.매장) === currentMenuManager)
+    .reduce((s,r) => s + (r.수량||0)*(PRICE_MAP[r.상품명]||0), 0) : 0;
+  const mgrPct = q && mgrOverallAmt ? (mgrTotalAmt/mgrOverallAmt*100).toFixed(1) : null;
+
   // 매출 기준 정렬
   const filteredStoreEntries = Object.entries(storeMap)
     .sort((a,b) => b[1].totalAmt - a[1].totalAmt);
@@ -3467,7 +3471,7 @@ function renderMenuManagerView() {
       </div>
       <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid ${color}44;flex:1;">
         <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 매출금액</div>
-        <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(mgrTotalAmt)}</div>
+        <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(mgrTotalAmt)}${mgrPct!==null ? `<span style="font-size:11px;color:#a0d0a0;font-weight:600;margin-left:6px;">/ 전체 매출 ${mgrPct}%</span>` : ''}</div>
       </div>
       ${makeCatRatioBar(filteredData.map(r=>({nm:r.상품명,cat:getCategory(r.상품명),qty:r.수량||0,amt:(r.수량||0)*(PRICE_MAP[r.상품명]||0)})), mgrTotalAmt, `${currentMenuManager} — 전체 상품 현황`)}
     </div>
