@@ -2077,14 +2077,8 @@ function setAnalysisTab(tab, userClick){
     el.innerHTML = `<div class="ks" style="color:#6b8fa8;">클릭하여 자세히 보기</div>`;
     if(userClick) openCumulModal();
   } else if(tab==='walnut'){
-    const monthly26 = getWalnutMonthlyQty();
-    const total26 = Object.values(monthly26).reduce((a,b)=>a+b, 0);
-    const total25 = Object.values(WALNUT_2025_MONTHLY).reduce((a,b)=>a+b, 0);
-    const totalDiffPct = total25 ? (((total26-total25)/total25)*100).toFixed(1) : '-';
     el.innerHTML = `
-      <div class="kv" style="font-size:15px;">26년 전체: ${total26.toLocaleString()}개 <span style="font-size:11px;color:${total26>=total25?'#4ade80':'#f87171'};">(${totalDiffPct}%)</span></div>
-      <div class="ks" style="color:#6b8fa8;">25년 전체: ${total25.toLocaleString()}개</div>
-      <div class="ks" style="color:#6b8fa8;margin-top:2px;">클릭하여 자세히 보기</div>
+      <div class="ks" style="color:#6b8fa8;">클릭하여 자세히 보기</div>
     `;
     if(userClick) openWalnutModal();
   } else if(tab==='gift'){
