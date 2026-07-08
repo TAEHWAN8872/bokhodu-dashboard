@@ -264,6 +264,7 @@ body.hide-names .store-name:hover{
       <li><span class="um-num">1.</span> 매출분석 &gt; 호두과자 25년/26년 비교 매출 추가</li>
       <li><span class="um-num">2.</span> 매출분석 &gt; 답례품 25년/26년 비교 매출 추가</li>
       <li><span class="um-num">3.</span> 메뉴별 검색 시 해당 상품 비율 표시 추가</li>
+      <li><span class="um-num">4.</span> 매장 클릭 시 월별 전년 대비 증감이 1월~12월 전체 표시되도록 개선</li>
     </ul>
     <div class="update-modal-actions">
       <label class="um-dontshow">
@@ -1672,7 +1673,6 @@ function openBranchModal(b){
   };
   const summaryRows=MONTHS.map((mon,i)=>{
     const v26=vals26[i], v25=vals25?vals25[i]:null;
-    if(v26==null&&v25==null) return null;
     const diff=(v26!=null&&v25!=null)?v26-v25:null;
     const rate=(diff!=null&&v25>0)?Math.round(diff/v25*1000)/10:null;
     const rateColor=rate==null?'#6b8fa8':rate>=0?'#3db87a':'#e05555';
