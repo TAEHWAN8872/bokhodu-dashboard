@@ -265,6 +265,7 @@ body.hide-names .store-name:hover{
       <li><span class="um-num">2.</span> 매출분석 &gt; 답례품 25년/26년 비교 매출 추가</li>
       <li><span class="um-num">3.</span> 메뉴별 검색 시 해당 상품 비율 표시 추가</li>
       <li><span class="um-num">4.</span> 매장 클릭 시 월별 전년 대비 증감이 1월~12월 전체 표시되도록 개선</li>
+      <li><span class="um-num">5.</span> 매장 클릭 시 물류 매출 비중 색상을 구간별로 정확히 표시하도록 수정</li>
     </ul>
     <div class="update-modal-actions">
       <label class="um-dontshow">
@@ -1704,7 +1705,7 @@ function openBranchModal(b){
       const sv = b.months[i]||0;
       const ratio = (sv>0 && lv>0) ? (lv/sv*100).toFixed(1) : null;
       const lvStr = fmtD(Math.round(lv/10000));
-      const ratioColor = ratio==null ? '#6b8fa8' : parseFloat(ratio)>=30 ? '#e05555' : parseFloat(ratio)>=20 ? '#f0a04a' : '#3db87a';
+      const ratioColor = ratio==null ? '#6b8fa8' : getLogRatioColor(parseFloat(ratio));
       const ratioStr = ratio!=null ? ratio+'%' : '-';
       return `<div style="min-width:80px;flex:1;background:#0a1220;border-radius:7px;padding:7px 8px;border:0.5px solid #1a2f44;text-align:center;">
   <div style="font-size:9px;color:#6b8fa8;margin-bottom:4px;font-weight:500;">${mon}</div>
@@ -2273,6 +2274,10 @@ const LOG_BUCKETS = [
   {label:'50~60%',  min:50,  max:60,  color:'rgba(220,38,38,0.85)',   guide:'위험 — 즉시 점검 필요', guideColor:'#dc2626'},
   {label:'60%초과', min:60,  max:Infinity, color:'rgba(153,27,27,0.85)', guide:'심각 — 운영 재검토', guideColor:'#991b1b'},
 ];
+function getLogRatioColor(ratio){
+  const bk = LOG_BUCKETS.find(b=>ratio>=b.min && ratio<b.max);
+  return bk ? bk.guideColor : '#6b8fa8';
+}
 let logSelMonthIdx = -1; // -1 = 평균
 let logChartInst = null;
 
