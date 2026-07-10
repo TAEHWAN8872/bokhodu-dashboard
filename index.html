@@ -2939,34 +2939,35 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
 
   window.checkContractAlert = checkContractAlert;
 
-  // ── 매출 급락(전달 대비 10%↑ 하락) 점검 필요 알림 ──
-  // 26년 데이터(ALL) 기준, 데이터가 존재하는 마지막 월과 그 전월을 비교
+  // ── 매출 급락(25년 1~6월 평균 대비 26년 1~6월 평균 10%↑ 하락) 점검 필요 알림 ──
+  function avgFirstHalf(monthsArr){
+    const vals = (monthsArr||[]).slice(0,6).filter(v=>v>0);
+    return vals.length ? vals.reduce((s,v)=>s+v,0)/vals.length : 0;
+  }
+
   function getDeclineBranches(){
-    const lastIdx = getLastMonthIdx(ALL);
-    const prevIdx = lastIdx - 1;
-    if(lastIdx < 0 || prevIdx < 0) return {list:[], lastIdx, prevIdx};
     const list = ALL.map(b=>{
-      const cur = b.months[lastIdx]||0;
-      const prev = b.months[prevIdx]||0;
-      if(cur<=0 || prev<=0) return null; // 신규/폐점 등 비교 불가 매장 제외
-      const rate = (cur-prev)/prev*100;
-      return {name:b.name, manager:b.manager, region:b.region, cur, prev, rate};
+      const avg26 = avgFirstHalf(b.months);
+      const avg25 = avgFirstHalf(ALL25[b.name]);
+      if(avg26<=0 || avg25<=0) return null; // 비교 불가(신규/폐점/25년 데이터 없음) 매장 제외
+      const rate = (avg26-avg25)/avg25*100;
+      return {name:b.name, manager:b.manager, region:b.region, avg26, avg25, rate};
     }).filter(x=>x && x.rate <= -10);
     list.sort((a,b)=>a.rate-b.rate); // 하락폭이 큰 매장이 위로
-    return {list, lastIdx, prevIdx};
+    return {list};
   }
 
   function checkDeclineAlert(){
-    const {list, lastIdx, prevIdx} = getDeclineBranches();
+    const {list} = getDeclineBranches();
     if(list.length===0) return;
-    const ymKey = 'decline_alert_dismissed_'+MONTHS[lastIdx]+'_vs_'+MONTHS[prevIdx];
+    const ymKey = 'decline_alert_dismissed_2025H1_vs_2026H1';
     let dismissed = false;
     try{ dismissed = localStorage.getItem(ymKey)==='1'; }catch(e){}
     if(dismissed) return;
 
     document.getElementById('declineAlertTitle').textContent = '점검 필요';
     document.getElementById('declineAlertSub').textContent =
-      `${MONTHS[prevIdx]} 대비 ${MONTHS[lastIdx]} 매출이 10% 이상 하락한 매장이 ${list.length}곳 있습니다.`;
+      `25년 1~6월 평균 대비 26년 1~6월 평균 매출이 10% 이상 하락한 매장이 ${list.length}곳 있습니다.`;
     document.getElementById('declineAlertList').innerHTML = list.map(r=>
       `<li><span style="display:flex;align-items:baseline;gap:6px;min-width:0;"><span class="rc-alert-name store-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.name}</span><span style="font-size:11px;color:#6b8fa8;white-space:nowrap;">${r.manager||'-'}</span></span><span class="rc-alert-date">${r.rate.toFixed(1)}%</span></li>`
     ).join('');
