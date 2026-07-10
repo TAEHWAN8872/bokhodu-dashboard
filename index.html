@@ -355,7 +355,7 @@ body.hide-names .store-name:hover{
   <!-- 페이지 탭 -->
   <div class="page-tabs">
     <div class="page-tab active" id="pageTab-sales" onclick="switchPage('sales')">📊 매출 현황판</div>
-    <div class="page-tab" id="pageTab-contract" onclick="switchPage('contract')">📋 재계약 현황판<span class="pt-badge" id="rcUrgentBadge" style="display:none;"></span></div>
+    <div class="page-tab" id="pageTab-contract" onclick="switchPage('contract')">📋 재계약 안내<span class="pt-badge" id="rcUrgentBadge" style="display:none;"></span></div>
   </div>
 
   <!-- 재계약 현황판 페이지 -->
@@ -2819,7 +2819,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     document.getElementById('contractPage').style.display = (page==='contract') ? '' : 'none';
     document.getElementById('pageTab-sales').classList.toggle('active', page==='sales');
     document.getElementById('pageTab-contract').classList.toggle('active', page==='contract');
-    document.getElementById('brandTitle').textContent = (page==='sales') ? '복호두 매출 현황판' : '복호두 재계약 현황판';
+    document.getElementById('brandTitle').textContent = (page==='sales') ? '복호두 매출 현황판' : '복호두 재계약 안내';
     if(page==='contract'){ renderContractKpis(); renderContractTable(); }
   };
 
