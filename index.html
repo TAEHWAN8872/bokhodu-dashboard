@@ -236,8 +236,10 @@ body.hide-names .store-name:hover{
 .modal-cw{position:relative;height:260px;}
 
 /* 업데이트 안내 모달 */
-.update-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:5000;align-items:center;justify-content:center;padding:16px;}
-.update-modal-overlay.open{display:flex;}
+.notice-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:5000;align-items:center;justify-content:center;padding:16px;overflow-y:auto;}
+.notice-overlay.open{display:flex;}
+.notice-stack{display:flex;flex-direction:row;flex-wrap:wrap;gap:16px;align-items:flex-start;justify-content:center;max-height:100%;max-width:100%;margin:auto;}
+.notice-stack .update-modal, .notice-stack .rc-alert-modal{flex:1 1 380px;max-height:88vh;overflow-y:auto;}
 .update-modal{background:#111e2e;border:1px solid #2a5a8a;border-radius:14px;max-width:440px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.5);}
 .update-modal-icon{font-size:28px;margin-bottom:10px;}
 .update-modal h2{font-size:17px;color:#e0f0ff;margin-bottom:4px;}
@@ -250,29 +252,90 @@ body.hide-names .store-name:hover{
 .um-dontshow input{cursor:pointer;}
 .um-close-btn{font-size:13px;font-weight:600;padding:8px 18px;background:#1a3a5c;border:1px solid #2a5a8a;color:#7eb8e8;border-radius:8px;cursor:pointer;}
 .um-close-btn:hover{background:#1e4a70;}
+
+/* 페이지 탭(매출/재계약) */
+.page-tabs{display:flex;gap:8px;margin-bottom:14px;}
+.page-tab{font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;cursor:pointer;border:1px solid #1e3347;color:#6b8fa8;background:#0d1b2a;transition:all .2s;}
+.page-tab:hover{border-color:#2a5a8a;color:#aac4e0;}
+.page-tab.active{background:#1a3a5c;border-color:#7eb8e8;color:#7eb8e8;}
+.page-tab .pt-badge{display:inline-block;margin-left:6px;background:#e05555;color:#fff;font-size:10px;font-weight:700;border-radius:9px;padding:1px 6px;vertical-align:middle;}
+
+/* 재계약현황판 */
+.rc-kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px;}
+.rc-kpi{background:#111e2e;border-radius:10px;padding:12px 16px;border:0.5px solid #1e3347;cursor:pointer;transition:border-color .2s,background .2s;}
+.rc-kpi:hover{border-color:#2a5a8a;background:#172840;}
+.rc-kpi.active{border-color:#7eb8e8;background:#172840;}
+.rc-kpi .kl{font-size:11px;color:#6b8fa8;margin-bottom:5px;}
+.rc-kpi .kv{font-size:22px;font-weight:700;color:#e0f0ff;}
+.rc-table-wrap{overflow-x:auto;}
+.rc-table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;}
+.rc-table th{position:sticky;top:0;background:#0d1b2a;color:#6b8fa8;font-weight:600;font-size:11px;padding:9px 10px;text-align:center;border-bottom:1px solid #1e3347;}
+.rc-table td{padding:8px 10px;text-align:center;border-bottom:0.5px solid #16283c;color:#c8dff0;}
+.rc-table tr:hover td{background:#152236;}
+.rc-table td.rc-name{text-align:left;color:#e0f0ff;font-weight:600;}
+.rc-badge{font-size:10px;padding:3px 8px;border-radius:5px;font-weight:600;white-space:nowrap;}
+.rc-urgent{background:#3a0d0d;color:#e05555;}
+.rc-soon{background:#3a1f0a;color:#f0a04a;}
+.rc-normal{background:#0d3320;color:#3db87a;}
+.rc-check{background:#2a2a2a;color:#aaa;}
+.rc-dday-urgent{color:#e05555;font-weight:700;}
+.rc-dday-soon{color:#f0a04a;font-weight:700;}
+.rc-dday-normal{color:#7eb8e8;}
+.rc-row-thismonth{background:rgba(240,160,74,0.08);}
+
+/* 재계약 알림 모달 (업데이트 안내 모달과 동일 톤) */
+/* 재계약 알림 모달은 notice-overlay를 공유 사용 */
+.rc-alert-modal{background:#111e2e;border:1px solid #f0a04a;border-radius:14px;max-width:460px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.5);}
+.rc-alert-icon{font-size:28px;margin-bottom:10px;}
+.rc-alert-modal h2{font-size:17px;color:#e0f0ff;margin-bottom:4px;}
+.rc-alert-modal .rc-alert-sub{font-size:11px;color:#6b8fa8;margin-bottom:16px;}
+.rc-alert-modal ul{list-style:none;padding:0;margin:0 0 20px 0;max-height:280px;overflow-y:auto;}
+.rc-alert-modal li{font-size:13px;color:#c8dff0;background:#0d1b2a;border:0.5px solid #1e3347;border-radius:8px;padding:10px 14px;margin-bottom:7px;display:flex;justify-content:space-between;gap:10px;align-items:center;}
+.rc-alert-modal li .rc-alert-name{font-weight:700;color:#e0f0ff;}
+.rc-alert-modal li .rc-alert-date{font-size:11px;color:#f0a04a;white-space:nowrap;}
+.rc-alert-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;}
 </style>
 </head>
 <body>
 
-<!-- 업데이트 안내 모달 -->
-<div class="update-modal-overlay" id="updateModalOverlay">
-  <div class="update-modal">
-    <div class="update-modal-icon">🔔</div>
-    <h2>업데이트 안내</h2>
-    <div class="um-date">2026.07.07 업데이트</div>
-    <ul>
-      <li><span class="um-num">1.</span> 매출분석 &gt; 호두과자 25년/26년 비교 매출 추가</li>
-      <li><span class="um-num">2.</span> 매출분석 &gt; 답례품 25년/26년 비교 매출 추가</li>
-      <li><span class="um-num">3.</span> 메뉴별 검색 시 해당 상품 비율 표시 추가</li>
-      <li><span class="um-num">4.</span> 매장 클릭 시 월별 전년 대비 증감이 1월~12월 전체 표시되도록 개선</li>
-      <li><span class="um-num">5.</span> 매장 클릭 시 물류 매출 비중 색상을 구간별로 정확히 표시하도록 수정</li>
-    </ul>
-    <div class="update-modal-actions">
-      <label class="um-dontshow">
-        <input type="checkbox" id="umDontShowCheck"> 다시 보지 않기
-      </label>
-      <button class="um-close-btn" onclick="closeUpdateModal()">확인</button>
+<!-- 공지 오버레이 (업데이트 안내 + 재계약 만료 알림을 함께 표시) -->
+<div class="notice-overlay" id="noticeOverlay">
+  <div class="notice-stack">
+
+    <!-- 업데이트 안내 모달 -->
+    <div class="update-modal" id="updateModalBox" style="display:none;">
+      <div class="update-modal-icon">🔔</div>
+      <h2>업데이트 안내</h2>
+      <div class="um-date">2026.07.07 업데이트</div>
+      <ul>
+        <li><span class="um-num">1.</span> 매출분석 &gt; 호두과자 25년/26년 비교 매출 추가</li>
+        <li><span class="um-num">2.</span> 매출분석 &gt; 답례품 25년/26년 비교 매출 추가</li>
+        <li><span class="um-num">3.</span> 메뉴별 검색 시 해당 상품 비율 표시 추가</li>
+        <li><span class="um-num">4.</span> 매장 클릭 시 월별 전년 대비 증감이 1월~12월 전체 표시되도록 개선</li>
+        <li><span class="um-num">5.</span> 매장 클릭 시 물류 매출 비중 색상을 구간별로 정확히 표시하도록 수정</li>
+      </ul>
+      <div class="update-modal-actions">
+        <label class="um-dontshow">
+          <input type="checkbox" id="umDontShowCheck"> 다시 보지 않기
+        </label>
+        <button class="um-close-btn" onclick="closeUpdateModal()">확인</button>
+      </div>
     </div>
+
+    <!-- 재계약 만료 임박 알림 모달 -->
+    <div class="rc-alert-modal" id="rcAlertBox" style="display:none;">
+      <div class="rc-alert-icon">📋</div>
+      <h2 id="rcAlertTitle">재계약 만료 임박 안내</h2>
+      <div class="rc-alert-sub" id="rcAlertSub"></div>
+      <ul id="rcAlertList"></ul>
+      <div class="rc-alert-actions">
+        <label class="um-dontshow">
+          <input type="checkbox" id="rcAlertDontShowCheck"> 이번 달은 다시 보지 않기
+        </label>
+        <button class="um-close-btn" onclick="closeContractAlertModal()">확인</button>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -280,7 +343,7 @@ body.hide-names .store-name:hover{
 
   <!-- 헤더 -->
   <div class="topbar">
-    <div class="brand"><span class="dot"></span><span>복호두 매출 현황판</span></div>
+    <div class="brand"><span class="dot"></span><span id="brandTitle">복호두 매출 현황판</span></div>
     <div class="top-right">
       <span class="last-update" id="lastUpdate">데이터 로딩 중...</span>
       <button class="upload-btn" id="maskBtn" onclick="toggleMaskNames()" style="border-color:#6b8fa8;color:#6b8fa8;cursor:pointer;">
@@ -288,6 +351,48 @@ body.hide-names .store-name:hover{
       </button>
     </div>
   </div>
+
+  <!-- 페이지 탭 -->
+  <div class="page-tabs">
+    <div class="page-tab active" id="pageTab-sales" onclick="switchPage('sales')">📊 매출 현황판</div>
+    <div class="page-tab" id="pageTab-contract" onclick="switchPage('contract')">📋 재계약 현황판<span class="pt-badge" id="rcUrgentBadge" style="display:none;"></span></div>
+  </div>
+
+  <!-- 재계약 현황판 페이지 -->
+  <div id="contractPage" style="display:none;">
+    <div class="rc-kpi-row" id="rcKpiRow"></div>
+    <div style="position:relative;margin-bottom:14px;max-width:280px;">
+      <span style="font-size:10px;color:#6b8fa8;position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;">🔍</span>
+      <input id="rcSearch" type="text" placeholder="점포명/담당자 검색..." autocomplete="off"
+        style="width:100%;padding:6px 32px 6px 28px;background:#1a2f44;border:0.5px solid #2a5a8a;border-radius:7px;color:#e0f0ff;font-size:11px;outline:none;"
+        oninput="renderContractTable()">
+    </div>
+    <div class="card">
+      <div class="ctitle">
+        <span id="rcTableTitle">재계약 현황 (마감 임박순)</span>
+        <select class="filter-sel" id="rcSortSel" onchange="renderContractTable()">
+          <option value="dday_asc">마감 임박순</option>
+          <option value="dday_desc">마감 여유순</option>
+          <option value="name">점포명 순</option>
+        </select>
+      </div>
+      <div class="rc-table-wrap">
+        <table class="rc-table">
+          <thead>
+            <tr>
+              <th>번호</th><th>점포명</th><th>담당자</th><th>연락처</th><th>계약회차</th>
+              <th>현재계약종료일</th><th>D-day</th><th>상태</th>
+              <th>6개월전 안내예정일</th><th>3개월전 안내예정일</th><th>안내문 발송</th>
+            </tr>
+          </thead>
+          <tbody id="rcTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 매출 현황판 페이지 -->
+  <div id="salesPage">
 
   <!-- 필터 탭 -->
   <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;align-items:center;">
@@ -2500,6 +2605,337 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   document.getElementById('lastUpdate').textContent='26년(1~6월) + 25년 연간 데이터 · '+ALL.length+'개 매장 · '+LAST_EDITED+' 수정';
 })();
 
+// ===== 재계약현황판 =====
+(function(){
+  // [번호, 점포명, 담당자, 연락처, 계약회차(누적), 현재계약종료일, 6개월전안내예정일, 3개월전안내예정일, 안내문발송여부]
+  const CONTRACT_DATA_RAW = [
+[1, "복호두 경남대점", "이지훈", "01091000138", 2, "2026-08-03", "2026-02-03", "2026-05-03", "완"],
+[2, "복호두 대전관평점", "고현돈", "01020017216", 1, "2026-08-07", "2026-02-07", "2026-05-07", "완"],
+[3, "복호두 호매실점", "홍정래", "01088652187", 1, "2026-08-11", "2026-02-11", "2026-05-11", "완"],
+[4, "복호두 포항이동점", "김상현", "01092589355", 1, "2026-08-12", "2026-02-12", "2026-05-12", "완"],
+[5, "복호두 포항 양덕점", "김윤아", "01020439992", 2, "2026-08-18", "2026-02-18", "2026-05-18", "완"],
+[6, "복호두 김포 장기점", "김보애,정승원", "01042848452", 2, "2026-08-19", "2026-02-19", "2026-05-19", "완"],
+[7, "복호두 논산내동점", "박은주", "01094122567", 1, "2026-08-20", "2026-02-20", "2026-05-20", "완"],
+[8, "복호두 홍성 내포점", "전현철", "01041005557", 2, "2026-08-24", "2026-02-24", "2026-05-24", "완"],
+[9, "복호두 거제 수월점", "홍인배", "01051337072", 2, "2026-09-02", "2026-03-02", "2026-06-02", "완"],
+[10, "복호두 의정부 민락점", "문준희", "01050715599", 2, "2026-09-11", "2026-03-11", "2026-06-11", "완"],
+[11, "복호두 고양 삼송점", "최재희", "01079971204", 2, "2026-09-13", "2026-03-13", "2026-06-13", "완"],
+[12, "복호두 서울 목동점", "김승아", "01064759309", 2, "2026-10-05", "2026-04-05", "2026-07-05", "완"],
+[13, "복호두 해운대 1호점", "김다은", "01030061410", 2, "2026-10-05", "2026-04-05", "2026-07-05", "완"],
+[14, "복호두 오창점", "이정현", "01075250707", 1, "2026-10-06", "2026-04-06", "2026-07-06", "완"],
+[15, "복호두 우정혁신점", "허준호", "01085429445", 1, "2026-10-15", "2026-04-15", "2026-07-15", "완"],
+[16, "복호두 공덕점", "주희, 이이주", "01028338835", 2, "2026-10-19", "2026-04-19", "2026-07-19", "완"],
+[17, "복호두 전주 혁신도시점", "유순일", "01026573329", 2, "2026-10-19", "2026-04-19", "2026-07-19", "완"],
+[18, "복호두 목포 남악점", "김효선", "01035497597", 2, "2026-10-23", "2026-04-23", "2026-07-23", "완"],
+[19, "복호두 세종 아름점", "임동혁", "01033438874", 2, "2026-10-26", "2026-04-26", "2026-07-26", "완"],
+[20, "복호두 동해 이도점", "이미정", "01022640269", 2, "2026-11-03", "2026-05-03", "2026-08-03", "미발송"],
+[21, "복호두 원주 무실점", "김유희, 김유진", "01021107925", 2, "2026-11-08", "2026-05-08", "2026-08-08", "미발송"],
+[22, "복호두 광주 상무점", "박지안", "01040982291", 2, "2026-11-25", "2026-05-25", "2026-08-25", "미발송"],
+[23, "복호두 상봉역점", "서소연", "01020249660", 1, "2026-11-25", "2026-05-25", "2026-08-25", "미발송"],
+[24, "복호두 화성봉담2지구점", "공애숙", "01076570886", 1, "2026-12-02", "2026-06-02", "2026-09-02", "미발송"],
+[25, "복호두 구미 봉곡점", "최용익", "01055462125", 2, "2026-12-03", "2026-06-03", "2026-09-03", "미발송"],
+[26, "복호두 DMC점", "김현균", "01040378155", 2, "2026-12-06", "2026-06-06", "2026-09-06", "미발송"],
+[27, "복호두 굴포천역점", "유민석", "01075775084", 2, "2026-12-17", "2026-06-17", "2026-09-17", "미발송"],
+[28, "복호두 대구 감삼점", "정수진", "01027133262", 2, "2026-12-20", "2026-06-20", "2026-09-20", "미발송"],
+[29, "복호두 상주점", "김현정", "01039553317", 2, "2027-01-01", "2026-07-01", "2026-10-01", "미발송"],
+[30, "복호두 수성 범어점", "최재광 ", "01094494101", 2, "2027-01-09", "2026-07-09", "2026-10-09", "미발송"],
+[31, "복호두 대전 둔산점", "박현준", "01055177150", 2, "2027-01-11", "2026-07-11", "2026-10-11", "미발송"],
+[32, "복호두 강동구청점", "오원미", "01023315516", 1, "2027-01-13", "2026-07-13", "2026-10-13", "미발송"],
+[33, "복호두 송도점", "임하영", "01065118270", 2, "2027-01-30", "2026-07-30", "2026-10-30", "미발송"],
+[34, "복호두 일산 풍동점", "민명희", "01097841780", 2, "2027-02-02", "2026-08-02", "2026-11-02", "미발송"],
+[35, "복호두 아산탕정신도시점", "신하나", "01045679529", 2, "2027-02-15", "2026-08-15", "2026-11-15", "미발송"],
+[36, "복호두 군산조촌점", "이정훈", "01031656636", 1, "2027-02-17", "2026-08-17", "2026-11-17", "미발송"],
+[37, "복호두 부산 명지점", "정은지", "01033433124", 2, "2027-03-01", "2026-09-01", "2026-12-01", "미발송"],
+[38, "복호두 여수 웅천점", "문수임", "01096469133", 2, "2027-03-08", "2026-09-08", "2026-12-08", "미발송"],
+[39, "복호두 파주 금촌점", "김미정", "01099363891", 2, "2027-03-09", "2026-09-09", "2026-12-09", "미발송"],
+[40, "복호두 월곡점", "최경두", "01063069649", 1, "2027-03-10", "2026-09-10", "2026-12-10", "미발송"],
+[41, "복호두 김천점", "강영선", "01097723268", 2, "2027-03-13", "2026-09-13", "2026-12-13", "미발송"],
+[42, "복호두 가좌점", "임광빈", "01028001810", 2, "2027-03-13", "2026-09-13", "2026-12-13", "미발송"],
+[43, "복호두 수원 천천점", "이언경", "01062251220", 2, "2027-04-11", "2026-10-11", "2027-01-11", "미발송"],
+[44, "복호두 광주 첨단지구점", "조정웅", "01046295799", 2, "2027-04-13", "2026-10-13", "2027-01-13", "미발송"],
+[45, "복호두 사당역점", "심정연", "01045776562", 1, "2027-04-14", "2026-10-14", "2027-01-14", "미발송"],
+[46, "복호두 과천점", "김미옥", "01066877306", 2, "2027-04-30", "2026-10-30", "2027-01-30", "미발송"],
+[47, "복호두 일산동구청점", "정은영", "01086226588", 1, "2027-05-06", "2026-11-06", "2027-02-06", "미발송"],
+[48, "복호두 노원하계점", "임현정", "01054467447", 2, "2027-05-18", "2026-11-18", "2027-02-18", "미발송"],
+[49, "복호두 청주동남지구점", "김혜란", "01025039135", 2, "2027-05-18", "2026-11-18", "2027-02-18", "미발송"],
+[50, "복호두 용호빌리브점", "한인규", "01096634959", 2, "2027-05-25", "2026-11-25", "2027-02-25", "미발송"],
+[51, "복호두 아산 풍기점", "양동영", "01088110711", 2, "2027-05-29", "2026-11-29", "2027-02-28", "미발송"],
+[52, "복호두 전주 에코시티점", "정지용", "01099300100", 2, "2027-06-11", "2026-12-11", "2027-03-11", "미발송"],
+[53, "복호두 구파발역점", "최은주", "01051568940", 1, "2027-06-16", "2026-12-16", "2027-03-16", "미발송"],
+[54, "복호두 삼각산점", "최인영", "01029782705", 2, "2027-06-22", "2026-12-22", "2027-03-22", "미발송"],
+[55, "복호두 대구 침산점", "엄정아", "01089742723", 2, "2027-06-25", "2026-12-25", "2027-03-25", "미발송"],
+[56, "복호두 부산 화명점", "김정옥", "01068621960", 2, "2027-07-26", "2027-01-26", "2027-04-26", "미발송"],
+[57, "복호두 용인 역북점", "장정석", "01083008375", 2, "2027-08-04", "2027-02-04", "2027-05-04", "미발송"],
+[58, "복호두 검단신도시점", "김은희", "01040408246", 2, "2027-08-06", "2027-02-06", "2027-05-06", "미발송"],
+[59, "복호두 익산 영등점", "노완숙", "01048493274", 2, "2027-08-13", "2027-02-13", "2027-05-13", "미발송"],
+[60, "복호두 광화문점", "장용한", "01031104180", 2, "2027-08-18", "2027-02-18", "2027-05-18", "미발송"],
+[61, "복호두 영등포시장점", "김윤희", "01047891702", 2, "2027-08-24", "2027-02-24", "2027-05-24", "미발송"],
+[62, "복호두 경복궁역점", "신미연", "01088113156", 1, "2027-08-24", "2027-02-24", "2027-05-24", "미발송"],
+[63, "복호두 신용산역점", "심정연, 신미연", "01045776562", 2, "2027-08-27", "2027-02-27", "2027-05-27", "미발송"],
+[64, "복호두 수지구청역점", "정은영, 최원하", "01091999085", 2, "2027-08-28", "2027-02-28", "2027-05-28", "미발송"],
+[65, "복호두 청라점", "김민지", "01063492066", 3, "2027-08-29", "2027-02-28", "2027-05-29", "미발송"],
+[66, "복호두 김포 구래점", "채숙자", "01084665778", 3, "2027-09-01", "2027-03-01", "2027-06-01", "미발송"],
+[67, "복호두 당진점", "박준규", "01042543254", 2, "2027-09-02", "2027-03-02", "2027-06-02", "미발송"],
+[68, "복호두 청주 율량점", "강민주", "01041195720", 2, "2027-09-04", "2027-03-04", "2027-06-04", "미발송"],
+[69, "복호두 여의도점", "김진환", "01077501702", 1, "2027-09-07", "2027-03-07", "2027-06-07", "미발송"],
+[70, "복호두 문정점", "김혜림", "01084604566", 2, "2027-09-08", "2027-03-08", "2027-06-08", "미발송"],
+[71, "복호두 대구 월성점", "이진규외 1명", "01064387901", 2, "2027-09-12", "2027-03-12", "2027-06-12", "미발송"],
+[72, "복호두 광주 진월점", "진성수", "01024474015", 2, "2027-09-13", "2027-03-13", "2027-06-13", "미발송"],
+[73, "복호두 서대문역점", "하정근", "01084150800", 1, "2027-09-14", "2027-03-14", "2027-06-14", "미발송"],
+[74, "복호두 양산 범어점", "김선진", "01086927892", 2, "2027-09-16", "2027-03-16", "2027-06-16", "미발송"],
+[75, "복호두 미사역점", "최은아", "01044933556", 2, "2027-09-24", "2027-03-24", "2027-06-24", "미발송"],
+[76, "복호두 송도스마트스퀘어점", "이인영", "010-4773-7318", 1, "2027-09-28", "2027-03-28", "2027-06-28", "미발송"],
+[77, "복호두 안산 상록수역점", "이인경", "01090048550", 2, "2027-10-10", "2027-04-10", "2027-07-10", "미발송"],
+[78, "복호두 용인 동백점", "오미향", "01056378286", 2, "2027-10-10", "2027-04-10", "2027-07-10", "미발송"],
+[79, "복호두 부평 청천점", "윤상호", "01084800179", 3, "2027-10-16", "2027-04-16", "2027-07-16", "미발송"],
+[80, "복호두 창원시청점", "정미라", "010-3334-7355", 1, "2027-10-19", "2027-04-19", "2027-07-19", "미발송"],
+[81, "복호두 칠곡점", "박명진, 이경옥", "01032468622", 2, "2027-10-31", "2027-04-30", "2027-07-31", "미발송"],
+[82, "복호두 잠실스타파크점", "김선희", "01087934001", 2, "2027-11-03", "2027-05-03", "2027-08-03", "미발송"],
+[83, "복호두 서울대입구역점", "이제윤", "010-4813-6895", 1, "2027-11-09", "2027-05-09", "2027-08-09", "미발송"],
+[84, "복호두 안양 비산점", "장수경", "01062088665", 2, "2027-11-09", "2027-05-09", "2027-08-09", "미발송"],
+[85, "복호두 다산점", "이현정", "01099654283", 3, "2027-11-09", "2027-05-09", "2027-08-09", "미발송"],
+[86, "복호두 부천 중동점", "양대선", "01072770136", 3, "2027-11-14", "2027-05-14", "2027-08-14", "미발송"],
+[87, "복호두 목동파리공원점", "강유현", "01038099275", 2, "2027-11-14", "2027-05-14", "2027-08-14", "미발송"],
+[88, "복호두 당하점", "이병윤", "01033265223", 3, "2027-11-15", "2027-05-15", "2027-08-15", "미발송"],
+[89, "복호두 파주교하점", "정현정", "010-4760-1207", 1, "2027-11-16", "2027-05-16", "2027-08-16", "미발송"],
+[90, "복호두 수원 시청역점", "조주연", "01020665463", 2, "2027-11-28", "2027-05-28", "2027-08-28", "미발송"],
+[91, "복호두 배곧점", "이희정", "01052934723", 3, "2027-12-01", "2027-06-01", "2027-09-01", "미발송"],
+[92, "복호두 송파 위례점", "김경민", "01040321895", 3, "2027-12-07", "2027-06-07", "2027-09-07", "미발송"],
+[93, "복호두 구월점", "한혜경", "01090754624", 3, "2027-12-11", "2027-06-11", "2027-09-11", "미발송"],
+[94, "복호두 김포 풍무점", "문윤호", "01031323169", 3, "2027-12-14", "2027-06-14", "2027-09-14", "미발송"],
+[95, "복호두 동탄 호수공원점", "백설희", "01050509902", 2, "2027-12-19", "2027-06-19", "2027-09-19", "미발송"],
+[96, "복호두 조치원점", "박경래", "01051158821", 3, "2027-12-21", "2027-06-21", "2027-09-21", "미발송"],
+[97, "복호두 구미 옥계점", "최용익", "01055462125", 2, "2028-01-01", "2027-07-01", "2027-10-01", "미발송"],
+[98, "복호두 대구청라언덕점", "윤나래", "010-2889-7815", 1, "2028-01-04", "2027-07-04", "2027-10-04", "미발송"],
+[99, "복호두 영종 하늘도시점", "전병주", "01056801750", 3, "2028-01-04", "2027-07-04", "2027-10-04", "미발송"],
+[100, "복호두 분당 정자점", "이선우", "01023841942", 2, "2028-01-07", "2027-07-07", "2027-10-07", "미발송"],
+[101, "복호두 동작구청점", "윤형식", "010-9488-8671", 1, "2028-01-11", "2027-07-11", "2027-10-11", "미발송"],
+[102, "복호두 세종 나성점", "임재승", "01099070638", 3, "2028-01-11", "2027-07-11", "2027-10-11", "미발송"],
+[103, "복호두 양주 옥정점", "강민수", "01071299082", 3, "2028-01-13", "2027-07-13", "2027-10-13", "미발송"],
+[104, "복호두 광명 소하점", "정은주", "01046646685", 3, "2028-01-18", "2027-07-18", "2027-10-18", "미발송"],
+[105, "복호두 은평 역촌점", "윤여민 외2명", "01063097988", 3, "2028-01-22", "2027-07-22", "2027-10-22", "미발송"],
+[106, "복호두 강남역점", "문혜원외 1명", "01032558770", 2, "2028-01-23", "2027-07-23", "2027-10-23", "미발송"],
+[107, "복호두 왕십리점", "신정환", "01037352675", 2, "2028-01-25", "2027-07-25", "2027-10-25", "미발송"],
+[108, "복호두 인천 논현점", "박순희", "01086287181", 2, "2028-02-05", "2027-08-05", "2027-11-05", "미발송"],
+[109, "복호두 용현sk점", "이명훈", "01079403664", 3, "2028-02-14", "2027-08-14", "2027-11-14", "미발송"],
+[110, "복호두 부천 옥길점", "이인애", "01092406006", 3, "2028-02-14", "2027-08-14", "2027-11-14", "미발송"],
+[111, "복호두 동탄 목동점", "정진경", "01063281702", 3, "2028-02-16", "2027-08-16", "2027-11-16", "미발송"],
+[112, "복호두 울산 구영점", "이현해", "01020366498", 2, "2028-02-18", "2027-08-18", "2027-11-18", "미발송"],
+[113, "복호두 화곡역점", "이지혁", "01051398610", 2, "2028-02-18", "2027-08-18", "2027-11-18", "미발송"],
+[114, "복호두 김해 율하점", "정치영", "01058828213", 2, "2028-02-26", "2027-08-26", "2027-11-26", "미발송"],
+[115, "복호두 오산 세교점", "이미정", "01062355090", 2, "2028-02-27", "2027-08-27", "2027-11-27", "미발송"],
+[116, "복호두 대치점", "심정연", "01045776562", 2, "2028-03-08", "2027-09-08", "2027-12-08", "미발송"],
+[117, "복호두 삼성중앙역점", "배동연", "010-4575-4571", 1, "2028-03-09", "2027-09-09", "2027-12-09", "미발송"],
+[118, "복호두 하남시청역점", "최은아", "01044933556", 1, "2028-03-11", "2027-09-11", "2027-12-11", "미발송"],
+[119, "복호두 순천신대점", "서현희", "010-6791-7127", 1, "2028-03-16", "2027-09-16", "2027-12-16", "미발송"],
+[120, "복호두 안양 평촌점", "장수영", "01031046660", 3, "2028-03-20", "2027-09-20", "2027-12-20", "미발송"],
+[121, "복호두 을지로3가점", "방미경", "010-2965-1945", 1, "2028-03-22", "2027-09-22", "2027-12-22", "미발송"],
+[122, "복호두 경주 용황점", "최나영", "01042527756", 2, "2028-04-02", "2027-10-02", "2028-01-02", "미발송"],
+[123, "복호두 산본점", "김인정", "01026016283", 3, "2028-04-02", "2027-10-02", "2028-01-02", "미발송"],
+[124, "복호두 충주점", "박미연", "01058911542", 3, "2028-04-03", "2027-10-03", "2028-01-03", "미발송"],
+[125, "복호두 광교점", "백미숙", "01071718789", 3, "2028-04-05", "2027-10-05", "2028-01-05", "미발송"],
+[126, "복호두 포항문덕점", "박재윤", "010-9884-0978", 1, "2028-04-12", "2027-10-12", "2028-01-12", "미발송"],
+[127, "복호두 창원 중동점", "양송이", "01086098120", 2, "2028-04-19", "2027-10-19", "2028-01-19", "미발송"],
+[128, "복호두 마곡역점", "김혜미", "01088953201", 3, "2028-04-19", "2027-10-19", "2028-01-19", "미발송"],
+[129, "복호두 분당야탑점", "손지희", "010-9837-2708", 1, "2028-04-19", "2027-10-19", "2028-01-19", "미발송"],
+[130, "복호두 연수동춘", "김문희", "01082766029", 3, "2028-04-23", "2027-10-23", "2028-01-23", "미발송"],
+[131, "복호두 계산점", "이성택", "01090722066", 3, "2028-04-28", "2027-10-28", "2028-01-28", "미발송"],
+[132, "복호두 안산중앙 직영점", "남우연", "010-2289-2408", 3, "2028-04-30", "2027-10-30", "2028-01-30", "미발송"],
+[133, "복호두 분당 서현점", "김은주", "01063187239", 3, "2028-04-30", "2027-10-30", "2028-01-30", "미발송"],
+[134, "복호두 평택 비전점", "이윤겸", "01071956214", 3, "2028-05-02", "2027-11-02", "2028-02-02", "미발송"],
+[135, "복호두 동탄 능동점", "장보배", "01089150289", 3, "2028-05-25", "2027-11-25", "2028-02-25", "미발송"],
+[136, "복호두 인천 서창점", "김하정", "01055026572", 3, "2028-05-29", "2027-11-29", "2028-02-29", "미발송"],
+[137, "복호두 강동 상일점", "조희진", "01093210012", 3, "2028-06-01", "2027-12-01", "2028-03-01", "미발송"],
+[138, "복호두 수원 망포점", "이언경", "01062251220", 3, "2028-06-07", "2027-12-07", "2028-03-07", "미발송"],
+[139, "복호두 구로디지털점", "김정혁", "01053882027", 2, "2028-06-09", "2027-12-09", "2028-03-09", "미발송"],
+[140, "복호두 안성 공도점", "홍지민", "01026257583", 3, "2028-06-13", "2027-12-13", "2028-03-13", "미발송"],
+[141, "복호두 지산 범물점", "박고훈", "01051107814", 2, "2028-06-22", "2027-12-22", "2028-03-22", "미발송"],
+[142, "복호두 시흥은계점", "조용호", "01090618034", 2, "2028-06-25", "2027-12-25", "2028-03-25", "미발송"],
+[143, "복호두 파주 운정점", "김보라", "010-7212-0952", 1, "2028-06-28", "2027-12-28", "2028-03-28", "미발송"],
+[144, "복호두 광주 수완점", "오춘순외1명(진성수)", "01024474015", 3, "2028-06-30", "2027-12-30", "2028-03-30", "미발송"],
+[145, "복호두 강남 논현점", "정은경", "01034553356", 3, "2028-07-05", "2028-01-05", "2028-04-05", "미발송"],
+[146, "복호두 일산 킨텍스점", "정은영, 최소진", "01086226588", 3, "2028-07-05", "2028-01-05", "2028-04-05", "미발송"],
+[147, "복호두 시흥 목감점", "박균남", "01089633946", 3, "2028-07-06", "2028-01-06", "2028-04-06", "미발송"],
+[148, "복호두 화정점", "장형란", "01046353077", 2, "2028-07-06", "2028-01-06", "2028-04-06", "미발송"],
+[149, "복호두 청주 터미널점", "공주희", "01076668297", 3, "2028-07-25", "2028-01-25", "2028-04-25", "미발송"],
+[150, "신규", "", "", 1, "2028-07-09", "2028-01-09", "2028-04-09", "미발송"],
+[151, "복호두 안산본점", "박동규", "01065302291", "직영/본점", "-", "-", "-", "-"],
+[152, "복호두 대전 직영본점", "박동규, 심규도", "01066208629", "직영/본점", "-", "-", "-", "-"],
+[153, "(폐점)파주 운정점", "이경희", "01087876797", 0, null, null, null, ""],
+[154, "복호두 하남 미사점", "매장 이전", "", 0, null, null, null, ""],
+[155, "(폐점)잠실 석촌고분역점", "폐점", "01071897879", 0, null, null, null, ""]
+];
+  // '신규' 임시 항목 제외 + 현재계약종료일이 있는 매장만 집계 대상으로 사용
+  const CONTRACT_DATA = CONTRACT_DATA_RAW.filter(r => r[1] !== '신규' && !!r[5]);
+  window.CONTRACT_DATA = CONTRACT_DATA;
+
+  function todayMidnight(){
+    const d = new Date();
+    d.setHours(0,0,0,0);
+    return d;
+  }
+
+  // 날짜문자열(YYYY-MM-DD) 기준 D-day, 상태 계산 (오늘 날짜 기준으로 항상 재계산)
+  function computeInfo(endStr){
+    if(!endStr) return {dday:null, status:'check'};
+    const end = new Date(endStr+'T00:00:00');
+    const today = todayMidnight();
+    const dday = Math.round((end-today)/86400000);
+    let status;
+    if(dday < 0) status = 'check';
+    else if(dday <= 90) status = 'urgent';
+    else if(dday <= 180) status = 'soon';
+    else status = 'normal';
+    return {dday, status};
+  }
+
+  const STATUS_LABEL = {
+    urgent: '🔴 3개월이내(긴급)',
+    soon: '🟡 6개월이내(안내필요)',
+    normal: '🟢 정상',
+    check: '⚠ 만료경과/확인필요'
+  };
+  const STATUS_BADGE_CLASS = {urgent:'rc-urgent', soon:'rc-soon', normal:'rc-normal', check:'rc-check'};
+  const STATUS_DDAY_CLASS = {urgent:'rc-dday-urgent', soon:'rc-dday-soon', normal:'rc-dday-normal', check:''};
+
+  // 오늘 기준 '다음 달'에 종료되는 매장 목록 (달력상 월이 1개월 차이)
+  function getNextMonthExpiring(){
+    const today = todayMidnight();
+    let targetMonth = today.getMonth()+1;
+    let targetYear = today.getFullYear();
+    if(targetMonth > 11){ targetMonth = 0; targetYear += 1; }
+    return CONTRACT_DATA.filter(r=>{
+      const endStr = r[5];
+      if(!endStr) return false;
+      const end = new Date(endStr+'T00:00:00');
+      return end.getFullYear()===targetYear && end.getMonth()===targetMonth;
+    });
+  }
+
+  window.__rcFilterStatus = 'all';
+
+  window.switchPage = function(page){
+    document.getElementById('salesPage').style.display = (page==='sales') ? '' : 'none';
+    document.getElementById('contractPage').style.display = (page==='contract') ? '' : 'none';
+    document.getElementById('pageTab-sales').classList.toggle('active', page==='sales');
+    document.getElementById('pageTab-contract').classList.toggle('active', page==='contract');
+    document.getElementById('brandTitle').textContent = (page==='sales') ? '복호두 매출 현황판' : '복호두 재계약 현황판';
+    if(page==='contract'){ renderContractKpis(); renderContractTable(); }
+  };
+
+  window.setRcFilter = function(status){
+    window.__rcFilterStatus = status;
+    renderContractKpis();
+    renderContractTable();
+  };
+
+  window.renderContractKpis = function(){
+    const counts = {all:0, urgent:0, soon:0, normal:0, check:0};
+    CONTRACT_DATA.forEach(r=>{
+      const {status} = computeInfo(r[5]);
+      counts.all++; counts[status]++;
+    });
+    const cards = [
+      {key:'all', label:'전체 매장', val:counts.all, color:'#e0f0ff'},
+      {key:'urgent', label:'🔴 3개월이내(긴급)', val:counts.urgent, color:'#e05555'},
+      {key:'soon', label:'🟡 6개월이내(안내필요)', val:counts.soon, color:'#f0a04a'},
+      {key:'normal', label:'🟢 정상', val:counts.normal, color:'#3db87a'},
+      {key:'check', label:'⚠ 확인필요', val:counts.check, color:'#aaaaaa'}
+    ];
+    document.getElementById('rcKpiRow').innerHTML = cards.map(c=>
+      `<div class="rc-kpi ${window.__rcFilterStatus===c.key?'active':''}" onclick="setRcFilter('${c.key}')">
+        <div class="kl">${c.label}</div>
+        <div class="kv" style="color:${c.color};">${c.val}</div>
+      </div>`).join('');
+    const urgentBadge = document.getElementById('rcUrgentBadge');
+    if(counts.urgent>0){ urgentBadge.style.display='inline-block'; urgentBadge.textContent=counts.urgent; }
+    else { urgentBadge.style.display='none'; }
+  };
+
+  window.renderContractTable = function(){
+    const q = (document.getElementById('rcSearch').value||'').trim();
+    const sortVal = document.getElementById('rcSortSel').value;
+    const today = todayMidnight();
+    let targetMonth = today.getMonth()+1, targetYear = today.getFullYear();
+    if(targetMonth>11){ targetMonth=0; targetYear+=1; }
+
+    let rows = CONTRACT_DATA.map(r=>{
+      const info = computeInfo(r[5]);
+      return {raw:r, ...info};
+    });
+    if(window.__rcFilterStatus!=='all') rows = rows.filter(r=>r.status===window.__rcFilterStatus);
+    if(q) rows = rows.filter(r=> r.raw[1].includes(q) || (r.raw[2]||'').includes(q));
+
+    rows.sort((a,b)=>{
+      if(sortVal==='name') return a.raw[1].localeCompare(b.raw[1]);
+      const da = a.dday===null ? 999999 : a.dday;
+      const db = b.dday===null ? 999999 : b.dday;
+      return sortVal==='dday_desc' ? db-da : da-db;
+    });
+
+    document.getElementById('rcTableBody').innerHTML = rows.map(r=>{
+      const [no,name,person,phone,cnt,end,m6,m3,sent] = r.raw;
+      const isThisMonth = end && (()=>{ const d=new Date(end+'T00:00:00'); return d.getFullYear()===targetYear && d.getMonth()===targetMonth; })();
+      const ddayText = r.dday===null ? '-' : (r.dday<0 ? `D+${-r.dday}` : `D-${r.dday}`);
+      return `<tr class="${isThisMonth?'rc-row-thismonth':''}">
+        <td>${no}</td>
+        <td class="rc-name store-name">${name}</td>
+        <td>${person||'-'}</td>
+        <td>${phone||'-'}</td>
+        <td>${cnt}회</td>
+        <td>${end||'-'}</td>
+        <td class="${STATUS_DDAY_CLASS[r.status]}">${ddayText}</td>
+        <td><span class="rc-badge ${STATUS_BADGE_CLASS[r.status]}">${STATUS_LABEL[r.status]}</span></td>
+        <td>${m6||'-'}</td>
+        <td>${m3||'-'}</td>
+        <td>${sent||'-'}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="10" style="padding:24px;color:#6b8fa8;">해당 조건의 매장이 없습니다.</td></tr>';
+
+    document.getElementById('rcTableTitle').textContent =
+      `재계약 현황 (${rows.length}개 매장)`;
+  };
+
+  // ── 재계약 만료 임박(다음 달 만료) 알림 모달 ──
+  function checkContractAlert(){
+    const list = getNextMonthExpiring();
+    if(list.length===0) return;
+    const today = todayMidnight();
+    let targetMonth = today.getMonth()+1, targetYear = today.getFullYear();
+    if(targetMonth>11){ targetMonth=0; targetYear+=1; }
+    const ymKey = `${targetYear}-${String(targetMonth+1).padStart(2,'0')}`;
+    const STORAGE_KEY = 'contract_alert_dismissed_'+ymKey;
+    let dismissed = false;
+    try{ dismissed = localStorage.getItem(STORAGE_KEY)==='1'; }catch(e){}
+    if(dismissed) return;
+
+    document.getElementById('rcAlertTitle').textContent = `${targetMonth+1}월 재계약 만료 예정 매장 안내`;
+    document.getElementById('rcAlertSub').textContent = `오늘(${today.getFullYear()}.${today.getMonth()+1}.${today.getDate()}) 기준, 다음 달 계약이 종료되는 매장이 ${list.length}곳 있습니다.`;
+    document.getElementById('rcAlertList').innerHTML = list
+      .sort((a,b)=> new Date(a[5]) - new Date(b[5]))
+      .map(r=>`<li><span class="rc-alert-name">${r[1]}</span><span class="rc-alert-date">${r[5]} 종료</span></li>`).join('');
+    document.getElementById('rcAlertBox').style.display = 'block';
+    window.openNoticeOverlay();
+    window.__rcAlertYmKey = STORAGE_KEY;
+  }
+
+  window.checkContractAlert = checkContractAlert;
+
+  window.closeContractAlertModal = function(){
+    const check = document.getElementById('rcAlertDontShowCheck');
+    if(check && check.checked && window.__rcAlertYmKey){
+      try{ localStorage.setItem(window.__rcAlertYmKey, '1'); }catch(e){}
+    }
+    document.getElementById('rcAlertBox').style.display = 'none';
+    window.maybeCloseNoticeOverlay();
+  };
+
+  window.addEventListener('DOMContentLoaded', function(){
+    renderContractKpis();
+    checkContractAlert(); // 업데이트 안내 모달과 같은 화면(오버레이)에 함께 표시됨
+  });
+})();
+
 
 
 // ===== 메뉴 분석 기능 =====
@@ -3637,6 +4073,9 @@ renderMenuMonthTabs();
       </div>
     </div>
   </div>
+
+  </div><!-- /salesPage -->
+
 </div>
 
 <style>
@@ -4247,6 +4686,18 @@ function toggleMaskNames() {
   }
 }
 
+// ── 공지 오버레이 공통 헬퍼 (업데이트 안내 + 재계약 알림을 함께 띄우기 위함) ──
+window.openNoticeOverlay = function(){
+  document.getElementById('noticeOverlay').classList.add('open');
+};
+window.maybeCloseNoticeOverlay = function(){
+  const u = document.getElementById('updateModalBox');
+  const r = document.getElementById('rcAlertBox');
+  if (u.style.display === 'none' && r.style.display === 'none') {
+    document.getElementById('noticeOverlay').classList.remove('open');
+  }
+};
+
 // ── 업데이트 안내 모달 (2026.07.07 ~ 2026.07.10 노출) ──
 (function(){
   const STORAGE_KEY = 'update_notice_20260707_dismissed';
@@ -4259,19 +4710,21 @@ function toggleMaskNames() {
     try { dismissed = localStorage.getItem(STORAGE_KEY) === '1'; } catch(e) {}
     if (!dismissed) {
       window.addEventListener('DOMContentLoaded', function(){
-        document.getElementById('updateModalOverlay').classList.add('open');
+        document.getElementById('updateModalBox').style.display = 'block';
+        window.openNoticeOverlay();
       });
     }
   }
 })();
 
 function closeUpdateModal(){
-  const overlay = document.getElementById('updateModalOverlay');
+  const box = document.getElementById('updateModalBox');
   const check = document.getElementById('umDontShowCheck');
   if (check && check.checked) {
     try { localStorage.setItem('update_notice_20260707_dismissed', '1'); } catch(e) {}
   }
-  overlay.classList.remove('open');
+  box.style.display = 'none';
+  window.maybeCloseNoticeOverlay();
 }
 </script>
 </body>
