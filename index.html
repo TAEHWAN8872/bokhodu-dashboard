@@ -370,12 +370,7 @@ body.hide-names .store-name:hover{
   <div class="page-tabs">
     <div class="page-tab active" id="pageTab-sales" onclick="switchPage('sales')">📊 매출 현황판</div>
     <div class="page-tab" id="pageTab-contract" onclick="switchPage('contract')">📋 재계약 안내<span class="pt-badge" id="rcUrgentBadge" style="display:none;"></span></div>
-    <div class="page-tab" id="pageTab-keyword" onclick="switchPage('keyword')">🔑 키워드검색</div>
-  </div>
-
-  <!-- 키워드검색 페이지 -->
-  <div id="keywordPage" style="display:none;height:calc(100vh - 140px);">
-    <iframe id="keywordFrame" src="" style="width:100%;height:100%;border:0;border-radius:8px;background:#0e1d2f;" loading="lazy"></iframe>
+    <div class="page-tab" id="pageTab-keyword" onclick="window.open('https://taehwan8872.github.io/bokhodu-keyword-tracker/', '_blank')" style="display:inline-flex;align-items:center;gap:4px;line-height:1;"><span style="display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:15px;height:15px;background:#03C75A;color:#fff;font-weight:800;font-size:10px;border-radius:3px;">N</span><span>키워드검색량</span></div>
   </div>
 
   <!-- 재계약 현황판 페이지 -->
@@ -2837,16 +2832,10 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   window.switchPage = function(page){
     document.getElementById('salesPage').style.display = (page==='sales') ? '' : 'none';
     document.getElementById('contractPage').style.display = (page==='contract') ? '' : 'none';
-    document.getElementById('keywordPage').style.display = (page==='keyword') ? '' : 'none';
     document.getElementById('pageTab-sales').classList.toggle('active', page==='sales');
     document.getElementById('pageTab-contract').classList.toggle('active', page==='contract');
-    document.getElementById('pageTab-keyword').classList.toggle('active', page==='keyword');
-    document.getElementById('brandTitle').textContent = (page==='sales') ? '복호두 매출 현황판' : (page==='contract') ? '복호두 재계약 안내' : '복호두 키워드검색';
+    document.getElementById('brandTitle').textContent = (page==='sales') ? '복호두 매출 현황판' : '복호두 재계약 안내';
     if(page==='contract'){ renderContractKpis(); renderContractTable(); }
-    if(page==='keyword'){
-      const frame = document.getElementById('keywordFrame');
-      if(!frame.src){ frame.src = 'https://taehwan8872.github.io/bokhodu-keyword-tracker/'; }
-    }
   };
 
   window.setRcFilter = function(status){
