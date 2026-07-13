@@ -2818,24 +2818,60 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       body.innerHTML = endRow + '<div style="color:#6b8fa8;font-size:13px;padding:8px 0;">등록된 매장정보가 없습니다.</div>';
     } else {
       const rows = [
-        ['주소', info.addr],
+        ['주소', info.addr, true],
         ['연락처', info.phone],
-        ['이메일주소', info.email],
+        ['이메일주소', info.email, true],
         ['사업자번호', info.biznum],
         ['성함', info.owner],
         ['최초계약일', info.firstdate],
         ['계약 종료일', contractEnd],
       ];
       body.innerHTML = rows.map(function(pair){
-        const label = pair[0], val = pair[1];
-        return '<div style="display:flex;gap:10px;padding:9px 12px;background:#0d1b2a;border-radius:8px;border:0.5px solid #1a2f44;">'
+        const label = pair[0], val = pair[1], copyable = pair[2];
+        const copyBtn = (copyable && val)
+          ? '<button onclick="siCopyField(this,\'' + String(val).replace(/'/g,"\\'") + '\')" style="flex-shrink:0;background:#16283c;border:0.5px solid #2a5a8a;color:#7eb8e8;font-size:11px;font-weight:600;border-radius:6px;padding:3px 9px;cursor:pointer;">복사</button>'
+          : '';
+        return '<div style="display:flex;gap:10px;padding:9px 12px;background:#0d1b2a;border-radius:8px;border:0.5px solid #1a2f44;align-items:center;">'
           + '<div style="min-width:78px;font-size:12px;color:#6b8fa8;font-weight:600;">' + label + '</div>'
-          + '<div style="font-size:13px;color:#dbe8f5;word-break:break-all;">' + (val || '-') + '</div>'
+          + '<div style="flex:1;font-size:13px;color:#dbe8f5;word-break:break-all;">' + (val || '-') + '</div>'
+          + copyBtn
           + '</div>';
       }).join('');
     }
     document.getElementById('storeInfoModal').classList.add('open');
   };
+
+  window.siCopyField = function(btn, text){
+    const done = function(){
+      const orig = btn.textContent;
+      btn.textContent = '복사됨';
+      btn.style.color = '#3db87a';
+      btn.style.borderColor = '#3db87a';
+      setTimeout(function(){
+        btn.textContent = orig;
+        btn.style.color = '#7eb8e8';
+        btn.style.borderColor = '#2a5a8a';
+      }, 1200);
+    };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done).catch(function(){
+        siFallbackCopy(text); done();
+      });
+    } else {
+      siFallbackCopy(text); done();
+    }
+  };
+
+  function siFallbackCopy(text){
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try{ document.execCommand('copy'); }catch(e){}
+    document.body.removeChild(ta);
+  }
 
   window.closeStoreInfoModal = function(){
     document.getElementById('storeInfoModal').classList.remove('open');
