@@ -310,13 +310,9 @@ body.hide-names .store-name:hover{
     <div class="update-modal" id="updateModalBox" style="display:none;">
       <div class="update-modal-icon">🔔</div>
       <h2>업데이트 안내</h2>
-      <div class="um-date">2026.07.07 업데이트</div>
+      <div class="um-date">2026.07.13 업데이트</div>
       <ul>
-        <li><span class="um-num">1.</span> 매출분석 &gt; 호두과자 25년/26년 비교 매출 추가</li>
-        <li><span class="um-num">2.</span> 매출분석 &gt; 답례품 25년/26년 비교 매출 추가</li>
-        <li><span class="um-num">3.</span> 메뉴별 검색 시 해당 상품 비율 표시 추가</li>
-        <li><span class="um-num">4.</span> 매장 클릭 시 월별 전년 대비 증감이 1월~12월 전체 표시되도록 개선</li>
-        <li><span class="um-num">5.</span> 매장 클릭 시 물류 매출 비중 색상을 구간별로 정확히 표시하도록 수정</li>
+        <li><span class="um-num">1.</span> 상단 탭에 🔑 키워드검색 메뉴 추가 (클릭 시 키워드검색 사이트 바로 이동)</li>
       </ul>
       <div class="update-modal-actions">
         <label class="um-dontshow">
@@ -4778,11 +4774,11 @@ window.maybeCloseNoticeOverlay = function(){
   }
 };
 
-// ── 업데이트 안내 모달 (2026.07.07 ~ 2026.07.10 노출) ──
+// ── 업데이트 안내 모달 (2026.07.13 ~ 2026.07.17 노출) ──
 (function(){
-  const STORAGE_KEY = 'update_notice_20260707_dismissed';
-  const START = new Date('2026-07-07T00:00:00');
-  const END = new Date('2026-07-10T23:59:59');
+  const STORAGE_KEY = 'update_notice_20260713_dismissed';
+  const START = new Date('2026-07-13T00:00:00');
+  const END = new Date('2026-07-17T23:59:59');
   const now = new Date();
 
   if (now >= START && now <= END) {
@@ -4801,7 +4797,7 @@ function closeUpdateModal(){
   const box = document.getElementById('updateModalBox');
   const check = document.getElementById('umDontShowCheck');
   if (check && check.checked) {
-    try { localStorage.setItem('update_notice_20260707_dismissed', '1'); } catch(e) {}
+    try { localStorage.setItem('update_notice_20260713_dismissed', '1'); } catch(e) {}
   }
   box.style.display = 'none';
   window.maybeCloseNoticeOverlay();
