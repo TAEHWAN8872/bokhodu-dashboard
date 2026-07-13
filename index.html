@@ -313,7 +313,7 @@ body.hide-names .store-name:hover{
       <div class="um-date">2026.07.13 업데이트</div>
       <ul>
         <li><span class="um-num">1.</span> 상단 탭에 🔑 키워드검색 메뉴 추가 (클릭 시 키워드검색 사이트 바로 이동)</li>
-        <li><span class="um-num">2.</span> 재계약 안내 &gt; 매장명 클릭 시 매장 기본정보(주소·연락처·이메일·사업자번호·성함·최초계약일) 팝업 추가</li>
+        <li><span class="um-num">2.</span> 재계약 안내 &gt; 매장명 클릭 시 매장 기본정보(주소·연락처·이메일·사업자번호·성함·최초계약일·계약 종료일) 팝업 추가</li>
       </ul>
       <div class="update-modal-actions">
         <label class="um-dontshow">
@@ -2803,13 +2803,19 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
 ;
   window.STORE_INFO = STORE_INFO;
 
-  window.openStoreInfoModal = function(name){
+  window.openStoreInfoModal = function(name, contractEnd){
     const info = STORE_INFO[name];
     document.getElementById('siModalTitle').textContent = name;
     document.getElementById('siModalSub').textContent = '매장 상세정보';
     const body = document.getElementById('siModalBody');
     if(!info){
-      body.innerHTML = '<div style="color:#6b8fa8;font-size:13px;padding:8px 0;">등록된 매장정보가 없습니다.</div>';
+      const endRow = contractEnd && contractEnd!=='-'
+        ? '<div style="display:flex;gap:10px;padding:9px 12px;background:#0d1b2a;border-radius:8px;border:0.5px solid #1a2f44;">'
+          + '<div style="min-width:78px;font-size:12px;color:#6b8fa8;font-weight:600;">계약 종료일</div>'
+          + '<div style="font-size:13px;color:#dbe8f5;word-break:break-all;">' + contractEnd + '</div>'
+          + '</div>'
+        : '';
+      body.innerHTML = endRow + '<div style="color:#6b8fa8;font-size:13px;padding:8px 0;">등록된 매장정보가 없습니다.</div>';
     } else {
       const rows = [
         ['주소', info.addr],
@@ -2818,6 +2824,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
         ['사업자번호', info.biznum],
         ['성함', info.owner],
         ['최초계약일', info.firstdate],
+        ['계약 종료일', contractEnd],
       ];
       body.innerHTML = rows.map(function(pair){
         const label = pair[0], val = pair[1];
@@ -2944,7 +2951,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       const ddayText = r.dday===null ? '-' : (r.dday<0 ? `D+${-r.dday}` : `D-${r.dday}`);
       return `<tr class="${isThisMonth?'rc-row-thismonth':''}">
         <td>${no}</td>
-        <td class="rc-name store-name" style="cursor:pointer;" onclick="openStoreInfoModal(decodeURIComponent('${encodeURIComponent(name)}'))">${name}</td>
+        <td class="rc-name store-name" style="cursor:pointer;" onclick="openStoreInfoModal(decodeURIComponent('${encodeURIComponent(name)}'),decodeURIComponent('${encodeURIComponent(end||'-')}'))">${name}</td>
         <td>${person||'-'}</td>
         <td>${phone||'-'}</td>
         <td>${cnt}회</td>
