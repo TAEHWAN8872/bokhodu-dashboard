@@ -5976,6 +5976,38 @@ window.addEventListener('DOMContentLoaded', () => {
     return null;
   }
 
+  // ── AI 폴백(Gemini) 연동 설정 ──
+  // 1) gemini-proxy-worker.js 를 Cloudflare Workers에 배포한 뒤
+  // 2) 배포된 워커 주소(https://xxx.workers.dev)를 아래에 붙여넣으세요.
+  //    비워두면(기본값) 규칙 매칭 실패 시 기존 안내 메시지만 표시됩니다.
+  const AI_PROXY_URL = ''; // 예: 'https://gemini-proxy.내계정.workers.dev'
+
+  // 규칙 매칭 실패 시 Gemini에게 현재 데이터 요약과 함께 질문을 넘겨 답을 받아옴
+  async function askAiFallback(text, ctx){
+    if (!AI_PROXY_URL) return null;
+    try {
+      const summary = ctx.data.map(b => {
+        const r = rowFor(b, ctx.lastIdx, ctx.prevIdx);
+        return {
+          매장명: b.name, 담당자: b.manager, 지역: b.region,
+          이번달매출: r.cur, 전월매출: r.prev, 물류매출: r.log,
+          물류비중: r.cur > 0 ? Math.round(r.ratio * 10) / 10 : 0,
+        };
+      }).filter(d => d.이번달매출 > 0);
+
+      const res = await fetch(AI_PROXY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: text, dataSummary: { 기준월: ctx.monthLabel, 매장목록: summary } }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.answer || null;
+    } catch(e) {
+      return null;
+    }
+  }
+
   const HELP_MSG = [
     '이렇게 물어보실 수 있어요:',
     '· "강남역점 이번 달 매출 얼마야?"',
@@ -6098,13 +6130,23 @@ window.addEventListener('DOMContentLoaded', () => {
       return answerTotalSales(ctx);
     }
 
-    return `죄송해요, 아직 이해하지 못한 질문이에요 😅<br>${HELP_MSG}`;
+    return NO_MATCH_MSG;
   }
 
   // 팝업 창에서 opener.processChatQueryPublic(text) 형태로 호출할 수 있도록 공개
-  window.processChatQueryPublic = function(text){
-    try { return processChatQuery(text); }
+  // 규칙 매칭 실패("이해하지 못한 질문") 시 Gemini AI 폴백을 시도한다
+  const NO_MATCH_MSG = `죄송해요, 아직 이해하지 못한 질문이에요 😅<br>${HELP_MSG}`;
+  window.processChatQueryPublic = async function(text){
+    let result;
+    try { result = processChatQuery(text); }
     catch(e) { return '죄송해요, 답변을 만드는 중 오류가 발생했어요.'; }
+
+    if (result === NO_MATCH_MSG) {
+      const ctx = chatContext(text);
+      const aiAnswer = await askAiFallback(text, ctx);
+      if (aiAnswer) return aiAnswer + '<br><br><span style="opacity:.5;font-size:10px;">🤖 AI 답변 (정확한 수치는 다시 확인해주세요)</span>';
+    }
+    return result;
   };
   window.__CHAT_HELP_MSG__ = HELP_MSG;
 
@@ -6184,20 +6226,25 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     msgsEl.scrollTop = msgsEl.scrollHeight;
   }
 
-  function ask(text){
+  async function ask(text){
     if (!text) return;
     const safe = String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     addBubble('user', safe);
     inputEl.value = '';
-    setTimeout(() => {
-      let answer = '죄송해요, 원본 대시보드 창이 닫혀서 데이터를 조회할 수 없어요. 대시보드를 닫지 말고 다시 시도해주세요.';
-      try {
-        if (opener_ && !opener_.closed && opener_.processChatQueryPublic) {
-          answer = opener_.processChatQueryPublic(text);
-        }
-      } catch(e) {}
-      addBubble('bot', answer);
-    }, 150);
+    const thinkingRow = document.createElement('div');
+    thinkingRow.className = 'row bot';
+    thinkingRow.innerHTML = '<div class="bubble bot" style="opacity:.6;">생각 중...</div>';
+    msgsEl.appendChild(thinkingRow);
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+
+    let answer = '죄송해요, 원본 대시보드 창이 닫혀서 데이터를 조회할 수 없어요. 대시보드를 닫지 말고 다시 시도해주세요.';
+    try {
+      if (opener_ && !opener_.closed && opener_.processChatQueryPublic) {
+        answer = await opener_.processChatQueryPublic(text);
+      }
+    } catch(e) {}
+    thinkingRow.remove();
+    addBubble('bot', answer);
   }
 
   document.getElementById('sendBtn').addEventListener('click', () => ask(inputEl.value.trim()));
