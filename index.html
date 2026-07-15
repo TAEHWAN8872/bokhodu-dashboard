@@ -5671,6 +5671,190 @@ window.addEventListener('DOMContentLoaded', () => {
     return `<b>${esc(store.name)}</b>은 ${esc(ctx.monthLabel)} 기준 전체 ${total}개 매장 중 <b>${rank}위</b>입니다 (매출 ${esc(fmtWonAI(r.cur))}).<br>${esc(store.region)} 지역 내에서는 <b>${regionRank}위</b>입니다.`;
   }
 
+  // ── 매장 자체 월평균 매출 ──
+  function answerStoreAverage(store, ctx){
+    const avg = getBranchAvg(store);
+    if (!avg) return `<b>${esc(store.name)}</b>의 매출 데이터가 없습니다.`;
+    const avg25 = get25Avg(store.name);
+    let cmp = '';
+    if (avg25 > 0) {
+      const rate = (avg - avg25) / avg25 * 100;
+      cmp = ` (작년 월평균 대비 ${rate>=0?'▲':'▼'}${Math.abs(rate).toFixed(1)}%)`;
+    }
+    return `<b>${esc(store.name)}</b>의 26년 월평균 매출은 <b>${esc(fmtWonAI(avg))}</b>입니다${cmp}.`;
+  }
+
+  // ── 매장 월별 매출 목록 ──
+  function answerStoreMonthly(store, ctx){
+    const rows = MONTHS.map((mon,i)=>({mon, v: store.months[i]||0})).filter(r=>r.v>0);
+    if (!rows.length) return `<b>${esc(store.name)}</b>의 월별 매출 데이터가 없습니다.`;
+    const list = rows.map(r=>`· ${r.mon}: ${esc(fmtWonAI(r.v))}`).join('<br>');
+    return `<b>${esc(store.name)}</b> 월별 매출(26년)<br>${list}`;
+  }
+
+  // ── 매장 물류비중 상세 (이상적 구간 32~36% 대비) ──
+  function answerStoreLogistics(store, ctx){
+    const r = rowFor(store, ctx.lastIdx, ctx.prevIdx);
+    if (r.cur <= 0 || r.log <= 0) return `<b>${esc(store.name)}</b>의 ${esc(ctx.monthLabel)} 물류 데이터가 없습니다.`;
+    const IDEAL_MIN = 32, IDEAL_MAX = 36;
+    const lines = [];
+    lines.push(`<b>${esc(store.name)}</b> ${esc(ctx.monthLabel)} 물류 매출: <b>${esc(fmtWonAI(r.log))}</b> (매출 대비 ${r.ratio.toFixed(1)}%)`);
+    if (r.ratio >= IDEAL_MIN && r.ratio <= IDEAL_MAX) {
+      lines.push(`✅ 이상적인 물류비중 구간(${IDEAL_MIN}~${IDEAL_MAX}%) 안에 있습니다.`);
+    } else if (r.ratio < IDEAL_MIN) {
+      lines.push(`이상적인 구간(${IDEAL_MIN}~${IDEAL_MAX}%)보다 ${(IDEAL_MIN-r.ratio).toFixed(1)}%p 낮습니다.`);
+    } else {
+      lines.push(`이상적인 구간(${IDEAL_MIN}~${IDEAL_MAX}%)보다 ${(r.ratio-IDEAL_MAX).toFixed(1)}%p 높습니다.`);
+    }
+    return lines.join('<br>');
+  }
+
+  // ── 매장 종합 AI 인사이트 (매출 흐름 + 지역 비교 + 물류비중 분석) ──
+  function answerStoreInsight(store, ctx){
+    const r = rowFor(store, ctx.lastIdx, ctx.prevIdx);
+    if (r.cur <= 0) return `<b>${esc(store.name)}</b>의 ${esc(ctx.monthLabel)} 매출 데이터가 없습니다.`;
+    const lines = [];
+    lines.push(`<b>📊 ${esc(store.name)} 인사이트 (${esc(ctx.monthLabel)})</b>`);
+
+    if (r.momRate !== null) {
+      lines.push(`전월 대비 ${r.momRate>=0?'▲':'▼'}${Math.abs(r.momRate).toFixed(1)}%`);
+    }
+    const y25 = get25Val(store.name, ctx.lastIdx);
+    if (y25 > 0) {
+      const yoyR = (r.cur - y25) / y25 * 100;
+      lines.push(`전년 동월 대비 ${yoyR>=0?'▲':'▼'}${Math.abs(yoyR).toFixed(1)}%`);
+    }
+
+    // 연속 상승/하락 추세
+    let streak = 0, dir = null;
+    for (let i = ctx.lastIdx; i >= 1; i--) {
+      const cur = store.months[i], prev = store.months[i-1];
+      if (!(cur > 0 && prev > 0)) break;
+      const d = cur > prev ? 'up' : cur < prev ? 'down' : null;
+      if (d === null) break;
+      if (dir === null) { dir = d; streak = 1; }
+      else if (d === dir) streak++;
+      else break;
+    }
+    if (streak >= 2) {
+      lines.push(dir === 'up' ? `📈 ${streak}개월 연속 매출 상승 중입니다` : `📉 ${streak}개월 연속 매출 하락 중입니다`);
+    }
+
+    // 전체 순위 + 매장 평균 대비
+    const allRows = ctx.data.map(b => rowFor(b, ctx.lastIdx, ctx.prevIdx)).filter(x=>x.cur>0);
+    allRows.sort((a,b)=>b.cur-a.cur);
+    const overallRank = allRows.findIndex(x=>x.b.name===store.name) + 1;
+    const avgAll = allRows.length ? allRows.reduce((s,x)=>s+x.cur,0) / allRows.length : 0;
+    if (overallRank > 0 && avgAll > 0) {
+      const diffPct = (r.cur - avgAll) / avgAll * 100;
+      lines.push(`전체 ${allRows.length}개 매장 중 <b>${overallRank}위</b> (전체 평균 대비 ${diffPct>=0?'▲':'▼'}${Math.abs(diffPct).toFixed(1)}%)`);
+    }
+
+    // 지역 내 순위 + 지역 평균 대비
+    const regionRows = allRows.filter(x=>x.b.region===store.region);
+    const regionRank = regionRows.findIndex(x=>x.b.name===store.name) + 1;
+    if (regionRows.length > 1 && regionRank > 0) {
+      const regionAvg = regionRows.reduce((s,x)=>s+x.cur,0) / regionRows.length;
+      const diffPct = (r.cur - regionAvg) / regionAvg * 100;
+      lines.push(`${esc(store.region)} 지역 내 ${regionRows.length}개 매장 중 <b>${regionRank}위</b> (지역 평균 대비 ${diffPct>=0?'▲':'▼'}${Math.abs(diffPct).toFixed(1)}%)`);
+    }
+
+    // 물류비중 이상적 구간(32~36%) 비교
+    if (r.log > 0) {
+      const IDEAL_MIN = 32, IDEAL_MAX = 36;
+      let verdict;
+      if (r.ratio >= IDEAL_MIN && r.ratio <= IDEAL_MAX) verdict = `이상적인 구간(${IDEAL_MIN}~${IDEAL_MAX}%) 안`;
+      else if (r.ratio < IDEAL_MIN) verdict = `이상적인 구간보다 ${(IDEAL_MIN-r.ratio).toFixed(1)}%p 낮음`;
+      else verdict = `이상적인 구간보다 ${(r.ratio-IDEAL_MAX).toFixed(1)}%p 높음`;
+      lines.push(`🚚 물류비중 ${r.ratio.toFixed(1)}% — ${verdict}`);
+    }
+
+    return lines.join('<br>');
+  }
+
+  // ── 특정 지역의 매장당 평균 매출 ──
+  function answerRegionAverage(region, ctx){
+    const rows = ctx.data.filter(b => b.region === region).map(b => rowFor(b, ctx.lastIdx, ctx.prevIdx)).filter(r => r.cur > 0);
+    if (!rows.length) return `${esc(region)} 지역 데이터가 없습니다.`;
+    const avg = rows.reduce((s,r)=>s+r.cur,0) / rows.length;
+    return `${esc(region)} 지역의 ${esc(ctx.monthLabel)} 매장당 평균 매출은 <b>${esc(fmtWonAI(Math.round(avg)))}</b>입니다 (${rows.length}개 매장).`;
+  }
+
+  // ── 담당자별 전체 매출 순위 ──
+  function answerManagerAll(ctx){
+    const rows = CHAT_MANAGERS.map(m => {
+      const list = ctx.data.filter(b => b.manager === m).map(b => rowFor(b, ctx.lastIdx, ctx.prevIdx)).filter(r => r.cur > 0);
+      const total = list.reduce((s,r)=>s+r.cur, 0);
+      return { manager: m, total, count: list.length };
+    }).filter(r => r.count > 0).sort((a,b)=>b.total-a.total);
+    if (!rows.length) return '담당자별 매출 데이터가 없습니다.';
+    const list = rows.map((r,i)=>`${i+1}위 ${esc(r.manager)} — ${esc(fmtWonAI(r.total))} (${r.count}개 매장)`).join('<br>');
+    return `${esc(ctx.monthLabel)} 담당자별 매출 순위<br>${list}`;
+  }
+
+  // ── 지역별 전체 매출 순위 ──
+  function answerRegionAll(ctx){
+    const rows = CHAT_REGIONS.map(rg => {
+      const list = ctx.data.filter(b => b.region === rg).map(b => rowFor(b, ctx.lastIdx, ctx.prevIdx)).filter(r => r.cur > 0);
+      const total = list.reduce((s,r)=>s+r.cur, 0);
+      return { region: rg, total, count: list.length };
+    }).filter(r => r.count > 0).sort((a,b)=>b.total-a.total);
+    if (!rows.length) return '지역별 매출 데이터가 없습니다.';
+    const list = rows.map((r,i)=>`${i+1}위 ${esc(r.region)} — ${esc(fmtWonAI(r.total))} (${r.count}개 매장)`).join('<br>');
+    return `${esc(ctx.monthLabel)} 지역별 매출 순위<br>${list}`;
+  }
+
+  // ── 지역별 매장당 평균 매출 순위 ──
+  function answerRegionAvgAll(ctx){
+    const rows = CHAT_REGIONS.map(rg => {
+      const list = ctx.data.filter(b => b.region === rg).map(b => rowFor(b, ctx.lastIdx, ctx.prevIdx)).filter(r => r.cur > 0);
+      if (!list.length) return null;
+      const avg = list.reduce((s,r)=>s+r.cur, 0) / list.length;
+      return { region: rg, avg, count: list.length };
+    }).filter(Boolean).sort((a,b)=>b.avg-a.avg);
+    if (!rows.length) return '지역별 평균 매출 데이터가 없습니다.';
+    const list = rows.map((r,i)=>`${i+1}위 ${esc(r.region)} — 매장당 평균 ${esc(fmtWonAI(Math.round(r.avg)))} (${r.count}개 매장)`).join('<br>');
+    return `${esc(ctx.monthLabel)} 지역별 매장당 평균 매출<br>${list}`;
+  }
+
+  // ── 전체 집계 헬퍼 (평균매출/물류비중/증감률의 매장·지역 미지정 버전에서 공통 사용) ──
+  function computeOverallStats(ctx){
+    const rows = ctx.data.map(b => rowFor(b, ctx.lastIdx, ctx.prevIdx)).filter(r => r.cur > 0);
+    const totalCur = rows.reduce((s,r)=>s+r.cur, 0);
+    const totalPrev = rows.reduce((s,r)=>s+r.prev, 0);
+    const totalLog = rows.reduce((s,r)=>s+r.log, 0);
+    const momRate = totalPrev > 0 ? (totalCur - totalPrev) / totalPrev * 100 : null;
+    const avgCur = rows.length ? totalCur / rows.length : 0;
+    const logRatio = totalCur > 0 && totalLog > 0 ? totalLog / totalCur * 100 : null;
+    return { rows, totalCur, totalPrev, totalLog, momRate, avgCur, logRatio };
+  }
+
+  // ── 전체 매장당 평균 매출 ──
+  function answerOverallAverage(ctx){
+    const s = computeOverallStats(ctx);
+    if (!s.rows.length) return '집계할 데이터가 없습니다.';
+    return `${esc(ctx.monthLabel)} 기준 매장당 평균 매출은 <b>${esc(fmtWonAI(Math.round(s.avgCur)))}</b>입니다 (총 ${s.rows.length}개 매장).`;
+  }
+
+  // ── 전체 평균 물류비중 개요 (숫자 조건 없이 "물류비중 알려줘" 같은 질문용) ──
+  function answerLogisticsOverview(ctx){
+    const s = computeOverallStats(ctx);
+    if (s.logRatio === null) return `${esc(ctx.monthLabel)} 물류 데이터가 없습니다.`;
+    const IDEAL_MIN = 32, IDEAL_MAX = 36;
+    let verdict;
+    if (s.logRatio >= IDEAL_MIN && s.logRatio <= IDEAL_MAX) verdict = '이상적인 구간 안입니다';
+    else if (s.logRatio < IDEAL_MIN) verdict = `이상적인 구간(${IDEAL_MIN}~${IDEAL_MAX}%)보다 ${(IDEAL_MIN-s.logRatio).toFixed(1)}%p 낮습니다`;
+    else verdict = `이상적인 구간(${IDEAL_MIN}~${IDEAL_MAX}%)보다 ${(s.logRatio-IDEAL_MAX).toFixed(1)}%p 높습니다`;
+    return `${esc(ctx.monthLabel)} 기준 전체 평균 물류비중은 <b>${s.logRatio.toFixed(1)}%</b>입니다 — ${verdict}`;
+  }
+
+  // ── 전체 매출 증감률 (매장 미지정) ──
+  function answerChangeRateOverall(ctx){
+    const s = computeOverallStats(ctx);
+    if (s.momRate === null) return `${esc(ctx.monthLabel)} 전월 데이터가 없어 증감률을 계산할 수 없습니다.`;
+    return `${esc(ctx.monthLabel)} 전체 매출은 전월 대비 ${s.momRate>=0?'▲':'▼'}${Math.abs(s.momRate).toFixed(1)}%입니다 (총매출 ${esc(fmtWonAI(s.totalCur))}).`;
+  }
+
   // ── 물류비중 임계값 필터 (cmp: gte/gt/lte/lt) ──
   function answerLogisticsThreshold(threshold, ctx, cmp){
     cmp = cmp || 'gte';
@@ -5774,6 +5958,12 @@ window.addEventListener('DOMContentLoaded', () => {
     decline: /(급감|많이\s*떨어|가장\s*떨어|가장\s*감소|감소한|줄어든|하락한)/,
     manager: /(담당|매장|실적|매출|성과)/,
     totalSales: /(총\s*매출|전체\s*매출|전체\s*실적|다\s*합쳐서)/,
+    avg: /평균/,
+    monthly: /(월별|매월|다달이|추이)/,
+    insight: /(인사이트|총평|코멘트|분석\s*해|분석해\s*줘)/,
+    byManager: /담당자\s*별/,
+    byRegion: /지역\s*별/,
+    changeRate: /(증감률|증감율|변동률|변화율)/,
   };
 
   function extractTopN(text){
@@ -5789,9 +5979,14 @@ window.addEventListener('DOMContentLoaded', () => {
   const HELP_MSG = [
     '이렇게 물어보실 수 있어요:',
     '· "강남역점 이번 달 매출 얼마야?"',
-    '· "물류비중 40% 넘는 매장 몇 개야?"',
-    '· "인천 지역 매출 1위는?"',
-    '· "이중섭 대리 담당 매장 실적은?"',
+    '· "강남역점 인사이트 보여줘"',
+    '· "강남역점 몇등이야?"',
+    '· "강남역점 월평균 매출은?"',
+    '· "물류비중 40% 넘는 매장 몇 개야?" / "40% 미만인 매장은?"',
+    '· "인천 지역 매출 1위는?" / "인천 지역 평균 매출은?"',
+    '· "지역별 매출 순위는?" / "지역별 평균 매출은?"',
+    '· "이중섭 대리 담당 매장 실적은?" / "담당자별 매출 순위는?"',
+    '· "이번 달 전체 증감률은?"',
     '· "매출 최하위 매장은?"',
     '· "목표 달성한 매장 몇 개야?"',
   ].join('<br>');
@@ -5808,25 +6003,22 @@ window.addEventListener('DOMContentLoaded', () => {
       return '안녕하세요! 매장 매출 데이터를 조회해드리는 챗봇입니다 🙂<br>' + HELP_MSG;
     }
 
-    // 1) 물류비중 필터 (이상/이하/초과/미만 구분)
-    const cmpInfo = extractComparison(text);
-    if (KW.logistics.test(text) && (KW.ratio.test(text) || cmpInfo !== null)) {
-      const threshold = cmpInfo !== null ? cmpInfo.value : 30;
-      const cmp = cmpInfo !== null ? cmpInfo.cmp : 'gte';
-      return answerLogisticsThreshold(threshold, ctx, cmp);
-    }
-
     let store = findStoreInText(text);
     let manager = findManagerInText(text);
     let region = !store ? findRegionInText(text) : null;
 
     // 매장/담당자/지역이 전혀 언급되지 않았다면, 직전 대화 주제(맥락)를 이어받는다
     // 예) "김태환 과장 1월달 매출은?" → "3월은?" (담당자 맥락 유지) / "강남역점 매출?" → "3월은?" (매장 맥락 유지)
-    if (!store && !manager && !region && lastContext) {
+    // 단, "담당자별/지역별/전체" 처럼 명백히 새로운 전체 집계 질문이면 맥락을 이어받지 않는다
+    const isGenericAggregateQuery = KW.byManager.test(text) || KW.byRegion.test(text)
+      || KW.totalSales.test(text) || /(전체|모든\s*매장|매장들)/.test(text)
+      || (KW.logistics.test(text) && extractComparison(text) !== null);
+    if (!store && !manager && !region && lastContext && !isGenericAggregateQuery) {
       const looksLikeFollowUp = extractMonthIdx(text) !== null
         || /(말고|대신|그럼|그러면)/.test(text)
-        || KW.sales.test(text)
-        || KW.rankTop.test(text) || KW.rankBottom.test(text) || KW.rankWord.test(text);
+        || KW.sales.test(text) || KW.avg.test(text) || KW.logistics.test(text) || KW.monthly.test(text)
+        || KW.rankTop.test(text) || KW.rankBottom.test(text) || KW.rankWord.test(text)
+        || KW.changeRate.test(text) || KW.insight.test(text);
       if (looksLikeFollowUp) {
         if (lastContext.type === 'store') store = lastContext.value;
         else if (lastContext.type === 'manager') manager = lastContext.value;
@@ -5834,51 +6026,74 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // 2) 특정 매장의 순위(몇등/몇위) 질문 — "매출" 답변보다 먼저 처리해야 함
-    if (store && KW.rankWord.test(text)) {
+    // ── 매장이 특정된 경우: 세부 의도별로 분기 ──
+    if (store) {
       lastContext = { type: 'store', value: store };
-      return answerStoreRank(store, ctx);
-    }
-
-    // 3) 특정 매장 매출 조회
-    if (store && KW.sales.test(text)) {
-      lastContext = { type: 'store', value: store };
+      if (KW.insight.test(text)) return answerStoreInsight(store, ctx);
+      if (KW.rankWord.test(text)) return answerStoreRank(store, ctx);
+      if (KW.monthly.test(text)) return answerStoreMonthly(store, ctx);
+      if (KW.avg.test(text)) return answerStoreAverage(store, ctx);
+      if (KW.logistics.test(text)) return answerStoreLogistics(store, ctx);
+      // 매출/증감률/기타 질문 또는 매장명만 언급된 경우 → 기본 매출 정보(전월대비 포함)
       return answerStoreSales(store, ctx);
     }
 
-    // 4) 담당자별 실적
-    if (manager && (KW.manager.test(text) || extractMonthIdx(text) !== null)) {
+    // ── 담당자가 특정된 경우 ──
+    if (manager) {
       lastContext = { type: 'manager', value: manager };
       return answerManagerStores(manager, ctx);
     }
 
-    // 5) 지역별 순위 (1위/최하위/순위/몇등 등 폭넓게 인식)
-    if (region && (KW.sales.test(text) || KW.rankTop.test(text) || KW.rankBottom.test(text) || KW.rankWord.test(text))) {
-      const worst = KW.rankBottom.test(text);
+    // ── 지역이 특정된 경우 ──
+    if (region) {
       lastContext = { type: 'region', value: region };
-      return answerRegionRank(region, ctx, extractTopN(text) || 1, worst);
+      if (KW.avg.test(text)) return answerRegionAverage(region, ctx);
+      if (KW.sales.test(text) || KW.rankTop.test(text) || KW.rankBottom.test(text) || KW.rankWord.test(text)) {
+        const worst = KW.rankBottom.test(text);
+        return answerRegionRank(region, ctx, extractTopN(text) || 1, worst);
+      }
     }
 
-    // 6) 매장명만 있어도 매출로 응답
-    if (store) {
-      lastContext = { type: 'store', value: store };
-      return answerStoreSales(store, ctx);
+    // ── 매장/담당자/지역 미지정 + 물류비중 (구간 조건 있으면 필터, 없으면 전체 평균 개요) ──
+    const cmpInfo = extractComparison(text);
+    if (KW.logistics.test(text) && (KW.ratio.test(text) || cmpInfo !== null)) {
+      if (cmpInfo !== null) {
+        return answerLogisticsThreshold(cmpInfo.value, ctx, cmpInfo.cmp);
+      }
+      return answerLogisticsOverview(ctx);
     }
 
-    // 7) 급성장/급감
+    // ── 담당자별 전체 순위 (특정 담당자명 없이 "담당자별 매출" 등) ──
+    if (KW.byManager.test(text)) return answerManagerAll(ctx);
+
+    // ── 지역별 전체 순위/평균 (특정 지역명 없이 "지역별 매출/평균매출" 등) ──
+    if (KW.byRegion.test(text)) {
+      if (KW.avg.test(text)) return answerRegionAvgAll(ctx);
+      return answerRegionAll(ctx);
+    }
+
+    // ── 전체 평균 매출 ──
+    if (KW.avg.test(text) && (KW.sales.test(text) || KW.rankWord.test(text))) {
+      return answerOverallAverage(ctx);
+    }
+
+    // ── 전체 증감률 ──
+    if (KW.changeRate.test(text)) return answerChangeRateOverall(ctx);
+
+    // ── 급성장/급감 ──
     if (KW.growth.test(text)) return answerMomentum(ctx, true);
     if (KW.decline.test(text)) return answerMomentum(ctx, false);
 
-    // 8) 목표 달성 현황
+    // ── 목표 달성 현황 ──
     if (KW.goal.test(text) && KW.achieve.test(text)) return answerGoal(ctx);
 
-    // 9) 전체 순위 (지역/매장 미지정) — "최하위", "꼴찌", "1위", "순위", "몇등" 등 폭넓게 인식
+    // ── 전체 순위 (지역/매장 미지정) — "최하위", "꼴찌", "1위", "순위", "몇등" 등 폭넓게 인식 ──
     if (KW.rankTop.test(text) || KW.rankBottom.test(text) || KW.rankWord.test(text)) {
       const worst = KW.rankBottom.test(text);
       return answerOverallRank(ctx, extractTopN(text) || 1, worst);
     }
 
-    // 10) 전체 총매출
+    // ── 전체 총매출 ──
     if (KW.totalSales.test(text)) {
       return answerTotalSales(ctx);
     }
