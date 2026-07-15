@@ -5548,6 +5548,7 @@ window.addEventListener('DOMContentLoaded', () => {
 <script>
 (function(){
   const CHAT_MANAGERS = ['김태환 과장','임도형 과장','이중섭 대리','박영태 대리','강동우 사원','이현민 사원'];
+  let lastMentionedStore = null; // "5월은?"처럼 매장명 없는 후속 질문에서 재사용
   const CHAT_REGIONS = ['서울','경기','인천','부산','대구','광주','대전','울산','세종','충북','충남','경북','경남','전북','전남','강원'];
 
   function normC(s){ return String(s==null?'':s).replace(/\s+/g,''); }
@@ -5581,12 +5582,32 @@ window.addEventListener('DOMContentLoaded', () => {
     return m ? parseFloat(m[1]) : null;
   }
 
-  function chatContext(){
+  // 문장에서 명시적으로 지정한 월(1~12)을 찾는다. '4%', '40개' 같은 숫자와 혼동하지 않도록 반드시 '월' 글자가 붙은 경우만 인식.
+  function extractMonthIdx(text){
+    const m = text.match(/(\d{1,2})\s*월/);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (n >= 1 && n <= 12) return n - 1;
+    }
+    if (/(지난\s*달|전월|저번\s*달)/.test(text)) return 'prev';
+    if (/(이번\s*달|이번달|당월|금월|최근)/.test(text)) return 'current';
+    return null;
+  }
+
+  function chatContext(text){
     const data = ALL || [];
-    const lastIdx = getLastMonthIdx(data);
+    const latestIdx = getLastMonthIdx(data);
+    let lastIdx = latestIdx;
+    const req = extractMonthIdx(text || '');
+    if (req === 'prev') {
+      lastIdx = latestIdx >= 1 ? latestIdx - 1 : latestIdx;
+    } else if (typeof req === 'number') {
+      lastIdx = req;
+    }
     const prevIdx = lastIdx >= 1 ? lastIdx - 1 : -1;
     const monthLabel = MONTHS[lastIdx] || '이번 달';
-    return { data, lastIdx, prevIdx, monthLabel };
+    const isFuture = lastIdx > latestIdx;
+    return { data, lastIdx, prevIdx, monthLabel, latestIdx, isFuture };
   }
 
   function rowFor(b, lastIdx, prevIdx){
@@ -5605,6 +5626,10 @@ window.addEventListener('DOMContentLoaded', () => {
     const r = rowFor(store, ctx.lastIdx, ctx.prevIdx);
     const lines = [];
     lines.push(`<b>${esc(store.name)}</b> (${esc(store.manager)} · ${esc(store.region)})`);
+    if (r.cur <= 0) {
+      lines.push(`${esc(ctx.monthLabel)} 매출 데이터가 아직 없습니다.`);
+      return lines.join('<br>');
+    }
     lines.push(`${esc(ctx.monthLabel)} 매출: <b>${esc(fmtWonAI(r.cur))}</b>`);
     if (r.momRate !== null) {
       const arrow = r.momRate >= 0 ? '▲' : '▼';
@@ -5709,7 +5734,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const text = String(raw||'').trim();
     if (!text) return '메시지를 입력해주세요.';
     const t = normC(text);
-    const ctx = chatContext();
+    const ctx = chatContext(text);
     if (!ctx.data.length) return '아직 매출 데이터가 로드되지 않았습니다.';
 
     if (/^(안녕|hi|hello|반가워)/.test(t) || /(뭐\s*할\s*수\s*있|도움말|help|사용법)/.test(text)) {
@@ -5722,8 +5747,20 @@ window.addEventListener('DOMContentLoaded', () => {
       return answerLogisticsThreshold(threshold, ctx);
     }
 
-    const store = findStoreInText(text);
+    let store = findStoreInText(text);
+
+    // 매장명이 문장에 없어도, 직전에 매장 얘기를 하고 있었고 "OO월은?" "말고 5월" 처럼
+    // 후속 질문으로 보이면 마지막 매장을 이어서 사용
+    if (!store && lastMentionedStore) {
+      const looksLikeFollowUp = extractMonthIdx(text) !== null || /(말고|대신|은\??$|는\??$|얼마|매출|실적)/.test(text);
+      const hasOtherSubject = findManagerInText(text) || findRegionInText(text);
+      if (looksLikeFollowUp && !hasOtherSubject) {
+        store = lastMentionedStore;
+      }
+    }
+
     if (store && /(매출|실적|얼마|현황|어때)/.test(text)) {
+      lastMentionedStore = store;
       return answerStoreSales(store, ctx);
     }
 
@@ -5740,6 +5777,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     if (store) {
       // 의도어가 명확하지 않아도 매장명이 잡히면 매출로 응답
+      lastMentionedStore = store;
       return answerStoreSales(store, ctx);
     }
 
