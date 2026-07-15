@@ -6130,23 +6130,25 @@ window.addEventListener('DOMContentLoaded', () => {
       return answerTotalSales(ctx);
     }
 
-    return NO_MATCH_MSG;
+    return `죄송해요, 아직 이해하지 못한 질문이에요 😅<br>${HELP_MSG}`;
   }
 
   // 팝업 창에서 opener.processChatQueryPublic(text) 형태로 호출할 수 있도록 공개
-  // 규칙 매칭 실패("이해하지 못한 질문") 시 Gemini AI 폴백을 시도한다
-  const NO_MATCH_MSG = `죄송해요, 아직 이해하지 못한 질문이에요 😅<br>${HELP_MSG}`;
+  // 모든 질문을 우선 Gemini AI가 답변하고, AI 호출이 실패했을 때만(네트워크 오류, 할당량 초과 등)
+  // 기존 규칙 기반 엔진으로 대체 답변한다.
   window.processChatQueryPublic = async function(text){
-    let result;
-    try { result = processChatQuery(text); }
-    catch(e) { return '죄송해요, 답변을 만드는 중 오류가 발생했어요.'; }
-
-    if (result === NO_MATCH_MSG) {
+    try {
       const ctx = chatContext(text);
+      if (!ctx.data.length) return '아직 매출 데이터가 로드되지 않았습니다.';
+
       const aiAnswer = await askAiFallback(text, ctx);
-      if (aiAnswer) return aiAnswer + '<br><br><span style="opacity:.5;font-size:10px;">🤖 AI 답변 (정확한 수치는 다시 확인해주세요)</span>';
+      if (aiAnswer) return aiAnswer;
+
+      // AI 호출 실패 시에만 규칙 기반 엔진으로 대체
+      return processChatQuery(text);
+    } catch(e) {
+      return '죄송해요, 답변을 만드는 중 오류가 발생했어요.';
     }
-    return result;
   };
   window.__CHAT_HELP_MSG__ = HELP_MSG;
 
