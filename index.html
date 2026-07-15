@@ -357,6 +357,14 @@ body.hide-names .store-name:hover{
 
 <div class="dash">
 
+  <!-- AI 자동 인사이트 (최상단 고정) -->
+  <div id="ai-insight-wrap" style="background:linear-gradient(135deg,#0d1e30,#111e2e);border:0.5px solid #2a5a8a;border-radius:12px;padding:14px 16px;margin-bottom:14px;">
+    <div style="font-size:11px;color:#7eb8e8;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+      ✨ AI 매출 인사이트
+    </div>
+    <div id="ai-insight-box" style="font-size:12px;color:#c8dff0;line-height:1.6;"></div>
+  </div>
+
   <!-- 헤더 -->
   <div class="topbar">
     <div class="brand"><span class="dot"></span><span id="brandTitle">복호두 매출 현황판</span></div>
@@ -4982,6 +4990,110 @@ function closeUpdateModal(){
   box.style.display = 'none';
   window.maybeCloseNoticeOverlay();
 }
+</script>
+
+<!-- ============================================================
+     AI 자동 인사이트 (Cloudflare Worker 연동)
+     ⚠️ 아래 WORKER_URL을 배포한 Worker 주소로 반드시 바꿔주세요.
+============================================================= -->
+<script>
+const AI_WORKER_URL = 'https://bokhodu-insight.YOUR-SUBDOMAIN.workers.dev'; // ← 여기 수정
+
+function buildSalesSummary() {
+  const data = ALL;
+  if (!data || !data.length) return null;
+
+  const lastIdx = getLastMonthIdx(data);
+  const prevIdx = lastIdx >= 1 ? lastIdx - 1 : -1;
+  const monthLabel = getMonthLabel(lastIdx);
+
+  const rows = data
+    .map((b) => ({
+      name: b.name,
+      manager: b.manager,
+      region: b.region,
+      cur: getBranchVal(b, lastIdx),
+      prev: prevIdx >= 0 ? getBranchVal(b, prevIdx) : 0,
+      v25: get25Val(b.name, lastIdx),
+      goal: getGoalVal(b.name, lastIdx),
+    }))
+    .filter((r) => r.cur > 0);
+
+  const totalCur = rows.reduce((s, r) => s + r.cur, 0);
+  const totalPrev = rows.reduce((s, r) => s + r.prev, 0);
+  const total25 = rows.reduce((s, r) => s + (r.v25 || 0), 0);
+
+  const momRate = totalPrev > 0 ? (((totalCur - totalPrev) / totalPrev) * 100).toFixed(1) : null;
+  const yoyRate = total25 > 0 ? (((totalCur - total25) / total25) * 100).toFixed(1) : null;
+
+  const withMomRows = rows
+    .filter((r) => r.prev > 0)
+    .map((r) => ({ ...r, momRate: ((r.cur - r.prev) / r.prev) * 100 }));
+
+  const top5 = [...withMomRows].sort((a, b) => b.momRate - a.momRate).slice(0, 5);
+  const bottom5 = [...withMomRows].sort((a, b) => a.momRate - b.momRate).slice(0, 5);
+
+  const goalHit = rows.filter((r) => r.goal > 0 && r.cur >= r.goal).length;
+  const goalTotal = rows.filter((r) => r.goal > 0).length;
+
+  return {
+    기준월: monthLabel,
+    매장수: rows.length,
+    이번달_총매출: totalCur,
+    전월대비_증감률: momRate,
+    전년동월대비_증감률: yoyRate,
+    전월대비_급성장_TOP5: top5.map((r) => ({
+      매장명: r.name, 담당자: r.manager, 전월대비: r.momRate.toFixed(1) + '%',
+    })),
+    전월대비_급감_TOP5: bottom5.map((r) => ({
+      매장명: r.name, 담당자: r.manager, 전월대비: r.momRate.toFixed(1) + '%',
+    })),
+    전년대비_목표달성_매장수: `${goalHit} / ${goalTotal}`,
+  };
+}
+
+function escapeHtmlAI(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function generateInsight() {
+  const box = document.getElementById('ai-insight-box');
+  if (!box) return;
+
+  const summary = buildSalesSummary();
+  if (!summary) {
+    box.textContent = '분석할 데이터가 없습니다.';
+    return;
+  }
+
+  box.innerHTML = '<span style="color:#6b8fa8;">AI가 이번 달 매출을 분석하고 있어요...</span>';
+
+  try {
+    const res = await fetch(AI_WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ summary }),
+    });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      box.innerHTML = '<span style="color:#e05555;">인사이트 생성 실패: ' + (data.error || res.status) + '</span>';
+      return;
+    }
+
+    box.innerHTML = data.insight
+      .split('\n')
+      .filter((line) => line.trim())
+      .map((line) => `<div style="margin-bottom:6px;">${escapeHtmlAI(line)}</div>`)
+      .join('');
+  } catch (e) {
+    box.innerHTML = '<span style="color:#e05555;">네트워크 오류: ' + e.message + '</span>';
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  setTimeout(generateInsight, 300); // 초기 데이터 렌더(ALL 채우기) 이후 실행
+});
 </script>
 </body>
 </html>
