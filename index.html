@@ -2106,7 +2106,7 @@ function openBranchModal(b){
       }
       if (salesArr.length > 1 && salesRank > 0) {
         const pctS = Math.max(1, Math.round(salesRank / salesArr.length * 100));
-        const salesDiff = curV != null ? ((curV - avgSales) / avgSales * 100) : null;
+        const salesDiff = salesRaw > 0 ? ((salesRaw - avgSales) / avgSales * 100) : null;
         benchLines.push(`이번 달 매출 순위: 전체 ${salesArr.length}개 매장 중 <b>${salesRank}위</b> (상위 ${pctS}%)` +
           (salesDiff != null ? ` · 매장 평균 대비 ${salesDiff >= 0 ? '▲' : '▼'}${Math.abs(salesDiff).toFixed(1)}%` : ''));
       }
