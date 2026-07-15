@@ -357,14 +357,6 @@ body.hide-names .store-name:hover{
 
 <div class="dash">
 
-  <!-- AI 자동 인사이트 (최상단 고정) -->
-  <div id="ai-insight-wrap" style="background:linear-gradient(135deg,#0d1e30,#111e2e);border:0.5px solid #2a5a8a;border-radius:12px;padding:14px 16px;margin-bottom:14px;">
-    <div style="font-size:11px;color:#7eb8e8;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
-      ✨ AI 매출 인사이트
-    </div>
-    <div id="ai-insight-box" style="font-size:12px;color:#c8dff0;line-height:1.6;"></div>
-  </div>
-
   <!-- 헤더 -->
   <div class="topbar">
     <div class="brand"><span class="dot"></span><span id="brandTitle">복호두 매출 현황판</span></div>
@@ -374,6 +366,14 @@ body.hide-names .store-name:hover{
         👁️ 매장명 가리기
       </button>
     </div>
+  </div>
+
+  <!-- AI 자동 인사이트 (매장명 가리기 버튼 바로 아래 고정) -->
+  <div id="ai-insight-wrap" style="background:linear-gradient(135deg,#0d1e30,#111e2e);border:0.5px solid #2a5a8a;border-radius:12px;padding:14px 16px;margin-bottom:14px;">
+    <div style="font-size:11px;color:#7eb8e8;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+      ✨ AI 매출 인사이트
+    </div>
+    <div id="ai-insight-box" style="font-size:12px;color:#c8dff0;line-height:1.6;"></div>
   </div>
 
   <!-- 페이지 탭 -->
@@ -4993,11 +4993,13 @@ function closeUpdateModal(){
 </script>
 
 <!-- ============================================================
-     AI 자동 인사이트 (Cloudflare Worker 연동)
-     ⚠️ 아래 WORKER_URL을 배포한 Worker 주소로 반드시 바꿔주세요.
+     자동 매출 인사이트 (로컬 계산 방식, 외부 API 호출 없음 · 무료)
 ============================================================= -->
 <script>
-const AI_WORKER_URL = 'https://bokhodu-insight.YOUR-SUBDOMAIN.workers.dev'; // ← 여기 수정
+function getLogVal(name, idx) {
+  const arr = (window.LOGISTICS || {})[name];
+  return arr ? (arr[idx] || 0) : 0;
+}
 
 function buildSalesSummary() {
   const data = ALL;
@@ -5016,15 +5018,27 @@ function buildSalesSummary() {
       prev: prevIdx >= 0 ? getBranchVal(b, prevIdx) : 0,
       v25: get25Val(b.name, lastIdx),
       goal: getGoalVal(b.name, lastIdx),
+      log: getLogVal(b.name, lastIdx),
+      logPrev: prevIdx >= 0 ? getLogVal(b.name, prevIdx) : 0,
     }))
     .filter((r) => r.cur > 0);
 
   const totalCur = rows.reduce((s, r) => s + r.cur, 0);
   const totalPrev = rows.reduce((s, r) => s + r.prev, 0);
   const total25 = rows.reduce((s, r) => s + (r.v25 || 0), 0);
+  const totalLogCur = rows.reduce((s, r) => s + (r.log || 0), 0);
+  const totalLogPrev = rows.reduce((s, r) => s + (r.logPrev || 0), 0);
 
   const momRate = totalPrev > 0 ? (((totalCur - totalPrev) / totalPrev) * 100).toFixed(1) : null;
   const yoyRate = total25 > 0 ? (((totalCur - total25) / total25) * 100).toFixed(1) : null;
+  const logMomRate = totalLogPrev > 0 ? (((totalLogCur - totalLogPrev) / totalLogPrev) * 100).toFixed(1) : null;
+  const logRatio = totalCur > 0 ? ((totalLogCur / totalCur) * 100).toFixed(1) : null;
+
+  // 평균 매출: 이번 달 매장당 평균 vs 작년(25년) 같은 달 매장당 평균
+  const storesWith25 = rows.filter((r) => r.v25 > 0);
+  const avgCur = rows.length > 0 ? totalCur / rows.length : null;
+  const avg25 = storesWith25.length > 0 ? total25 / storesWith25.length : null;
+  const avgYoyRate = avgCur !== null && avg25 ? (((avgCur - avg25) / avg25) * 100).toFixed(1) : null;
 
   const withMomRows = rows
     .filter((r) => r.prev > 0)
@@ -5042,6 +5056,12 @@ function buildSalesSummary() {
     이번달_총매출: totalCur,
     전월대비_증감률: momRate,
     전년동월대비_증감률: yoyRate,
+    이번달_평균매출: avgCur,
+    작년_평균매출: avg25,
+    평균매출_전년비_증감률: avgYoyRate,
+    이번달_물류매출: totalLogCur,
+    물류_전월대비_증감률: logMomRate,
+    물류_매출대비_비중: logRatio,
     전월대비_급성장_TOP5: top5.map((r) => ({
       매장명: r.name, 담당자: r.manager, 전월대비: r.momRate.toFixed(1) + '%',
     })),
@@ -5056,7 +5076,161 @@ function escapeHtmlAI(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-async function generateInsight() {
+
+// ── 금액 포맷 (만원/억 단위) ──
+function fmtWonAI(v) {
+  if (!v || v <= 0) return '0원';
+  const m = Math.round(v / 10000);
+  if (m >= 10000) {
+    const u = Math.floor(m / 10000), r = m % 10000;
+    return r > 0 ? `${u}억 ${r.toLocaleString()}만원` : `${u}억원`;
+  }
+  return m.toLocaleString() + '만원';
+}
+
+// ── 문구 템플릿 (매번 랜덤하게 하나씩 선택되어 자연스럽게 문구가 바뀜) ──
+const INSIGHT_TEMPLATES = {
+  up: [
+    (r) => `이번 달 매출은 전월 대비 ${r}% 증가했습니다. 좋은 흐름이 이어지고 있어요 📈`,
+    (r) => `전월보다 ${r}% 늘었어요! 성장세가 계속되고 있습니다 ✨`,
+    (r) => `이번 달 매출이 ${r}% 상승했습니다. 꾸준한 성장이 인상적이에요 🚀`,
+    (r) => `전월 대비 ${r}% 증가하며 견조한 흐름을 이어가고 있습니다`,
+  ],
+  down: [
+    (r) => `이번 달 매출은 전월 대비 ${r}% 감소했습니다. 비수기 영향일 수 있어요 📊`,
+    (r) => `전월보다 ${r}% 낮아졌어요. 원인을 함께 살펴볼 필요가 있어 보입니다`,
+    (r) => `이번 달은 ${r}% 하락세를 보였습니다. 다음 달 회복을 기대해봅니다`,
+    (r) => `전월 대비 ${r}% 감소했습니다. 계절적 요인인지 점검이 필요해 보여요`,
+  ],
+  flat: [
+    () => `전월과 비슷한 수준의 매출을 유지하고 있습니다. 안정적인 흐름이에요`,
+    () => `이번 달 매출은 전월과 큰 차이 없이 유지되고 있습니다`,
+    () => `전월 대비 큰 변동 없이 안정세를 보이고 있습니다`,
+  ],
+  yoyUp: [
+    (r) => `전년 동월 대비로는 ${r}% 증가한 수치입니다`,
+    (r) => `작년 같은 달과 비교하면 ${r}% 늘어난 결과예요`,
+  ],
+  yoyDown: [
+    (r) => `전년 동월 대비로는 ${r}% 감소한 수치입니다`,
+    (r) => `작년 같은 달과 비교하면 ${r}% 줄어든 결과예요`,
+  ],
+  top: [
+    (n, m, r) => `${n}(${m})이(가) 전월 대비 ${r}% 성장하며 가장 눈에 띄는 성과를 보였습니다 🎉`,
+    (n, m, r) => `${n}(${m})의 상승세가 돋보였어요. 전월 대비 ${r}% 성장했습니다 👏`,
+  ],
+  bottom: [
+    (n, m, r) => `${n}(${m})은(는) 전월 대비 ${r}% 감소해 관심이 필요합니다`,
+    (n, m, r) => `${n}(${m})은(는) 전월보다 ${r}% 줄어, 원인 점검이 필요해 보여요`,
+  ],
+  goal: [
+    (h, t, p) => `목표를 설정한 ${t}개 매장 중 ${h}개 매장이 목표를 달성했습니다 (${p}%)`,
+    (h, t, p) => `목표 매장 ${t}곳 중 ${h}곳이 목표를 달성해, 달성률 ${p}%를 기록했습니다`,
+  ],
+  avgUp: [
+    (cur, r) => `매장당 평균 매출은 ${cur}으로, 작년 같은 달보다 ${r}% 높습니다 💪`,
+    (cur, r) => `이번 달 매장 평균 매출은 ${cur}이에요. 작년 대비 ${r}% 성장했습니다`,
+  ],
+  avgDown: [
+    (cur, r) => `매장당 평균 매출은 ${cur}으로, 작년 같은 달보다 ${r}% 낮습니다`,
+    (cur, r) => `이번 달 매장 평균 매출은 ${cur}이에요. 작년 대비 ${r}% 감소했습니다`,
+  ],
+  avgFlat: [
+    (cur) => `매장당 평균 매출은 ${cur}으로, 작년과 비슷한 수준을 유지하고 있습니다`,
+  ],
+  logUp: [
+    (amt, r, ratio) => `🚚 물류 매출은 ${amt}로 전월 대비 ${r}% 늘었습니다 (매출 대비 ${ratio}%)`,
+    (amt, r, ratio) => `🚚 물류 인사이트: 이번 달 물류 매출 ${amt}, 전월보다 ${r}% 증가했어요 (비중 ${ratio}%)`,
+  ],
+  logDown: [
+    (amt, r, ratio) => `🚚 물류 매출은 ${amt}로 전월 대비 ${r}% 줄었습니다 (매출 대비 ${ratio}%)`,
+    (amt, r, ratio) => `🚚 물류 인사이트: 이번 달 물류 매출 ${amt}, 전월보다 ${r}% 감소했어요 (비중 ${ratio}%)`,
+  ],
+  logFlat: [
+    (amt, ratio) => `🚚 물류 매출은 ${amt} 수준으로 전월과 비슷합니다 (매출 대비 ${ratio}%)`,
+  ],
+};
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function generateLocalInsightLines(summary) {
+  const lines = [];
+  const momRate = summary.전월대비_증감률 !== null ? parseFloat(summary.전월대비_증감률) : null;
+  const yoyRate = summary.전년동월대비_증감률 !== null ? parseFloat(summary.전년동월대비_증감률) : null;
+
+  // 1) 전월 대비 총평
+  if (momRate === null) {
+    lines.push(`${summary.기준월} 기준, 매출 데이터를 집계했습니다.`);
+  } else if (Math.abs(momRate) < 1) {
+    lines.push(pick(INSIGHT_TEMPLATES.flat)());
+  } else if (momRate > 0) {
+    lines.push(pick(INSIGHT_TEMPLATES.up)(Math.abs(momRate).toFixed(1)));
+  } else {
+    lines.push(pick(INSIGHT_TEMPLATES.down)(Math.abs(momRate).toFixed(1)));
+  }
+
+  // 2) 전년 동월 대비
+  if (yoyRate !== null) {
+    if (yoyRate > 0) lines.push(pick(INSIGHT_TEMPLATES.yoyUp)(Math.abs(yoyRate).toFixed(1)));
+    else if (yoyRate < 0) lines.push(pick(INSIGHT_TEMPLATES.yoyDown)(Math.abs(yoyRate).toFixed(1)));
+  }
+
+  // 3) 작년 대비 평균매출
+  if (summary.이번달_평균매출 !== null) {
+    const avgCurFmt = fmtWonAI(summary.이번달_평균매출);
+    const avgRate = summary.평균매출_전년비_증감률 !== null ? parseFloat(summary.평균매출_전년비_증감률) : null;
+    if (avgRate === null) {
+      lines.push(`이번 달 매장당 평균 매출은 ${avgCurFmt}입니다`);
+    } else if (Math.abs(avgRate) < 1) {
+      lines.push(pick(INSIGHT_TEMPLATES.avgFlat)(avgCurFmt));
+    } else if (avgRate > 0) {
+      lines.push(pick(INSIGHT_TEMPLATES.avgUp)(avgCurFmt, Math.abs(avgRate).toFixed(1)));
+    } else {
+      lines.push(pick(INSIGHT_TEMPLATES.avgDown)(avgCurFmt, Math.abs(avgRate).toFixed(1)));
+    }
+  }
+
+  // 4) 물류 인사이트
+  if (summary.이번달_물류매출 > 0) {
+    const logAmtFmt = fmtWonAI(summary.이번달_물류매출);
+    const logRate = summary.물류_전월대비_증감률 !== null ? parseFloat(summary.물류_전월대비_증감률) : null;
+    const ratio = summary.물류_매출대비_비중 !== null ? summary.물류_매출대비_비중 : '-';
+    if (logRate === null) {
+      lines.push(`🚚 이번 달 물류 매출은 ${logAmtFmt}입니다 (매출 대비 ${ratio}%)`);
+    } else if (Math.abs(logRate) < 1) {
+      lines.push(pick(INSIGHT_TEMPLATES.logFlat)(logAmtFmt, ratio));
+    } else if (logRate > 0) {
+      lines.push(pick(INSIGHT_TEMPLATES.logUp)(logAmtFmt, Math.abs(logRate).toFixed(1), ratio));
+    } else {
+      lines.push(pick(INSIGHT_TEMPLATES.logDown)(logAmtFmt, Math.abs(logRate).toFixed(1), ratio));
+    }
+  }
+
+  // 5) 가장 성장한 매장
+  const bestStore = summary.전월대비_급성장_TOP5 && summary.전월대비_급성장_TOP5[0];
+  if (bestStore && parseFloat(bestStore.전월대비) > 0) {
+    lines.push(pick(INSIGHT_TEMPLATES.top)(bestStore.매장명, bestStore.담당자, Math.abs(parseFloat(bestStore.전월대비)).toFixed(1)));
+  }
+
+  // 6) 가장 감소한 매장
+  const worstStore = summary.전월대비_급감_TOP5 && summary.전월대비_급감_TOP5[0];
+  if (worstStore && parseFloat(worstStore.전월대비) < 0) {
+    lines.push(pick(INSIGHT_TEMPLATES.bottom)(worstStore.매장명, worstStore.담당자, Math.abs(parseFloat(worstStore.전월대비)).toFixed(1)));
+  }
+
+  // 7) 목표 달성 현황
+  if (summary.전년대비_목표달성_매장수) {
+    const [hit, total] = summary.전년대비_목표달성_매장수.split('/').map((s) => parseInt(s.trim(), 10));
+    if (total > 0) {
+      const pct = ((hit / total) * 100).toFixed(0);
+      lines.push(pick(INSIGHT_TEMPLATES.goal)(hit, total, pct));
+    }
+  }
+
+  return lines;
+}
+
+function generateInsight() {
   const box = document.getElementById('ai-insight-box');
   if (!box) return;
 
@@ -5066,29 +5240,16 @@ async function generateInsight() {
     return;
   }
 
-  box.innerHTML = '<span style="color:#6b8fa8;">AI가 이번 달 매출을 분석하고 있어요...</span>';
+  box.innerHTML = '<span style="color:#6b8fa8;">이번 달 매출을 분석하고 있어요...</span>';
 
-  try {
-    const res = await fetch(AI_WORKER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ summary }),
-    });
-    const data = await res.json();
-
-    if (!res.ok || data.error) {
-      box.innerHTML = '<span style="color:#e05555;">인사이트 생성 실패: ' + (data.error || res.status) + '</span>';
-      return;
-    }
-
-    box.innerHTML = data.insight
-      .split('\n')
-      .filter((line) => line.trim())
+  // 실제 계산은 이미 로컬에서 끝난 상태라 즉시 표시 가능하지만,
+  // 자연스러운 로딩 느낌을 위해 짧은 지연만 둡니다 (네트워크 호출 없음 · 비용 없음)
+  setTimeout(() => {
+    const lines = generateLocalInsightLines(summary);
+    box.innerHTML = lines
       .map((line) => `<div style="margin-bottom:6px;">${escapeHtmlAI(line)}</div>`)
       .join('');
-  } catch (e) {
-    box.innerHTML = '<span style="color:#e05555;">네트워크 오류: ' + e.message + '</span>';
-  }
+  }, 400);
 }
 
 window.addEventListener('DOMContentLoaded', () => {
