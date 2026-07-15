@@ -2051,8 +2051,9 @@ function openBranchModal(b){
       costEl.innerHTML = '';
     } else {
       const bucket = LOG_BUCKETS.find(bk => logRatio >= bk.min && logRatio < bk.max) || null;
+      const IDEAL_MIN = 32, IDEAL_MAX = 36; // CJ물류 기준 이상적인 물류비중 구간
 
-      // 최근 최대 3개월 물류비중 추이
+      // 최근 최대 3개월 물류비중 평균 + 이상적 구간 비교
       const ratioTrend = [];
       for (let k = 2; k >= 0; k--) {
         const idx = lastIdx - k;
@@ -2062,47 +2063,66 @@ function openBranchModal(b){
         if (sv > 0 && lv > 0) ratioTrend.push(lv / sv * 100);
       }
       let trendLine = '';
-      if (ratioTrend.length >= 2) {
-        const chg = ratioTrend[ratioTrend.length - 1] - ratioTrend[0];
-        if (Math.abs(chg) >= 1) {
-          trendLine = chg > 0
-            ? `최근 ${ratioTrend.length}개월간 물류비중이 <span style="color:#e05555;font-weight:700;">${chg.toFixed(1)}%p 상승</span> 추세입니다 — 원가 관리가 필요해요`
-            : `최근 ${ratioTrend.length}개월간 물류비중이 <span style="color:#3db87a;font-weight:700;">${Math.abs(chg).toFixed(1)}%p 하락</span> 추세입니다 — 원가 개선 중이에요`;
-        } else {
-          trendLine = `최근 ${ratioTrend.length}개월간 물류비중이 큰 변동 없이 유지되고 있어요`;
-        }
+      if (ratioTrend.length >= 1) {
+        const threeMoAvg = ratioTrend.reduce((s, v) => s + v, 0) / ratioTrend.length;
+        const trendBucket = LOG_BUCKETS.find(bk => threeMoAvg >= bk.min && threeMoAvg < bk.max) || null;
+        const verdict = (threeMoAvg >= IDEAL_MIN && threeMoAvg <= IDEAL_MAX)
+          ? `<span style="color:#3db87a;">이상적인 범위(32~36%)</span>`
+          : (trendBucket ? `<span style="color:${trendBucket.guideColor};">${trendBucket.guide}</span>` : '');
+        trendLine = `최근 ${ratioTrend.length}개월간 물류비중은 평균 <b>${threeMoAvg.toFixed(1)}%</b>입니다 — 이상적인 물류비중(${IDEAL_MIN}~${IDEAL_MAX}%)과 비교하면 ${verdict}`;
       }
 
-      // 프랜차이즈 전체 매장 대비 벤치마크 (당월 기준)
-      const salesArr = [], ratioArr = [];
+      // 프랜차이즈 전체 매장 대비 벤치마크 (당월 매출 기준)
+      const salesArr = [];
       (window.ALL || ALL).forEach(st => {
         const sv = st.months[lastIdx] || 0;
         if (sv > 0) salesArr.push({ name: st.name, v: sv });
-        const lv = (LOGISTICS[st.name] && LOGISTICS[st.name][lastIdx]) || 0;
-        if (sv > 0 && lv > 0) ratioArr.push({ name: st.name, v: lv / sv * 100 });
       });
       salesArr.sort((a, c) => c.v - a.v);
-      ratioArr.sort((a, c) => a.v - c.v); // 원가율 낮은 순 (좋은 순)
       const salesRank = salesArr.findIndex(s => s.name === b.name) + 1;
-      const ratioRank = ratioArr.findIndex(s => s.name === b.name) + 1;
       const avgSales = salesArr.length ? salesArr.reduce((s, x) => s + x.v, 0) / salesArr.length : 0;
-      const FRANCHISE_AVG_RATIO = 40; // 프랜차이즈 평균 물류비중 기준선 (고정값)
+
+      // 매장 자체 평균 물류비중 (데이터가 있는 전체 개월 평균) — 프랜차이즈 평균과 "평균 대 평균"으로 비교하기 위함
+      const storeAvgRatioOf = (st) => {
+        const stLog = LOGISTICS[st.name] || [];
+        const arr = [];
+        for (let i = 0; i < 12; i++) {
+          const sv = st.months[i] || 0;
+          const lv = stLog[i] || 0;
+          if (sv > 0 && lv > 0) arr.push(lv / sv * 100);
+        }
+        return arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : null;
+      };
+      const storeAvgRatio = storeAvgRatioOf(b);
+      const allStoreAvgRatios = (window.ALL || ALL).map(storeAvgRatioOf).filter(v => v != null);
+      const franchiseAvgRatio = allStoreAvgRatios.length
+        ? allStoreAvgRatios.reduce((s, v) => s + v, 0) / allStoreAvgRatios.length
+        : null;
 
       const benchLines = [];
       if (bucket) {
-        benchLines.push(`📦 물류 비중 <b>${logRatio.toFixed(1)}%</b> → <span style="color:${bucket.guideColor};font-weight:700;">${bucket.guide}</span> 구간`);
+        benchLines.push(`📦 이번 달 물류 비중 <b>${logRatio.toFixed(1)}%</b> → <span style="color:${bucket.guideColor};font-weight:700;">${bucket.guide}</span> 구간`);
       }
       if (trendLine) benchLines.push(trendLine);
       {
-        const diff = logRatio - FRANCHISE_AVG_RATIO;
-        const diffStr = diff >= 0
-          ? `<span style="color:#e05555;">기준보다 ${diff.toFixed(1)}%p 높음</span>`
-          : `<span style="color:#3db87a;">기준보다 ${Math.abs(diff).toFixed(1)}%p 낮음</span>`;
-        benchLines.push(`복호두 평균 물류비중 기준(${FRANCHISE_AVG_RATIO}%) 대비 ${diffStr}`);
+        if (logRatio >= IDEAL_MIN && logRatio <= IDEAL_MAX) {
+          benchLines.push(`✅ 이번 달 물류비중이 이상적인 구간(${IDEAL_MIN}~${IDEAL_MAX}%) 안에 있습니다`);
+        } else if (logRatio < IDEAL_MIN) {
+          const diff = IDEAL_MIN - logRatio;
+          const g = bucket ? `<span style="color:${bucket.guideColor};">${bucket.guide}</span>` : '';
+          benchLines.push(`물류비중 ${logRatio.toFixed(1)}%로 이상적인 구간(${IDEAL_MIN}~${IDEAL_MAX}%)보다 ${diff.toFixed(1)}%p 낮습니다 — ${g}`);
+        } else {
+          const diff = logRatio - IDEAL_MAX;
+          const g = bucket ? `<span style="color:${bucket.guideColor};">${bucket.guide}</span>` : '';
+          benchLines.push(`물류비중 ${logRatio.toFixed(1)}%로 이상적인 구간(${IDEAL_MIN}~${IDEAL_MAX}%)보다 ${diff.toFixed(1)}%p 높습니다 — ${g}`);
+        }
       }
-      if (ratioArr.length > 1 && ratioRank > 0) {
-        const pct = Math.max(1, Math.round(ratioRank / ratioArr.length * 100));
-        benchLines.push(`원가 효율 순위: 전체 ${ratioArr.length}개 매장 중 <b>${ratioRank}위</b> (상위 ${pct}% · 낮을수록 우수)`);
+      if (storeAvgRatio != null && franchiseAvgRatio != null) {
+        const diffAvg = storeAvgRatio - franchiseAvgRatio;
+        const diffAvgStr = diffAvg >= 0
+          ? `<span style="color:#e05555;">평균보다 ${diffAvg.toFixed(1)}%p 높음</span>`
+          : `<span style="color:#3db87a;">평균보다 ${Math.abs(diffAvg).toFixed(1)}%p 낮음</span>`;
+        benchLines.push(`복호두 평균 물류비중(${franchiseAvgRatio.toFixed(1)}%) 대비 이 매장의 평균 물류비중(${storeAvgRatio.toFixed(1)}%)은 ${diffAvgStr}`);
       }
       if (salesArr.length > 1 && salesRank > 0) {
         const pctS = Math.max(1, Math.round(salesRank / salesArr.length * 100));
