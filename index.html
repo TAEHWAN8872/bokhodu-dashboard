@@ -6133,13 +6133,28 @@ window.addEventListener('DOMContentLoaded', () => {
     return `죄송해요, 아직 이해하지 못한 질문이에요 😅<br>${HELP_MSG}`;
   }
 
+  // ── 순위/랭킹류 질문 감지 ──
+  // "1위", "가장 높은", "TOP N", "몇 등", "순위", "꼴찌" 등은 규칙 엔진(KW.rankTop/rankBottom/rankWord)이
+  // 이미 정확하게 인식하므로, 이런 패턴이 감지되면 AI를 거치지 않고 규칙 엔진으로 바로 답한다.
+  // (매장/지역/담당자 컨텍스트가 있는 순위 질문도 processChatQuery 내부 라우팅이 알아서 처리함)
+  function isRankingQuery(text){
+    return KW.rankTop.test(text) || KW.rankBottom.test(text) || KW.rankWord.test(text);
+  }
+
   // 팝업 창에서 opener.processChatQueryPublic(text) 형태로 호출할 수 있도록 공개
-  // 모든 질문을 우선 Gemini AI가 답변하고, AI 호출이 실패했을 때만(네트워크 오류, 할당량 초과 등)
-  // 기존 규칙 기반 엔진으로 대체 답변한다.
+  // 1) 순위/랭킹류 질문("1위", "몇 위", "TOP N" 등)은 규칙 엔진(answerOverallRank 등)이 이미 정확히
+  //    처리할 수 있으므로 AI 호출 없이 규칙 엔진으로 먼저 답한다 (가장 확실하고 빠른 방법).
+  // 2) 그 외 애매하거나 규칙으로 못 잡는 질문만 Gemini AI에게 넘기고,
+  //    AI 호출이 실패했을 때(네트워크 오류, 할당량 초과 등)는 규칙 기반 엔진으로 대체 답변한다.
   window.processChatQueryPublic = async function(text){
     try {
       const ctx = chatContext(text);
       if (!ctx.data.length) return '아직 매출 데이터가 로드되지 않았습니다.';
+
+      // ── 순위/랭킹 질문은 규칙 엔진 우선 ──
+      if (isRankingQuery(text)) {
+        return processChatQuery(text);
+      }
 
       const aiAnswer = await askAiFallback(text, ctx);
       if (aiAnswer) return aiAnswer;
