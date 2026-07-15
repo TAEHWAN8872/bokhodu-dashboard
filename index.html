@@ -380,6 +380,7 @@ body.hide-names .store-name:hover{
     <div class="page-tab active" id="pageTab-sales" onclick="switchPage('sales')">📊 매출 현황판</div>
     <div class="page-tab" id="pageTab-contract" onclick="switchPage('contract')">📋 재계약 안내<span class="pt-badge" id="rcUrgentBadge" style="display:none;"></span></div>
     <div class="page-tab" id="pageTab-keyword" onclick="window.open('https://taehwan8872.github.io/bokhodu-keyword-tracker/', '_blank')" style="display:inline-flex;align-items:center;gap:4px;line-height:1;"><span style="display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:15px;height:15px;background:#03C75A;color:#fff;font-weight:800;font-size:10px;border-radius:3px;">N</span><span>키워드검색량</span></div>
+    <div class="page-tab" id="pageTab-aichat" onclick="openAiChatWindow()" style="display:inline-flex;align-items:center;gap:4px;line-height:1;"><span>🤖</span><span>AI 챗봇</span></div>
   </div>
 
   <!-- 재계약 현황판 페이지 -->
@@ -5537,6 +5538,346 @@ function generateInsight() {
 window.addEventListener('DOMContentLoaded', () => {
   setTimeout(generateInsight, 300); // 초기 데이터 렌더(ALL 채우기) 이후 실행
 });
+</script>
+
+<!-- ============================================================
+     방법 1: 데이터 기반 규칙형 챗봇
+     - 키워드(매장명/담당자/지역/의도어)를 찾아 ALL·ALL25·LOGISTICS 를 조회해 답변 생성
+     - 외부 API 호출 없음 · 무료 · 데이터 유출 위험 없음
+============================================================= -->
+<script>
+(function(){
+  const CHAT_MANAGERS = ['김태환 과장','임도형 과장','이중섭 대리','박영태 대리','강동우 사원','이현민 사원'];
+  const CHAT_REGIONS = ['서울','경기','인천','부산','대구','광주','대전','울산','세종','충북','충남','경북','경남','전북','전남','강원'];
+
+  function normC(s){ return String(s==null?'':s).replace(/\s+/g,''); }
+
+  // 문장 안에서 매장명을 찾는다 (긴 이름 우선 매칭)
+  function findStoreInText(text){
+    const t = normC(text);
+    let best = null;
+    (window.ALL||[]).forEach(b=>{
+      const bn = normC(b.name);
+      if (t.includes(bn)) {
+        if (!best || bn.length > normC(best.name).length) best = b;
+      }
+    });
+    return best;
+  }
+
+  function findManagerInText(text){
+    const t = normC(text);
+    return CHAT_MANAGERS.find(m => t.includes(normC(m)) || t.includes(normC(m.split(' ')[0])));
+  }
+
+  function findRegionInText(text){
+    const t = normC(text);
+    // '점' 이름 안에 지역명이 우연히 들어가는 경우를 줄이기 위해, 매장명이 먼저 매칭되면 지역은 스킵
+    return CHAT_REGIONS.find(r => t.includes(r));
+  }
+
+  function extractPercent(text){
+    const m = text.match(/(\d+(?:\.\d+)?)\s*(%|퍼센트)/);
+    return m ? parseFloat(m[1]) : null;
+  }
+
+  function chatContext(){
+    const data = window.ALL || [];
+    const lastIdx = getLastMonthIdx(data);
+    const prevIdx = lastIdx >= 1 ? lastIdx - 1 : -1;
+    const monthLabel = MONTHS[lastIdx] || '이번 달';
+    return { data, lastIdx, prevIdx, monthLabel };
+  }
+
+  function rowFor(b, lastIdx, prevIdx){
+    const cur = getBranchVal(b, lastIdx);
+    const prev = prevIdx >= 0 ? getBranchVal(b, prevIdx) : 0;
+    const log = getLogVal(b.name, lastIdx);
+    const ratio = cur > 0 ? (log / cur * 100) : 0;
+    const momRate = prev > 0 ? ((cur - prev) / prev * 100) : null;
+    return { b, cur, prev, log, ratio, momRate };
+  }
+
+  function esc(s){ return escapeHtmlAI(String(s==null?'':s)); }
+
+  // ── 개별 매장 매출 조회 ──
+  function answerStoreSales(store, ctx){
+    const r = rowFor(store, ctx.lastIdx, ctx.prevIdx);
+    const lines = [];
+    lines.push(`<b>${esc(store.name)}</b> (${esc(store.manager)} · ${esc(store.region)})`);
+    lines.push(`${esc(ctx.monthLabel)} 매출: <b>${esc(fmtWonAI(r.cur))}</b>`);
+    if (r.momRate !== null) {
+      const arrow = r.momRate >= 0 ? '▲' : '▼';
+      lines.push(`전월 대비 ${arrow} ${Math.abs(r.momRate).toFixed(1)}%`);
+    }
+    if (r.log > 0) {
+      lines.push(`🚚 물류 매출: ${esc(fmtWonAI(r.log))} (매출 대비 ${r.ratio.toFixed(1)}%)`);
+    }
+    return lines.join('<br>');
+  }
+
+  // ── 물류비중 임계값 필터 ──
+  function answerLogisticsThreshold(threshold, ctx){
+    const rows = ctx.data.map(b => rowFor(b, ctx.lastIdx, ctx.prevIdx)).filter(r => r.cur > 0);
+    const hit = rows.filter(r => r.ratio >= threshold).sort((a,b)=>b.ratio-a.ratio);
+    if (!hit.length) {
+      return `물류비중 ${threshold}% 이상인 매장은 없습니다.`;
+    }
+    const list = hit.slice(0, 10).map(r => `· ${esc(r.b.name)} — ${r.ratio.toFixed(1)}%`).join('<br>');
+    const more = hit.length > 10 ? `<br>… 외 ${hit.length - 10}개 매장` : '';
+    return `물류비중 ${threshold}% 이상 매장은 총 <b>${hit.length}개</b>입니다.<br>${list}${more}`;
+  }
+
+  // ── 지역별 1위/순위 ──
+  function answerRegionRank(region, ctx, topN){
+    const rows = ctx.data.filter(b => b.region === region).map(b => rowFor(b, ctx.lastIdx, ctx.prevIdx)).filter(r => r.cur > 0);
+    if (!rows.length) return `${esc(region)} 지역 데이터가 없습니다.`;
+    rows.sort((a,b)=>b.cur-a.cur);
+    const n = topN || 1;
+    const top = rows.slice(0, n);
+    if (n === 1) {
+      const r = top[0];
+      return `${esc(region)} 지역 매출 1위는 <b>${esc(r.b.name)}</b>(${esc(r.b.manager)})이며, ${esc(ctx.monthLabel)} 매출은 <b>${esc(fmtWonAI(r.cur))}</b>입니다.`;
+    }
+    const list = top.map((r,i)=>`${i+1}위 ${esc(r.b.name)} — ${esc(fmtWonAI(r.cur))}`).join('<br>');
+    return `${esc(region)} 지역 매출 TOP${n}<br>${list}`;
+  }
+
+  // ── 담당자별 실적 집계 ──
+  function answerManagerStores(manager, ctx){
+    const rows = ctx.data.filter(b => b.manager === manager).map(b => rowFor(b, ctx.lastIdx, ctx.prevIdx)).filter(r => r.cur > 0);
+    if (!rows.length) return `${esc(manager)} 담당 매장 데이터가 없습니다.`;
+    const total = rows.reduce((s,r)=>s+r.cur, 0);
+    rows.sort((a,b)=>b.cur-a.cur);
+    const top3 = rows.slice(0,3).map((r,i)=>`${i+1}위 ${esc(r.b.name)} — ${esc(fmtWonAI(r.cur))}`).join('<br>');
+    return `<b>${esc(manager)}</b> 담당 매장은 총 <b>${rows.length}개</b>, ${esc(ctx.monthLabel)} 합계 매출은 <b>${esc(fmtWonAI(total))}</b>입니다.<br>상위 매장:<br>${top3}`;
+  }
+
+  // ── 전체 순위 (지역/매장 미지정) ──
+  function answerOverallRank(ctx, topN, worst){
+    const rows = ctx.data.map(b => rowFor(b, ctx.lastIdx, ctx.prevIdx)).filter(r => r.cur > 0);
+    rows.sort((a,b)=> worst ? a.cur-b.cur : b.cur-a.cur);
+    const n = topN || 1;
+    const top = rows.slice(0, n);
+    const label = worst ? '하위' : '상위';
+    if (n === 1) {
+      const r = top[0];
+      return `전체 매출 ${worst?'꼴찌':'1위'}는 <b>${esc(r.b.name)}</b>(${esc(r.b.manager)} · ${esc(r.b.region)})이며, 매출은 <b>${esc(fmtWonAI(r.cur))}</b>입니다.`;
+    }
+    const list = top.map((r,i)=>`${i+1}위 ${esc(r.b.name)} — ${esc(fmtWonAI(r.cur))}`).join('<br>');
+    return `전체 매출 ${label} TOP${n}<br>${list}`;
+  }
+
+  // ── 목표 달성 현황 ──
+  function answerGoal(ctx){
+    const rows = ctx.data.map(b => ({ b, cur: getBranchVal(b, ctx.lastIdx), goal: getGoalVal(b.name, ctx.lastIdx) })).filter(r => r.cur > 0);
+    const withGoal = rows.filter(r => r.goal > 0);
+    const hit = withGoal.filter(r => r.cur >= r.goal);
+    if (!withGoal.length) return '목표가 설정된 매장이 없습니다.';
+    const pct = ((hit.length / withGoal.length) * 100).toFixed(0);
+    return `목표가 설정된 ${withGoal.length}개 매장 중 <b>${hit.length}개</b> 매장이 목표를 달성했습니다 (달성률 ${pct}%).`;
+  }
+
+  // ── 급성장/급감 매장 ──
+  function answerMomentum(ctx, up){
+    const rows = ctx.data.map(b => rowFor(b, ctx.lastIdx, ctx.prevIdx)).filter(r => r.momRate !== null);
+    rows.sort((a,b)=> up ? b.momRate-a.momRate : a.momRate-b.momRate);
+    const top = rows.slice(0,5);
+    const list = top.map((r,i)=>`${i+1}위 ${esc(r.b.name)} — ${r.momRate>=0?'▲':'▼'}${Math.abs(r.momRate).toFixed(1)}%`).join('<br>');
+    return `전월 대비 ${up?'가장 많이 성장한':'가장 많이 감소한'} 매장 TOP5<br>${list}`;
+  }
+
+  // ── 전체 총매출 ──
+  function answerTotalSales(ctx){
+    const summary = buildSalesSummary();
+    if (!summary) return '집계할 데이터가 없습니다.';
+    return `${esc(summary.기준월)} 기준 전체 매출은 <b>${esc(fmtWonAI(summary.이번달_총매출))}</b>입니다 (매장 ${summary.매장수}개).`;
+  }
+
+  const HELP_MSG = [
+    '이렇게 물어보실 수 있어요:',
+    '· "강남역점 이번 달 매출 얼마야?"',
+    '· "물류비중 40% 넘는 매장 몇 개야?"',
+    '· "인천 지역 매출 1위는?"',
+    '· "이중섭 대리 담당 매장 실적은?"',
+    '· "전체 매출 순위 알려줘"',
+    '· "목표 달성한 매장 몇 개야?"',
+  ].join('<br>');
+
+  // ── 메인 라우터: 규칙 매칭으로 의도 파악 ──
+  function processChatQuery(raw){
+    const text = String(raw||'').trim();
+    if (!text) return '메시지를 입력해주세요.';
+    const t = normC(text);
+    const ctx = chatContext();
+    if (!ctx.data.length) return '아직 매출 데이터가 로드되지 않았습니다.';
+
+    if (/^(안녕|hi|hello|반가워)/.test(t) || /(뭐\s*할\s*수\s*있|도움말|help|사용법)/.test(text)) {
+      return '안녕하세요! 매장 매출 데이터를 조회해드리는 챗봇입니다 🙂<br>' + HELP_MSG;
+    }
+
+    const pct = extractPercent(text);
+    if (/물류/.test(text) && (/비중|퍼센트|%/.test(text) || pct !== null)) {
+      const threshold = pct !== null ? pct : 30;
+      return answerLogisticsThreshold(threshold, ctx);
+    }
+
+    const store = findStoreInText(text);
+    if (store && /(매출|실적|얼마|현황|어때)/.test(text)) {
+      return answerStoreSales(store, ctx);
+    }
+
+    const manager = findManagerInText(text);
+    if (manager && /(담당|매장|실적|매출)/.test(text)) {
+      return answerManagerStores(manager, ctx);
+    }
+
+    const region = !store ? findRegionInText(text) : null;
+    if (region && /(매출|순위|1위|랭킹|top)/i.test(text)) {
+      const nMatch = text.match(/(\d+)\s*위/);
+      return answerRegionRank(region, ctx, nMatch ? parseInt(nMatch[1],10) : 1);
+    }
+
+    if (store) {
+      // 의도어가 명확하지 않아도 매장명이 잡히면 매출로 응답
+      return answerStoreSales(store, ctx);
+    }
+
+    if (/(급성장|많이\s*오른|가장\s*오른|가장\s*성장)/.test(text)) return answerMomentum(ctx, true);
+    if (/(급감|많이\s*떨어|가장\s*떨어|가장\s*감소)/.test(text)) return answerMomentum(ctx, false);
+
+    if (/(목표).*(달성)|(달성).*(목표)|목표\s*달성/.test(text)) return answerGoal(ctx);
+
+    if (/(순위|랭킹|top)/i.test(text)) {
+      const nMatch = text.match(/(\d+)\s*위/);
+      const worst = /(꼴찌|하위|최하)/.test(text);
+      return answerOverallRank(ctx, nMatch ? parseInt(nMatch[1],10) : 1, worst);
+    }
+
+    if (/(총\s*매출|전체\s*매출|이번\s*달\s*매출)/.test(text) ) {
+      return answerTotalSales(ctx);
+    }
+
+    return `죄송해요, 아직 이해하지 못한 질문이에요 😅<br>${HELP_MSG}`;
+  }
+
+  // 팝업 창에서 opener.processChatQueryPublic(text) 형태로 호출할 수 있도록 공개
+  window.processChatQueryPublic = function(text){
+    try { return processChatQuery(text); }
+    catch(e) { return '죄송해요, 답변을 만드는 중 오류가 발생했어요.'; }
+  };
+  window.__CHAT_HELP_MSG__ = HELP_MSG;
+
+  // ── "AI 챗봇" 탭 클릭 시 새 창으로 채팅 UI 오픈 ──
+  window.openAiChatWindow = function(){
+    // 이미 열려있는 창이 있으면 포커스만 이동
+    if (window.__aiChatWin && !window.__aiChatWin.closed) {
+      window.__aiChatWin.focus();
+      return;
+    }
+    const win = window.open('', 'aiChatbotWindow', 'width=420,height=680,resizable=yes,scrollbars=yes');
+    if (!win) {
+      alert('팝업이 차단되었습니다. 브라우저 팝업 차단을 해제한 뒤 다시 시도해주세요.');
+      return;
+    }
+    window.__aiChatWin = win;
+
+    const doc = win.document;
+    doc.open();
+    doc.write(`<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 챗봇 · 복호두 매출</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-serif;display:flex;flex-direction:column;height:100vh;}
+.hdr{padding:14px 16px;border-bottom:0.5px solid #1e3347;display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.hdr .ttl{font-size:14px;font-weight:700;color:#e0f0ff;}
+.hdr .sub{font-size:10px;color:#6b8fa8;margin-left:auto;cursor:pointer;}
+.msgs{flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:8px;}
+.msgs::-webkit-scrollbar{width:3px;}
+.msgs::-webkit-scrollbar-thumb{background:#1e3347;border-radius:2px;}
+.row{display:flex;}
+.row.user{justify-content:flex-end;}
+.row.bot{justify-content:flex-start;}
+.bubble{max-width:85%;padding:9px 12px;border-radius:10px;font-size:12px;line-height:1.6;}
+.bubble.user{background:#1a3a5c;color:#e0f0ff;}
+.bubble.bot{background:#111e2e;border:0.5px solid #1e3347;color:#c8dff0;}
+.quick{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px 10px;flex-shrink:0;}
+.qbtn{font-size:10px;padding:5px 10px;border-radius:6px;border:0.5px solid #2a5a8a;color:#7eb8e8;cursor:pointer;background:transparent;white-space:nowrap;}
+.qbtn:hover{background:#172840;}
+.inputRow{display:flex;gap:8px;padding:10px 12px 14px;border-top:0.5px solid #1e3347;flex-shrink:0;}
+.inputRow input{flex:1;font-size:12px;background:#0d1b2a;border:0.5px solid #1e3347;color:#e0f0ff;padding:10px 12px;border-radius:8px;outline:none;}
+.inputRow button{font-size:12px;font-weight:600;padding:10px 16px;background:#1a3a5c;border:0.5px solid #2a5a8a;color:#7eb8e8;border-radius:8px;cursor:pointer;white-space:nowrap;}
+.inputRow button:hover{background:#1e4a70;}
+</style></head>
+<body>
+  <div class="hdr">
+    <span style="font-size:16px;">🤖</span>
+    <span class="ttl">AI 챗봇</span>
+    <span class="sub" id="clearBtn">대화 초기화</span>
+  </div>
+  <div class="msgs" id="msgs"></div>
+  <div class="quick">
+    <div class="qbtn" data-q="강남역점 이번 달 매출 얼마야?">강남역점 매출?</div>
+    <div class="qbtn" data-q="물류비중 40% 넘는 매장 몇 개야?">물류비중 40%↑</div>
+    <div class="qbtn" data-q="인천 지역 매출 1위는?">인천 1위?</div>
+    <div class="qbtn" data-q="이중섭 대리 담당 매장 실적은?">이중섭 대리 실적?</div>
+  </div>
+  <div class="inputRow">
+    <input id="chatInput" type="text" placeholder="예) 강남역점 이번 달 매출 얼마야?" autocomplete="off">
+    <button id="sendBtn">전송</button>
+  </div>
+<script>
+  const opener_ = window.opener;
+  const msgsEl = document.getElementById('msgs');
+  const inputEl = document.getElementById('chatInput');
+
+  function addBubble(role, html){
+    const row = document.createElement('div');
+    row.className = 'row ' + role;
+    const b = document.createElement('div');
+    b.className = 'bubble ' + role;
+    b.innerHTML = html;
+    row.appendChild(b);
+    msgsEl.appendChild(row);
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+  }
+
+  function ask(text){
+    if (!text) return;
+    const safe = String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    addBubble('user', safe);
+    inputEl.value = '';
+    setTimeout(() => {
+      let answer = '죄송해요, 원본 대시보드 창이 닫혀서 데이터를 조회할 수 없어요. 대시보드를 닫지 말고 다시 시도해주세요.';
+      try {
+        if (opener_ && !opener_.closed && opener_.processChatQueryPublic) {
+          answer = opener_.processChatQueryPublic(text);
+        }
+      } catch(e) {}
+      addBubble('bot', answer);
+    }, 150);
+  }
+
+  document.getElementById('sendBtn').addEventListener('click', () => ask(inputEl.value.trim()));
+  inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') ask(inputEl.value.trim()); });
+  document.querySelectorAll('.qbtn').forEach(el => {
+    el.addEventListener('click', () => ask(el.getAttribute('data-q')));
+  });
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    msgsEl.innerHTML = '';
+    addBubble('bot', '대화를 초기화했어요. 무엇이든 물어보세요! 🙂<br>' + (window.__helpMsg || ''));
+  });
+
+  window.__helpMsg = ${JSON.stringify(HELP_MSG)};
+  addBubble('bot', '안녕하세요! 매장 매출 데이터를 조회해드리는 챗봇입니다 🙂<br>' + window.__helpMsg);
+  inputEl.focus();
+<\/script>
+</body></html>`);
+    doc.close();
+  };
+})();
 </script>
 </body>
 </html>
