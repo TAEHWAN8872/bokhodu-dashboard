@@ -679,6 +679,8 @@ body.hide-names .store-name:hover{
     <div id="modalSummary" style="margin-top:10px;overflow-x:auto;"></div>
     <!-- 물류 매출 섹션 -->
     <div id="modalLogistics" style="margin-top:14px;"></div>
+    <!-- 매장별 AI 인사이트 -->
+    <div id="modalStoreInsight" style="margin-top:14px;"></div>
   </div>
 </div>
 
@@ -1871,6 +1873,76 @@ function openBranchModal(b){
 <div style="border-top:0.5px solid #1a2f44;padding-top:12px;">
   <div style="font-size:10px;color:#6b8fa8;margin-bottom:6px;font-weight:500;">물류 매출 &nbsp;<span style="color:#a78bfa">■ 물류(VAT포함)</span> &nbsp;<span style="color:#6b8fa8">· 매출 대비 비중</span></div>
   <div style="display:flex;gap:5px;flex-wrap:wrap;">${logRows.join('')}</div>
+</div>`;
+  }
+
+  // ── 매장별 AI 인사이트 (물류 매출 섹션 바로 아래) ─────────────────────
+  const insightEl = document.getElementById('modalStoreInsight');
+  if (insightEl) {
+    const lastIdx = active26[active26.length - 1].i;
+    const prevIdxStore = lastIdx >= 1 ? lastIdx - 1 : -1;
+    const monthLabel = MONTHS[lastIdx];
+    const curV = vals26[lastIdx];
+    const prevV = prevIdxStore >= 0 ? vals26[prevIdxStore] : null;
+    const v25curV = vals25 ? vals25[lastIdx] : null;
+    const goalCurV = goals ? goals[lastIdx] : null;
+    const logCurRaw = logData ? (logData[lastIdx] || 0) : 0;
+    const salesRaw = b.months[lastIdx] || 0;
+    const logRatio = (logCurRaw > 0 && salesRaw > 0) ? (logCurRaw / salesRaw * 100) : null;
+
+    const momR = (prevV && prevV > 0) ? ((curV - prevV) / prevV * 100) : null;
+    const yoyR = (v25curV && v25curV > 0) ? ((curV - v25curV) / v25curV * 100) : null;
+
+    const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    const lines = [];
+
+    if (momR === null) {
+      lines.push(`${monthLabel} 기준 매출 데이터를 확인했습니다.`);
+    } else if (Math.abs(momR) < 1) {
+      lines.push(pickOne([
+        `전월과 비슷한 매출을 유지하고 있어요`,
+        `전월 대비 큰 변동 없이 안정적인 흐름입니다`,
+      ]));
+    } else if (momR > 0) {
+      lines.push(pickOne([
+        `전월 대비 ${Math.abs(momR).toFixed(1)}% 증가했습니다 📈`,
+        `전월보다 ${Math.abs(momR).toFixed(1)}% 늘었어요, 좋은 흐름이에요 ✨`,
+      ]));
+    } else {
+      lines.push(pickOne([
+        `전월 대비 ${Math.abs(momR).toFixed(1)}% 감소했습니다. 원인 점검이 필요해 보여요`,
+        `전월보다 ${Math.abs(momR).toFixed(1)}% 낮아졌어요. 다음 달 회복을 기대해봅니다`,
+      ]));
+    }
+
+    if (yoyR !== null) {
+      if (yoyR > 0) lines.push(`전년 동월 대비로는 ${Math.abs(yoyR).toFixed(1)}% 증가한 수치입니다`);
+      else if (yoyR < 0) lines.push(`전년 동월 대비로는 ${Math.abs(yoyR).toFixed(1)}% 감소한 수치입니다`);
+    }
+
+    if (logRatio !== null) {
+      lines.push(`🚚 이번 달 물류 비중은 매출 대비 ${logRatio.toFixed(1)}%입니다`);
+    }
+
+    if (goalCurV && goalCurV > 0 && curV != null) {
+      if (curV >= goalCurV) {
+        lines.push(pickOne([
+          `목표(전년 대비 +5%)를 달성했습니다 🎉`,
+          `이번 달 목표를 무사히 달성했어요 👏`,
+        ]));
+      } else {
+        const gap = goalCurV - curV;
+        const gapFmt = gap >= 10000
+          ? `${Math.floor(gap / 10000)}억 ${(gap % 10000).toLocaleString()}만원`
+          : `${gap.toLocaleString()}만원`;
+        lines.push(`목표(전년 대비 +5%)까지 ${gapFmt} 남았습니다`);
+      }
+    }
+
+    insightEl.innerHTML = `
+<div style="border-top:0.5px solid #1a2f44;padding-top:12px;background:linear-gradient(135deg,#0d1e30,#111e2e);border:0.5px solid #2a5a8a;border-radius:10px;padding:12px 14px;">
+  <div style="font-size:10px;color:#7eb8e8;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px;">✨ AI 매출 인사이트</div>
+  <div style="font-size:11px;color:#c8dff0;line-height:1.6;">${lines.map(l => `<div style="margin-bottom:4px;">${l}</div>`).join('')}</div>
 </div>`;
   }
 }
