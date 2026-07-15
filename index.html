@@ -5556,7 +5556,7 @@ window.addEventListener('DOMContentLoaded', () => {
   function findStoreInText(text){
     const t = normC(text);
     let best = null;
-    (window.ALL||[]).forEach(b=>{
+    (ALL||[]).forEach(b=>{
       const bn = normC(b.name);
       if (t.includes(bn)) {
         if (!best || bn.length > normC(best.name).length) best = b;
@@ -5582,7 +5582,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function chatContext(){
-    const data = window.ALL || [];
+    const data = ALL || [];
     const lastIdx = getLastMonthIdx(data);
     const prevIdx = lastIdx >= 1 ? lastIdx - 1 : -1;
     const monthLabel = MONTHS[lastIdx] || '이번 달';
