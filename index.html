@@ -1944,6 +1944,90 @@ function openBranchModal(b){
   <div style="font-size:10px;color:#7eb8e8;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px;">✨ AI 매출 인사이트</div>
   <div style="font-size:11px;color:#c8dff0;line-height:1.6;">${lines.map(l => `<div style="margin-bottom:4px;">${l}</div>`).join('')}</div>
 </div>`;
+
+    // ── 원가율(물류비중) 심층 분석 + 프랜차이즈 전체 매장 대비 벤치마크 ──
+    const costEl = document.getElementById('modalCostInsight') || (() => {
+      const el = document.createElement('div');
+      el.id = 'modalCostInsight';
+      el.style.marginTop = '10px';
+      insightEl.parentNode.insertBefore(el, insightEl.nextSibling);
+      return el;
+    })();
+
+    if (logRatio === null) {
+      costEl.innerHTML = '';
+    } else {
+      const bucket = LOG_BUCKETS.find(bk => logRatio >= bk.min && logRatio < bk.max) || null;
+
+      // 최근 최대 3개월 물류비중 추이
+      const ratioTrend = [];
+      for (let k = 2; k >= 0; k--) {
+        const idx = lastIdx - k;
+        if (idx < 0) continue;
+        const lv = (logData && logData[idx]) || 0;
+        const sv = b.months[idx] || 0;
+        if (sv > 0 && lv > 0) ratioTrend.push(lv / sv * 100);
+      }
+      let trendLine = '';
+      if (ratioTrend.length >= 2) {
+        const chg = ratioTrend[ratioTrend.length - 1] - ratioTrend[0];
+        if (Math.abs(chg) >= 1) {
+          trendLine = chg > 0
+            ? `최근 ${ratioTrend.length}개월간 물류비중이 <span style="color:#e05555;font-weight:700;">${chg.toFixed(1)}%p 상승</span> 추세입니다 — 원가 관리가 필요해요`
+            : `최근 ${ratioTrend.length}개월간 물류비중이 <span style="color:#3db87a;font-weight:700;">${Math.abs(chg).toFixed(1)}%p 하락</span> 추세입니다 — 원가 개선 중이에요`;
+        } else {
+          trendLine = `최근 ${ratioTrend.length}개월간 물류비중이 큰 변동 없이 유지되고 있어요`;
+        }
+      }
+
+      // 프랜차이즈 전체 매장 대비 벤치마크 (당월 기준)
+      const salesArr = [], ratioArr = [];
+      (window.ALL || ALL).forEach(st => {
+        const sv = st.months[lastIdx] || 0;
+        if (sv > 0) salesArr.push({ name: st.name, v: sv });
+        const lv = (LOGISTICS[st.name] && LOGISTICS[st.name][lastIdx]) || 0;
+        if (sv > 0 && lv > 0) ratioArr.push({ name: st.name, v: lv / sv * 100 });
+      });
+      salesArr.sort((a, c) => c.v - a.v);
+      ratioArr.sort((a, c) => a.v - c.v); // 원가율 낮은 순 (좋은 순)
+      const salesRank = salesArr.findIndex(s => s.name === b.name) + 1;
+      const ratioRank = ratioArr.findIndex(s => s.name === b.name) + 1;
+      const avgSales = salesArr.length ? salesArr.reduce((s, x) => s + x.v, 0) / salesArr.length : 0;
+      const FRANCHISE_AVG_RATIO = 40; // 프랜차이즈 평균 물류비중 기준선 (고정값)
+
+      const benchLines = [];
+      if (bucket) {
+        benchLines.push(`📦 물류 비중 <b>${logRatio.toFixed(1)}%</b> → <span style="color:${bucket.guideColor};font-weight:700;">${bucket.guide}</span> 구간`);
+      }
+      if (trendLine) benchLines.push(trendLine);
+      {
+        const diff = logRatio - FRANCHISE_AVG_RATIO;
+        const diffStr = diff >= 0
+          ? `<span style="color:#e05555;">기준보다 ${diff.toFixed(1)}%p 높음</span>`
+          : `<span style="color:#3db87a;">기준보다 ${Math.abs(diff).toFixed(1)}%p 낮음</span>`;
+        benchLines.push(`복호두 평균 물류비중 기준(${FRANCHISE_AVG_RATIO}%) 대비 ${diffStr}`);
+      }
+      if (ratioArr.length > 1 && ratioRank > 0) {
+        const pct = Math.max(1, Math.round(ratioRank / ratioArr.length * 100));
+        benchLines.push(`원가 효율 순위: 전체 ${ratioArr.length}개 매장 중 <b>${ratioRank}위</b> (상위 ${pct}% · 낮을수록 우수)`);
+      }
+      if (salesArr.length > 1 && salesRank > 0) {
+        const pctS = Math.max(1, Math.round(salesRank / salesArr.length * 100));
+        const salesDiff = curV != null ? ((curV - avgSales) / avgSales * 100) : null;
+        benchLines.push(`이번 달 매출 순위: 전체 ${salesArr.length}개 매장 중 <b>${salesRank}위</b> (상위 ${pctS}%)` +
+          (salesDiff != null ? ` · 매장 평균 대비 ${salesDiff >= 0 ? '▲' : '▼'}${Math.abs(salesDiff).toFixed(1)}%` : ''));
+      }
+
+      if (benchLines.length) {
+        costEl.innerHTML = `
+<div style="background:linear-gradient(135deg,#1a1030,#241338);border:0.5px solid #7c3aed;border-radius:10px;padding:12px 14px;">
+  <div style="font-size:10px;color:#c4b5fd;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px;">📊 원가율(물류비중) · 복호두 전체 비교</div>
+  <div style="font-size:11px;color:#e5deff;line-height:1.7;">${benchLines.map(l => `<div style="margin-bottom:4px;">${l}</div>`).join('')}</div>
+</div>`;
+      } else {
+        costEl.innerHTML = '';
+      }
+    }
   }
 }
 
