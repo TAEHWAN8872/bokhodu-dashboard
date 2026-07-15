@@ -1920,6 +1920,38 @@ function openBranchModal(b){
       else if (yoyR < 0) lines.push(`전년 동월 대비로는 ${Math.abs(yoyR).toFixed(1)}% 감소한 수치입니다`);
     }
 
+    // ── 연속 상승/하락 개월 수 (모멘텀 추세) ─────────────────────
+    let streak = 0, streakDir = null;
+    for (let i = lastIdx; i >= 1; i--) {
+      const cur = b.months[i], prev = b.months[i - 1];
+      if (!(cur > 0 && prev > 0)) break;
+      const dir = cur > prev ? 'up' : cur < prev ? 'down' : null;
+      if (dir === null) break;
+      if (streakDir === null) { streakDir = dir; streak = 1; }
+      else if (dir === streakDir) streak++;
+      else break;
+    }
+    if (streak >= 2) {
+      if (streakDir === 'up') {
+        lines.push(`📈 <b>${streak + 1}개월 연속 상승세</b>입니다 — 안정적인 성장 구간으로 보여요`);
+      } else {
+        lines.push(`⚠️ <b>${streak + 1}개월 연속 하락세</b>입니다 — 원인 분석과 대응이 시급해 보여요`);
+      }
+    }
+
+    // ── 전월·전년 조합 기반 전략적 코멘트 ─────────────────────
+    if (momR !== null && yoyR !== null) {
+      if (momR > 0 && yoyR > 0) {
+        lines.push(`💡 전월·전년 모두 증가하는 <b>이중 성장 구간</b>입니다. 현재 운영 방식과 프로모션을 유지·강화하는 것이 좋아 보입니다`);
+      } else if (momR > 0 && yoyR <= 0) {
+        lines.push(`💡 전월 대비는 반등했지만 작년보다는 아직 낮은 수준입니다. 일시적 반등인지 다음 달까지 지켜보며 원인을 파악해보세요`);
+      } else if (momR <= 0 && yoyR > 0) {
+        lines.push(`💡 전월 대비는 주춤하지만 작년보다는 여전히 좋은 흐름입니다. 계절적 요인이거나 일시적 조정일 가능성이 있어요`);
+      } else {
+        lines.push(`💡 전월·전년 모두 감소하는 <b>구조적 부진 신호</b>입니다. 상권 변화, 경쟁점 진입, 메뉴/프로모션 등 다각도 점검이 필요해 보여요`);
+      }
+    }
+
     if (logRatio !== null) {
       lines.push(`🚚 이번 달 물류 비중은 매출 대비 ${logRatio.toFixed(1)}%입니다`);
     }
@@ -1945,7 +1977,68 @@ function openBranchModal(b){
   <div style="font-size:11px;color:#c8dff0;line-height:1.6;">${lines.map(l => `<div style="margin-bottom:4px;">${l}</div>`).join('')}</div>
 </div>`;
 
-    // ── 원가율(물류비중) 심층 분석 + 프랜차이즈 전체 매장 대비 벤치마크 ──
+    // ── 지역별 매출 비교 벤치마크 ─────────────────────
+    const regionEl = document.getElementById('modalRegionInsight') || (() => {
+      const el = document.createElement('div');
+      el.id = 'modalRegionInsight';
+      el.style.marginTop = '10px';
+      insightEl.parentNode.insertBefore(el, insightEl.nextSibling);
+      return el;
+    })();
+
+    if (curV == null) {
+      regionEl.innerHTML = '';
+    } else {
+      const regionName = b.region || '기타';
+      const regionStores = (window.ALL || ALL).filter(st => (st.region || '기타') === regionName);
+      const regionCurList = regionStores.map(st => ({ name: st.name, v: st.months[lastIdx] || 0 })).filter(x => x.v > 0);
+      regionCurList.sort((a, c) => c.v - a.v);
+      const regionRank = regionCurList.findIndex(x => x.name === b.name) + 1;
+      const regionAvgCur = regionCurList.length ? regionCurList.reduce((s, x) => s + x.v, 0) / regionCurList.length : 0;
+
+      const regionLines = [];
+      if (regionCurList.length > 1 && regionRank > 0) {
+        const pctR = Math.max(1, Math.round(regionRank / regionCurList.length * 100));
+        const diffPct = ((curV * 10000 - regionAvgCur) / regionAvgCur * 100);
+        const diffStr = diffPct >= 0
+          ? `<span style="color:#3db87a;">지역 평균보다 ▲${diffPct.toFixed(1)}% 높음</span>`
+          : `<span style="color:#e05555;">지역 평균보다 ▼${Math.abs(diffPct).toFixed(1)}% 낮음</span>`;
+        regionLines.push(`📍 <b>${regionName}</b> 지역 내 매출 순위: 전체 ${regionCurList.length}개 매장 중 <b>${regionRank}위</b> (상위 ${pctR}%)`);
+        regionLines.push(`지역 평균 매출(${fmtD(Math.round(regionAvgCur / 10000))}) 대비 ${diffStr}`);
+
+        // 지역 평균 대비 전월 성장률 비교
+        if (prevIdxStore >= 0 && momR !== null) {
+          const regionPrevList = regionStores.map(st => st.months[prevIdxStore] || 0).filter(v => v > 0);
+          const regionAvgPrev = regionPrevList.length ? regionPrevList.reduce((s, v) => s + v, 0) / regionPrevList.length : 0;
+          if (regionAvgPrev > 0) {
+            const regionMomR = (regionAvgCur - regionAvgPrev) / regionAvgPrev * 100;
+            const gapMom = momR - regionMomR;
+            const gapStr = gapMom >= 0
+              ? `<span style="color:#3db87a;">지역 평균 성장률(${regionMomR.toFixed(1)}%)보다 ${gapMom.toFixed(1)}%p 높음 — 지역 내 성장을 주도하고 있어요</span>`
+              : `<span style="color:#e05555;">지역 평균 성장률(${regionMomR.toFixed(1)}%)보다 ${Math.abs(gapMom).toFixed(1)}%p 낮음 — 지역 내에서 상대적으로 처지고 있어요</span>`;
+            regionLines.push(`이번 달 성장률 비교: ${gapStr}`);
+          }
+        }
+
+        if (regionRank === 1) {
+          regionLines.push(`🏆 이번 달 <b>${regionName} 지역 1위</b> 매장입니다`);
+        } else if (regionRank <= Math.ceil(regionCurList.length * 0.2)) {
+          regionLines.push(`지역 상위권(상위 20% 이내)에 속하는 우수 매장입니다`);
+        } else if (regionRank > Math.ceil(regionCurList.length * 0.8)) {
+          regionLines.push(`지역 내 하위권에 속해 있어 벤치마킹 및 개선 방안 검토가 필요해 보입니다`);
+        }
+      }
+
+      if (regionLines.length) {
+        regionEl.innerHTML = `
+<div style="background:linear-gradient(135deg,#0d2416,#0f2e1c);border:0.5px solid #22c55e;border-radius:10px;padding:12px 14px;">
+  <div style="font-size:10px;color:#86efac;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px;">🗺️ 지역별 매출 비교 분석</div>
+  <div style="font-size:11px;color:#dcfce7;line-height:1.7;">${regionLines.map(l => `<div style="margin-bottom:4px;">${l}</div>`).join('')}</div>
+</div>`;
+      } else {
+        regionEl.innerHTML = '';
+      }
+    }
     const costEl = document.getElementById('modalCostInsight') || (() => {
       const el = document.createElement('div');
       el.id = 'modalCostInsight';
