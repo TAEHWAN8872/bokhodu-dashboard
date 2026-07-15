@@ -5653,19 +5653,20 @@ window.addEventListener('DOMContentLoaded', () => {
     return `물류비중 ${threshold}% 이상 매장은 총 <b>${hit.length}개</b>입니다.<br>${list}${more}`;
   }
 
-  // ── 지역별 1위/순위 ──
-  function answerRegionRank(region, ctx, topN){
+  // ── 지역별 1위/순위 (worst=true면 하위 순위) ──
+  function answerRegionRank(region, ctx, topN, worst){
     const rows = ctx.data.filter(b => b.region === region).map(b => rowFor(b, ctx.lastIdx, ctx.prevIdx)).filter(r => r.cur > 0);
     if (!rows.length) return `${esc(region)} 지역 데이터가 없습니다.`;
-    rows.sort((a,b)=>b.cur-a.cur);
+    rows.sort((a,b)=> worst ? a.cur-b.cur : b.cur-a.cur);
     const n = topN || 1;
     const top = rows.slice(0, n);
     if (n === 1) {
       const r = top[0];
-      return `${esc(region)} 지역 매출 1위는 <b>${esc(r.b.name)}</b>(${esc(r.b.manager)})이며, ${esc(ctx.monthLabel)} 매출은 <b>${esc(fmtWonAI(r.cur))}</b>입니다.`;
+      const label = worst ? '최하위' : '1위';
+      return `${esc(region)} 지역 매출 ${label}는 <b>${esc(r.b.name)}</b>(${esc(r.b.manager)})이며, ${esc(ctx.monthLabel)} 매출은 <b>${esc(fmtWonAI(r.cur))}</b>입니다.`;
     }
-    const list = top.map((r,i)=>`${i+1}위 ${esc(r.b.name)} — ${esc(fmtWonAI(r.cur))}`).join('<br>');
-    return `${esc(region)} 지역 매출 TOP${n}<br>${list}`;
+    const list = top.map((r,i)=>`${i+1}${worst?'(하위)':''}위 ${esc(r.b.name)} — ${esc(fmtWonAI(r.cur))}`).join('<br>');
+    return `${esc(region)} 지역 매출 ${worst?'하위':'TOP'}${n}<br>${list}`;
   }
 
   // ── 담당자별 실적 집계 ──
@@ -5719,13 +5720,39 @@ window.addEventListener('DOMContentLoaded', () => {
     return `${esc(summary.기준월)} 기준 전체 매출은 <b>${esc(fmtWonAI(summary.이번달_총매출))}</b>입니다 (매장 ${summary.매장수}개).`;
   }
 
+  // ── 의도 파악용 동의어 그룹 (정확한 단어 하나가 아니라 여러 표현을 폭넓게 인식) ──
+  const KW = {
+    sales: /(매출|실적|판매|얼마|매상|현황|어때|알려줘|보여줘|궁금)/,
+    rankTop: /(1위|1등|최고|베스트|가장\s*(높은|많이|잘|좋은|나은)|톱|top)/i,
+    rankBottom: /(꼴찌|최하위|최하|하위|바닥|가장\s*(낮은|적은|안\s*좋은|나쁜|저조한)|부진)/,
+    rankWord: /(순위|랭킹|랭크)/i,
+    logistics: /물류/,
+    ratio: /(비중|퍼센트|%)/,
+    goal: /목표/,
+    achieve: /달성/,
+    growth: /(급성장|많이\s*오른|가장\s*오른|가장\s*성장|성장세|증가한|늘어난)/,
+    decline: /(급감|많이\s*떨어|가장\s*떨어|가장\s*감소|감소한|줄어든|하락한)/,
+    manager: /(담당|매장|실적|매출|성과)/,
+    totalSales: /(총\s*매출|전체\s*매출|전체\s*실적|다\s*합쳐서)/,
+  };
+
+  function extractTopN(text){
+    let m = text.match(/(\d+)\s*위/);
+    if (m) return parseInt(m[1], 10);
+    m = text.match(/(상위|하위)\s*(\d+)\s*(개|곳|점)/);
+    if (m) return parseInt(m[2], 10);
+    m = text.match(/top\s*(\d+)/i);
+    if (m) return parseInt(m[1], 10);
+    return null;
+  }
+
   const HELP_MSG = [
     '이렇게 물어보실 수 있어요:',
     '· "강남역점 이번 달 매출 얼마야?"',
     '· "물류비중 40% 넘는 매장 몇 개야?"',
     '· "인천 지역 매출 1위는?"',
     '· "이중섭 대리 담당 매장 실적은?"',
-    '· "전체 매출 순위 알려줘"',
+    '· "매출 최하위 매장은?"',
     '· "목표 달성한 매장 몇 개야?"',
   ].join('<br>');
 
@@ -5741,58 +5768,64 @@ window.addEventListener('DOMContentLoaded', () => {
       return '안녕하세요! 매장 매출 데이터를 조회해드리는 챗봇입니다 🙂<br>' + HELP_MSG;
     }
 
+    // 1) 물류비중 필터
     const pct = extractPercent(text);
-    if (/물류/.test(text) && (/비중|퍼센트|%/.test(text) || pct !== null)) {
+    if (KW.logistics.test(text) && (KW.ratio.test(text) || pct !== null)) {
       const threshold = pct !== null ? pct : 30;
       return answerLogisticsThreshold(threshold, ctx);
     }
 
     let store = findStoreInText(text);
 
-    // 매장명이 문장에 없어도, 직전에 매장 얘기를 하고 있었고 "OO월은?" "말고 5월" 처럼
-    // 후속 질문으로 보이면 마지막 매장을 이어서 사용
+    // 매장명이 없어도 직전 대화에서 매장을 다루고 있었다면 후속 질문으로 간주
     if (!store && lastMentionedStore) {
-      const looksLikeFollowUp = extractMonthIdx(text) !== null || /(말고|대신|은\??$|는\??$|얼마|매출|실적)/.test(text);
+      const looksLikeFollowUp = extractMonthIdx(text) !== null || /(말고|대신)/.test(text) || KW.sales.test(text);
       const hasOtherSubject = findManagerInText(text) || findRegionInText(text);
       if (looksLikeFollowUp && !hasOtherSubject) {
         store = lastMentionedStore;
       }
     }
 
-    if (store && /(매출|실적|얼마|현황|어때)/.test(text)) {
+    // 2) 특정 매장 매출 조회
+    if (store && KW.sales.test(text)) {
       lastMentionedStore = store;
       return answerStoreSales(store, ctx);
     }
 
+    // 3) 담당자별 실적
     const manager = findManagerInText(text);
-    if (manager && /(담당|매장|실적|매출)/.test(text)) {
+    if (manager && KW.manager.test(text)) {
       return answerManagerStores(manager, ctx);
     }
 
+    // 4) 지역별 순위 (1위/최하위/순위 등 폭넓게 인식)
     const region = !store ? findRegionInText(text) : null;
-    if (region && /(매출|순위|1위|랭킹|top)/i.test(text)) {
-      const nMatch = text.match(/(\d+)\s*위/);
-      return answerRegionRank(region, ctx, nMatch ? parseInt(nMatch[1],10) : 1);
+    if (region && (KW.sales.test(text) || KW.rankTop.test(text) || KW.rankBottom.test(text) || KW.rankWord.test(text))) {
+      const worst = KW.rankBottom.test(text);
+      return answerRegionRank(region, ctx, extractTopN(text) || 1, worst);
     }
 
+    // 5) 매장명만 있어도 매출로 응답
     if (store) {
-      // 의도어가 명확하지 않아도 매장명이 잡히면 매출로 응답
       lastMentionedStore = store;
       return answerStoreSales(store, ctx);
     }
 
-    if (/(급성장|많이\s*오른|가장\s*오른|가장\s*성장)/.test(text)) return answerMomentum(ctx, true);
-    if (/(급감|많이\s*떨어|가장\s*떨어|가장\s*감소)/.test(text)) return answerMomentum(ctx, false);
+    // 6) 급성장/급감
+    if (KW.growth.test(text)) return answerMomentum(ctx, true);
+    if (KW.decline.test(text)) return answerMomentum(ctx, false);
 
-    if (/(목표).*(달성)|(달성).*(목표)|목표\s*달성/.test(text)) return answerGoal(ctx);
+    // 7) 목표 달성 현황
+    if (KW.goal.test(text) && KW.achieve.test(text)) return answerGoal(ctx);
 
-    if (/(순위|랭킹|top)/i.test(text)) {
-      const nMatch = text.match(/(\d+)\s*위/);
-      const worst = /(꼴찌|하위|최하)/.test(text);
-      return answerOverallRank(ctx, nMatch ? parseInt(nMatch[1],10) : 1, worst);
+    // 8) 전체 순위 (지역/매장 미지정) — "최하위", "꼴찌", "1위", "순위" 등 폭넓게 인식
+    if (KW.rankTop.test(text) || KW.rankBottom.test(text) || KW.rankWord.test(text)) {
+      const worst = KW.rankBottom.test(text);
+      return answerOverallRank(ctx, extractTopN(text) || 1, worst);
     }
 
-    if (/(총\s*매출|전체\s*매출|이번\s*달\s*매출)/.test(text) ) {
+    // 9) 전체 총매출
+    if (KW.totalSales.test(text)) {
       return answerTotalSales(ctx);
     }
 
