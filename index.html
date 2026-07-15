@@ -5982,11 +5982,14 @@ window.addEventListener('DOMContentLoaded', () => {
   //    비워두면(기본값) 규칙 매칭 실패 시 기존 안내 메시지만 표시됩니다.
   const AI_PROXY_URL = 'https://script.google.com/macros/s/AKfycbx9hyJK0em0rI-Ge2IWRN3j6EFCsbrOttwyA8zMbUJlEEvaVyPfcSfUcjPC_o8CNrg/exec';
 
-  // 규칙 매칭 실패 시 Gemini에게 현재 데이터 요약과 함께 질문을 넘겨 답을 받아옴
+  // 규칙 매칭 실패 시(=자유 서술형 질문일 때만) Gemini에게 넘김.
+  // 중요: 원본 데이터를 던지고 Gemini가 직접 정렬/비교하게 하면 다자리 숫자에서 오답이 잦다.
+  // 그래서 서버로 보내기 전에 JS로 미리 "매출 순위(내림차순/오름차순)"와 "물류비중 순위"를 계산해서
+  // 같이 넘긴다 — Gemini는 이미 정렬된 결과를 문장으로 설명만 하면 되므로 정확도가 크게 올라간다.
   async function askAiFallback(text, ctx){
     if (!AI_PROXY_URL) return null;
     try {
-      const summary = ctx.data.map(b => {
+      const rows = ctx.data.map(b => {
         const r = rowFor(b, ctx.lastIdx, ctx.prevIdx);
         return {
           매장명: b.name, 담당자: b.manager, 지역: b.region,
@@ -5995,10 +5998,26 @@ window.addEventListener('DOMContentLoaded', () => {
         };
       }).filter(d => d.이번달매출 > 0);
 
+      // ── 미리 계산해서 넘길 순위표(사전 정렬) ──
+      // Gemini가 스스로 정렬/비교하지 않도록, 매출 기준 내림차순·오름차순 순위와
+      // 물류비중 기준 순위를 계산된 형태 그대로 넘긴다. (금액 비교 오류 방지의 핵심)
+      const bySalesDesc = [...rows].sort((a,b)=> b.이번달매출 - a.이번달매출)
+        .map((d,i)=>({ 순위: i+1, ...d }));
+      const byLogisticsRatioDesc = [...rows].sort((a,b)=> b.물류비중 - a.물류비중)
+        .map((d,i)=>({ 순위: i+1, 매장명: d.매장명, 물류비중: d.물류비중 }));
+
+      const dataSummary = {
+        기준월: ctx.monthLabel,
+        매장목록: rows,
+        // 아래 두 항목은 이미 정렬 완료된 결과 — Gemini는 재계산하지 말고 그대로 참조해서 답할 것
+        매출순위_높은순: bySalesDesc,
+        물류비중순위_높은순: byLogisticsRatioDesc,
+      };
+
       const res = await fetch(AI_PROXY_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Apps Script는 preflight(OPTIONS) 미지원 → text/plain으로 단순요청 처리
-        body: JSON.stringify({ question: text, dataSummary: { 기준월: ctx.monthLabel, 매장목록: summary } }),
+        body: JSON.stringify({ question: text, dataSummary }),
       });
       if (!res.ok) return null;
       const data = await res.json();
@@ -6022,6 +6041,10 @@ window.addEventListener('DOMContentLoaded', () => {
     '· "매출 최하위 매장은?"',
     '· "목표 달성한 매장 몇 개야?"',
   ].join('<br>');
+
+  // 규칙 엔진이 질문 의도를 전혀 못 잡았을 때 반환하는 안내 메시지.
+  // processChatQueryPublic에서 "규칙엔진이 답을 찾았는지"를 판별하는 용도로도 재사용한다.
+  const UNRECOGNIZED_MSG = `죄송해요, 아직 이해하지 못한 질문이에요 😅<br>${HELP_MSG}`;
 
   // ── 메인 라우터: 규칙 매칭으로 의도 파악 ──
   function processChatQuery(raw){
@@ -6130,37 +6153,39 @@ window.addEventListener('DOMContentLoaded', () => {
       return answerTotalSales(ctx);
     }
 
-    return `죄송해요, 아직 이해하지 못한 질문이에요 😅<br>${HELP_MSG}`;
-  }
-
-  // ── 순위/랭킹류 질문 감지 ──
-  // "1위", "가장 높은", "TOP N", "몇 등", "순위", "꼴찌" 등은 규칙 엔진(KW.rankTop/rankBottom/rankWord)이
-  // 이미 정확하게 인식하므로, 이런 패턴이 감지되면 AI를 거치지 않고 규칙 엔진으로 바로 답한다.
-  // (매장/지역/담당자 컨텍스트가 있는 순위 질문도 processChatQuery 내부 라우팅이 알아서 처리함)
-  function isRankingQuery(text){
-    return KW.rankTop.test(text) || KW.rankBottom.test(text) || KW.rankWord.test(text);
+    return UNRECOGNIZED_MSG;
   }
 
   // 팝업 창에서 opener.processChatQueryPublic(text) 형태로 호출할 수 있도록 공개
-  // 1) 순위/랭킹류 질문("1위", "몇 위", "TOP N" 등)은 규칙 엔진(answerOverallRank 등)이 이미 정확히
-  //    처리할 수 있으므로 AI 호출 없이 규칙 엔진으로 먼저 답한다 (가장 확실하고 빠른 방법).
-  // 2) 그 외 애매하거나 규칙으로 못 잡는 질문만 Gemini AI에게 넘기고,
-  //    AI 호출이 실패했을 때(네트워크 오류, 할당량 초과 등)는 규칙 기반 엔진으로 대체 답변한다.
+  //
+  // ── 라우팅 원칙 (중요) ──
+  // 순위/비교/금액 계산이 들어가는 질문은 "정확한 계산"이 생명이라 LLM에게 통째로 맡기면 안 된다.
+  // (LLM은 텍스트 생성 방식으로 다자리 숫자를 비교/정렬하면 종종 틀린다 — 무료/유료 모델 등급과 무관한 근본적 한계)
+  // 그래서 순서를 다음과 같이 반전한다:
+  //   1) 항상 규칙 엔진(processChatQuery)을 먼저 실행한다. 이 엔진은 순위·비교·담당자·지역·물류비중 등
+  //      숫자가 관련된 질문 대부분을 실제 JS 연산(sort/filter/reduce)으로 정확하게 계산해서 답한다.
+  //   2) 규칙 엔진이 "이해하지 못했다"고 판단한 경우(UNRECOGNIZED_MSG)에만, 즉 인사이트 요청처럼
+  //      정말 자유 서술형인 질문에 한해서 Gemini에게 넘긴다.
+  //   3) 이때도 원본 데이터를 그대로 넘기지 않고, 미리 계산해둔 순위표(precomputed ranking)를 함께 넘겨서
+  //      Gemini가 숫자 비교를 직접 하지 않고 "설명/문장 생성"만 하도록 만든다.
+  //   4) AI 호출이 실패(네트워크 오류, 할당량 초과 등)하면 규칙 엔진의 안내 메시지로 대체한다.
   window.processChatQueryPublic = async function(text){
     try {
       const ctx = chatContext(text);
       if (!ctx.data.length) return '아직 매출 데이터가 로드되지 않았습니다.';
 
-      // ── 순위/랭킹 질문은 규칙 엔진 우선 ──
-      if (isRankingQuery(text)) {
-        return processChatQuery(text);
+      // ── 1) 규칙 엔진 우선 시도: 계산이 필요한 질문은 대부분 여기서 정확하게 처리됨 ──
+      const ruleAnswer = processChatQuery(text);
+      if (ruleAnswer !== UNRECOGNIZED_MSG) {
+        return ruleAnswer;
       }
 
+      // ── 2) 규칙 엔진이 못 잡은 자유 서술형 질문만 AI로 ──
       const aiAnswer = await askAiFallback(text, ctx);
       if (aiAnswer) return aiAnswer;
 
-      // AI 호출 실패 시에만 규칙 기반 엔진으로 대체
-      return processChatQuery(text);
+      // ── 3) AI 호출 실패 시 규칙 엔진의 안내 메시지로 대체 ──
+      return ruleAnswer;
     } catch(e) {
       return '죄송해요, 답변을 만드는 중 오류가 발생했어요.';
     }
