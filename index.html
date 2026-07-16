@@ -575,6 +575,12 @@ body.hide-names .store-name:hover{
           </div>
           <div id="menuAnalysisLegend" style="flex:1;min-width:220px;"></div>
         </div>
+        <div style="margin-top:20px;padding-top:16px;border-top:0.5px solid #1e3347;">
+          <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:12px;">📊 월별 메뉴 비중 추이 (%기준)</div>
+          <div style="position:relative;height:260px;">
+            <canvas id="menuAnalysisBarChart"></canvas>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -4129,6 +4135,91 @@ function renderMenuAnalysisChart() {
   }
 }
 
+// 월별(1~6월)로 카테고리별 비중(%)을 계산한다. 콤보 상품은 파이차트와 동일하게
+// 포함된 카테고리 개수만큼 수량을 균등 분배해서 집계한다.
+function computeMenuAnalysisMonthlyPercents() {
+  const months = [1, 2, 3, 4, 5, 6];
+  const perMonthTotals = months.map(m => {
+    const data = MENU_DATA_BY_MONTH[m] || [];
+    const totals = {};
+    MENU_ANALYSIS_CATEGORIES.forEach(c => totals[c] = 0);
+    data.forEach(row => {
+      const name = row['상품명'] || '';
+      const qty = row['수량'] || 0;
+      if (qty <= 0) return;
+      const matched = MENU_ANALYSIS_CATEGORIES.filter(c => name.includes(c));
+      if (!matched.length) return;
+      const share = qty / matched.length;
+      matched.forEach(c => totals[c] += share);
+    });
+    return totals;
+  });
+
+  return months.map((m, i) => {
+    const totals = perMonthTotals[i];
+    const grand = MENU_ANALYSIS_CATEGORIES.reduce((s, c) => s + totals[c], 0);
+    const pct = {};
+    MENU_ANALYSIS_CATEGORIES.forEach(c => {
+      pct[c] = grand ? (totals[c] / grand * 100) : 0;
+    });
+    return { month: m, hasData: !!MENU_DATA_BY_MONTH[m], totals, pct };
+  });
+}
+
+let menuAnalysisBarChartInst = null;
+function renderMenuAnalysisBarChart() {
+  const canvas = document.getElementById('menuAnalysisBarChart');
+  if (!canvas) return;
+  if (menuAnalysisBarChartInst) { try { menuAnalysisBarChartInst.destroy(); } catch (e) {} menuAnalysisBarChartInst = null; }
+
+  const monthly = computeMenuAnalysisMonthlyPercents();
+  const labels = monthly.map(d => `${d.month}월`);
+  const datasets = MENU_ANALYSIS_CATEGORIES.map(c => ({
+    label: c,
+    data: monthly.map(d => Math.round(d.pct[c] * 10) / 10),
+    backgroundColor: MENU_ANALYSIS_COLORS[c],
+    borderRadius: 3,
+    maxBarThickness: 22
+  }));
+
+  menuAnalysisBarChartInst = new Chart(canvas, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          ticks: { color: '#aac4e0', font: { size: 11 } },
+          grid: { color: 'rgba(255,255,255,0.05)' }
+        },
+        y: {
+          beginAtZero: true,
+          max: 100,
+          ticks: { color: '#6b8fa8', font: { size: 10 }, callback: (v) => v + '%' },
+          grid: { color: 'rgba(255,255,255,0.05)' }
+        }
+      },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { color: '#c8dff0', font: { size: 11 }, usePointStyle: true, boxWidth: 8 }
+        },
+        datalabels: {
+          color: '#0a1628',
+          font: { weight: 700, size: 9 },
+          formatter: (v) => v >= 5 ? v.toFixed(1) + '%' : ''
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%`
+          }
+        }
+      }
+    }
+  });
+}
+
 function onMenuAnalysisClick() {
   document.querySelectorAll('#menuMonthTabs .tab').forEach(b => b.classList.remove('active'));
   document.getElementById('menuAnalysisTab').classList.add('active');
@@ -4146,6 +4237,7 @@ function onMenuAnalysisClick() {
   document.getElementById('menuAnalysisView').style.display = '';
 
   renderMenuAnalysisChart();
+  renderMenuAnalysisBarChart();
 }
 
 function onMenuMonthClick(monthIdx) {
