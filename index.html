@@ -471,6 +471,9 @@ body.hide-names .store-name:hover{
         <option value="gte4000">4000만원 이상</option>
         <option value="nodata">매출데이터 없음</option>
       </select>
+      <select class="filter-sel" id="mkManagerSel" onchange="renderMarketingTable()">
+        <option value="all">담당자 전체</option>
+      </select>
     </div>
     <div class="card">
       <div class="ctitle">
@@ -3222,6 +3225,27 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     if(avg < 40000000) return '3000to4000';
     return 'gte4000';
   }
+  // 매장별 담당자(ALL 26년 데이터 기준) 조회 - 마케팅 데이터엔 담당자가 비어있어서 매장명으로 매칭
+  function mkStoreManager(name){
+    if(!window.__mkManagerMap){
+      window.__mkManagerMap = {};
+      (window.ALL || (typeof ALL !== 'undefined' ? ALL : [])).forEach(b=>{ window.__mkManagerMap[b.name] = b.manager || null; });
+    }
+    return window.__mkManagerMap.hasOwnProperty(name) ? window.__mkManagerMap[name] : null;
+  }
+  function mkPopulateManagerSel(){
+    const sel = document.getElementById('mkManagerSel');
+    if(!sel || sel.__populated) return;
+    const ORDER=['김태환 과장','임도형 과장','이중섭 대리','박영태 대리','강동우 사원','이현민 사원'];
+    const present = new Set(MARKETING_DATA_RAW.map(s=>mkStoreManager(s[0])).filter(Boolean));
+    const sorted = [...ORDER.filter(m=>present.has(m)), ...[...present].filter(m=>!ORDER.includes(m)).sort()];
+    sorted.forEach(m=>{
+      const opt = document.createElement('option');
+      opt.value = m; opt.textContent = m;
+      sel.appendChild(opt);
+    });
+    sel.__populated = true;
+  }
 
   window.renderMarketingKpis = function(){
     const rates = MARKETING_DATA_RAW.map(s=>mkStoreRate(s).rate).filter(r=>r!==null);
@@ -3286,9 +3310,11 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     const expanded = window.__mkExpanded === idx;
     const avgSales = mkStoreAvgSales(s[0]);
     const avgSalesTxt = avgSales===null ? '매출데이터없음' : fmt(avgSales)+' (평균)';
+    const mgr = mkStoreManager(s[0]);
+    const subTxt = mgr ? `${mgr} · ${avgSalesTxt}` : avgSalesTxt;
     let html = `<tr class="mk-row${expanded?' expanded':''}" onclick="toggleMkRow(${idx})">
       <td>${i}</td>
-      <td class="rc-name"><span class="mk-store-name-wrap"><span class="mk-expand-ico">▶</span>${s[0]}</span><div style="font-size:9px;color:#4a6070;margin-top:2px;">${avgSalesTxt}</div></td>
+      <td class="rc-name"><span class="mk-store-name-wrap"><span class="mk-expand-ico">▶</span>${s[0]}</span><div style="font-size:9px;color:#4a6070;margin-top:2px;">${subTxt}</div></td>
       <td>${s[2]||'-'}</td>
       <td>
         <div style="display:flex;align-items:center;gap:8px;">
@@ -3377,10 +3403,12 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   }
 
   window.renderMarketingTable = function(){
+    mkPopulateManagerSel();
     const q = (document.getElementById('mkSearch').value||'').trim().toLowerCase();
     const sortVal = document.getElementById('mkSortSel').value;
     const groupVal = document.getElementById('mkGroupSel').value;
     const salesVal = document.getElementById('mkSalesSel') ? document.getElementById('mkSalesSel').value : 'all';
+    const managerVal = document.getElementById('mkManagerSel') ? document.getElementById('mkManagerSel').value : 'all';
     let rows = MARKETING_DATA_RAW.map((s, idx)=>({s, idx, r: mkStoreRate(s)}));
     if(window.__mkRegion !== 'all'){
       rows = rows.filter(x => (x.s[2]||'미지정') === window.__mkRegion);
@@ -3390,6 +3418,9 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     }
     if(salesVal !== 'all'){
       rows = rows.filter(x => mkSalesBucketOf(mkStoreAvgSales(x.s[0])) === salesVal);
+    }
+    if(managerVal !== 'all'){
+      rows = rows.filter(x => mkStoreManager(x.s[0]) === managerVal);
     }
     renderMkSalesSummary(salesVal);
     const sortFn = (a,b)=>{
@@ -3402,8 +3433,9 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     const regionLabel = window.__mkRegion==='all' ? '' : ` · ${window.__mkRegion}`;
     const salesLabels = {lt1000:'1000만원 미만', '1000to1500':'1000~1500만원', '1500to2000':'1500~2000만원', '2000to3000':'2000~3000만원', '3000to4000':'3000~4000만원', gte4000:'4000만원 이상', nodata:'매출데이터 없음'};
     const salesLabel = salesVal==='all' ? '' : ` · 평균매출 ${salesLabels[salesVal]}`;
+    const managerLabel = managerVal==='all' ? '' : ` · ${managerVal}`;
     document.getElementById('mkTableTitle').textContent =
-      q ? `마케팅 캠페인 참여현황${regionLabel}${salesLabel} — "${q}" 검색결과 (${rows.length}건)` : `마케팅 캠페인 참여현황 (2월~6월)${regionLabel}${salesLabel} — 전체 ${rows.length}개 매장`;
+      q ? `마케팅 캠페인 참여현황${regionLabel}${salesLabel}${managerLabel} — "${q}" 검색결과 (${rows.length}건)` : `마케팅 캠페인 참여현황 (2월~6월)${regionLabel}${salesLabel}${managerLabel} — 전체 ${rows.length}개 매장`;
 
     if(rows.length === 0){
       document.getElementById('mkTableBody').innerHTML =
