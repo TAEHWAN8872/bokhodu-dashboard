@@ -326,6 +326,12 @@ body.hide-names .store-name:hover{
 .mk-store-name-wrap{display:flex;align-items:center;gap:6px;}
 .mk-expand-ico{font-size:9px;color:#6b8fa8;transition:transform .2s;display:inline-block;}
 .mk-row.expanded .mk-expand-ico{transform:rotate(90deg);}
+.mk-chip{font-size:11px;font-weight:600;padding:6px 13px;border-radius:20px;border:0.5px solid #1e3347;background:#111e2e;color:#8fa8c0;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.mk-chip:hover{border-color:#2a5a8a;color:#aac4e0;}
+.mk-chip.active{background:#1a3a5c;border-color:#7eb8e8;color:#7eb8e8;}
+.mk-chip .mk-chip-rate{opacity:.75;margin-left:5px;font-weight:700;}
+.mk-region-head td{background:#0d1b2a;color:#7eb8e8;font-weight:700;font-size:11px;padding:9px 10px;border-bottom:1px solid #1e3347;text-align:left;}
+.mk-region-head .mk-region-rate{float:right;font-weight:700;}
 </style>
 </head>
 <body>
@@ -443,11 +449,18 @@ body.hide-names .store-name:hover{
   <!-- 마케팅 참여현황 페이지 -->
   <div id="marketingPage" style="display:none;">
     <div class="rc-kpi-row" id="mkKpiRow"></div>
-    <div style="position:relative;margin-bottom:14px;max-width:280px;">
-      <span style="font-size:10px;color:#6b8fa8;position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;">🔍</span>
-      <input id="mkSearch" type="text" placeholder="매장명 검색..." autocomplete="off"
-        style="width:100%;padding:6px 32px 6px 28px;background:#1a2f44;border:0.5px solid #2a5a8a;border-radius:7px;color:#e0f0ff;font-size:11px;outline:none;"
-        oninput="renderMarketingTable()">
+    <div id="mkRegionChips" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px;"></div>
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+      <div style="position:relative;max-width:280px;flex:1;min-width:180px;">
+        <span style="font-size:10px;color:#6b8fa8;position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;">🔍</span>
+        <input id="mkSearch" type="text" placeholder="매장명 검색..." autocomplete="off"
+          style="width:100%;padding:6px 32px 6px 28px;background:#1a2f44;border:0.5px solid #2a5a8a;border-radius:7px;color:#e0f0ff;font-size:11px;outline:none;box-sizing:border-box;"
+          oninput="renderMarketingTable()">
+      </div>
+      <select class="filter-sel" id="mkGroupSel" onchange="renderMarketingTable()">
+        <option value="grouped">지역별로 묶어보기</option>
+        <option value="flat">전체 목록으로 보기</option>
+      </select>
     </div>
     <div class="card">
       <div class="ctitle">
@@ -458,7 +471,7 @@ body.hide-names .store-name:hover{
           <option value="name">점포명 순</option>
         </select>
       </div>
-      <div style="font-size:10px;color:#4a5f75;margin-bottom:10px;">행을 클릭하면 월별 캠페인 상세 참여내역을 볼 수 있어요.</div>
+      <div style="font-size:10px;color:#4a5f75;margin-bottom:10px;">행을 클릭하면 월별 캠페인 상세 참여내역을 볼 수 있어요. 위 지역 칩을 클릭하면 해당 지역만 볼 수 있어요.</div>
       <div class="rc-table-wrap">
         <table class="rc-table">
           <thead>
@@ -3179,6 +3192,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   }
 
   window.__mkExpanded = null;
+  window.__mkRegion = 'all';
 
   window.renderMarketingKpis = function(){
     const rates = MARKETING_DATA_RAW.map(s=>mkStoreRate(s).rate).filter(r=>r!==null);
@@ -3198,24 +3212,104 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       </div>`).join('');
   };
 
+  function mkRegionStats(){
+    const map = {};
+    MARKETING_DATA_RAW.forEach(s=>{
+      const region = s[2] || '미지정';
+      if(!map[region]) map[region] = {region, stores:[], rates:[]};
+      map[region].stores.push(s);
+      const rate = mkStoreRate(s).rate;
+      if(rate!==null) map[region].rates.push(rate);
+    });
+    return Object.values(map).map(r=>({
+      region: r.region,
+      count: r.stores.length,
+      avg: r.rates.length ? Math.round(r.rates.reduce((a,b)=>a+b,0)/r.rates.length) : null
+    })).sort((a,b)=> a.region.localeCompare(b.region));
+  }
+
+  window.setMkRegion = function(region){
+    window.__mkRegion = region;
+    renderMarketingRegionChips();
+    renderMarketingTable();
+  };
+
+  window.renderMarketingRegionChips = function(){
+    const stats = mkRegionStats();
+    let html = `<div class="mk-chip${window.__mkRegion==='all'?' active':''}" onclick="setMkRegion('all')">전체 <span class="mk-chip-rate">${MARKETING_DATA_RAW.length}개</span></div>`;
+    html += stats.map(r=>{
+      const c = mkRateColor(r.avg);
+      const rateTxt = r.avg===null ? '-' : r.avg+'%';
+      return `<div class="mk-chip${window.__mkRegion===r.region?' active':''}" onclick="setMkRegion('${r.region.replace(/'/g,"\\'")}')">${r.region} <span class="mk-chip-rate" style="color:${c};">${rateTxt}</span></div>`;
+    }).join('');
+    document.getElementById('mkRegionChips').innerHTML = html;
+  };
+
   window.toggleMkRow = function(idx){
     window.__mkExpanded = (window.__mkExpanded === idx) ? null : idx;
     renderMarketingTable();
   };
 
+  function mkRenderStoreRow(s, idx, i){
+    const r = mkStoreRate(s);
+    const rateColor = mkRateColor(r.rate);
+    const rateTxt = r.rate===null ? '데이터없음' : r.rate+'%';
+    const expanded = window.__mkExpanded === idx;
+    let html = `<tr class="mk-row${expanded?' expanded':''}" onclick="toggleMkRow(${idx})">
+      <td>${i}</td>
+      <td class="rc-name"><span class="mk-store-name-wrap"><span class="mk-expand-ico">▶</span>${s[0]}</span></td>
+      <td>${s[2]||'-'}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="mk-bar-track" style="flex:1;"><div class="mk-bar-fill" style="width:${r.rate===null?0:r.rate}%;background:${rateColor};"></div></div>
+          <span class="mk-rate-txt" style="color:${rateColor};">${rateTxt}</span>
+        </div>
+      </td>
+      ${MK_MONTHS.map(m=>{
+        const mr = mkMonthRate(s, m);
+        const c = mkRateColor(mr);
+        const label = mr===null ? '-' : mr+'%';
+        return `<td><span class="mk-month-dot${mr===null?' na':''}" style="${mr!==null?`background:${c}22;color:${c};`:''}">${label}</span></td>`;
+      }).join('')}
+    </tr>`;
+    if(expanded){
+      html += `<tr class="mk-detail-row"><td colspan="9"><div class="mk-detail-wrap"><div class="mk-detail-months">
+        ${MK_MONTHS.map(m=>{
+          const camp = s[3][m] || {};
+          const entries = Object.entries(camp);
+          if(entries.length===0) return '';
+          return `<div class="mk-detail-month"><h4>${m}</h4>${entries.map(([name,val])=>{
+            const cls = val===true?'mk-camp-yes':val===false?'mk-camp-no':'mk-camp-na';
+            const txt = val===true?'✅ 참여':val===false?'❌ 미참여':'– 데이터없음';
+            return `<div class="mk-detail-camp"><span>${name}</span><span class="mk-camp-val ${cls}">${txt}</span></div>`;
+          }).join('')}</div>`;
+        }).join('')}
+      </div></div></td></tr>`;
+    }
+    return html;
+  }
+
   window.renderMarketingTable = function(){
     const q = (document.getElementById('mkSearch').value||'').trim().toLowerCase();
     const sortVal = document.getElementById('mkSortSel').value;
+    const groupVal = document.getElementById('mkGroupSel').value;
     let rows = MARKETING_DATA_RAW.map((s, idx)=>({s, idx, r: mkStoreRate(s)}));
+    if(window.__mkRegion !== 'all'){
+      rows = rows.filter(x => (x.s[2]||'미지정') === window.__mkRegion);
+    }
     if(q){
       rows = rows.filter(x => (x.s[0]||'').toLowerCase().includes(q));
     }
-    if(sortVal==='rate_asc') rows.sort((a,b)=> (a.r.rate===null?101:a.r.rate) - (b.r.rate===null?101:b.r.rate));
-    else if(sortVal==='rate_desc') rows.sort((a,b)=> (b.r.rate===null?-1:b.r.rate) - (a.r.rate===null?-1:a.r.rate));
-    else rows.sort((a,b)=> (a.s[0]||'').localeCompare(b.s[0]||''));
+    const sortFn = (a,b)=>{
+      if(sortVal==='rate_asc') return (a.r.rate===null?101:a.r.rate) - (b.r.rate===null?101:b.r.rate);
+      if(sortVal==='rate_desc') return (b.r.rate===null?-1:b.r.rate) - (a.r.rate===null?-1:a.r.rate);
+      return (a.s[0]||'').localeCompare(b.s[0]||'');
+    };
+    rows.sort(sortFn);
 
+    const regionLabel = window.__mkRegion==='all' ? '' : ` · ${window.__mkRegion}`;
     document.getElementById('mkTableTitle').textContent =
-      q ? `마케팅 캠페인 참여현황 — "${q}" 검색결과 (${rows.length}건)` : `마케팅 캠페인 참여현황 (2월~6월) — 전체 ${rows.length}개 매장`;
+      q ? `마케팅 캠페인 참여현황${regionLabel} — "${q}" 검색결과 (${rows.length}건)` : `마케팅 캠페인 참여현황 (2월~6월)${regionLabel} — 전체 ${rows.length}개 매장`;
 
     if(rows.length === 0){
       document.getElementById('mkTableBody').innerHTML =
@@ -3224,43 +3318,29 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     }
 
     let html = '';
-    rows.forEach((x, i)=>{
-      const {s, idx, r} = x;
-      const rateColor = mkRateColor(r.rate);
-      const rateTxt = r.rate===null ? '데이터없음' : r.rate+'%';
-      const expanded = window.__mkExpanded === idx;
-      html += `<tr class="mk-row${expanded?' expanded':''}" onclick="toggleMkRow(${idx})">
-        <td>${i+1}</td>
-        <td class="rc-name"><span class="mk-store-name-wrap"><span class="mk-expand-ico">▶</span>${s[0]}</span></td>
-        <td>${s[2]||'-'}</td>
-        <td>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <div class="mk-bar-track" style="flex:1;"><div class="mk-bar-fill" style="width:${r.rate===null?0:r.rate}%;background:${rateColor};"></div></div>
-            <span class="mk-rate-txt" style="color:${rateColor};">${rateTxt}</span>
-          </div>
-        </td>
-        ${MK_MONTHS.map(m=>{
-          const mr = mkMonthRate(s, m);
-          const c = mkRateColor(mr);
-          const label = mr===null ? '-' : mr+'%';
-          return `<td><span class="mk-month-dot${mr===null?' na':''}" style="${mr!==null?`background:${c}22;color:${c};`:''}">${label}</span></td>`;
-        }).join('')}
-      </tr>`;
-      if(expanded){
-        html += `<tr class="mk-detail-row"><td colspan="9"><div class="mk-detail-wrap"><div class="mk-detail-months">
-          ${MK_MONTHS.map(m=>{
-            const camp = s[3][m] || {};
-            const entries = Object.entries(camp);
-            if(entries.length===0) return '';
-            return `<div class="mk-detail-month"><h4>${m}</h4>${entries.map(([name,val])=>{
-              const cls = val===true?'mk-camp-yes':val===false?'mk-camp-no':'mk-camp-na';
-              const txt = val===true?'✅ 참여':val===false?'❌ 미참여':'– 데이터없음';
-              return `<div class="mk-detail-camp"><span>${name}</span><span class="mk-camp-val ${cls}">${txt}</span></div>`;
-            }).join('')}</div>`;
-          }).join('')}
-        </div></div></td></tr>`;
-      }
-    });
+    // 지역별 묶어보기: 전체 지역을 볼 때만 그룹핑 (특정 지역 선택 시엔 의미 없어 자동으로 목록형)
+    if(groupVal === 'grouped' && window.__mkRegion === 'all' && !q){
+      const byRegion = {};
+      rows.forEach(x=>{
+        const region = x.s[2] || '미지정';
+        (byRegion[region] = byRegion[region] || []).push(x);
+      });
+      const regionNames = Object.keys(byRegion).sort((a,b)=>a.localeCompare(b));
+      let counter = 0;
+      regionNames.forEach(region=>{
+        const group = byRegion[region];
+        const rates = group.map(x=>x.r.rate).filter(v=>v!==null);
+        const avg = rates.length ? Math.round(rates.reduce((a,b)=>a+b,0)/rates.length) : null;
+        const c = mkRateColor(avg);
+        html += `<tr class="mk-region-head"><td colspan="9">📍 ${region} <span style="color:#6b8fa8;font-weight:500;">(${group.length}개 매장)</span><span class="mk-region-rate" style="color:${c};">평균 참여율 ${avg===null?'-':avg+'%'}</span></td></tr>`;
+        group.forEach(x=>{
+          counter++;
+          html += mkRenderStoreRow(x.s, x.idx, counter);
+        });
+      });
+    } else {
+      rows.forEach((x, i)=>{ html += mkRenderStoreRow(x.s, x.idx, i+1); });
+    }
     document.getElementById('mkTableBody').innerHTML = html;
   };
 
@@ -3398,7 +3478,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     document.getElementById('pageTab-marketing').classList.toggle('active', page==='marketing');
     document.getElementById('brandTitle').textContent = (page==='sales') ? '복호두 매출 현황판' : (page==='contract') ? '복호두 재계약 안내' : '복호두 마케팅 참여현황';
     if(page==='contract'){ renderContractKpis(); renderContractTable(); }
-    if(page==='marketing'){ renderMarketingKpis(); renderMarketingTable(); }
+    if(page==='marketing'){ renderMarketingKpis(); renderMarketingRegionChips(); renderMarketingTable(); }
   };
 
   window.setRcFilter = function(status){
