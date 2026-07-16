@@ -580,12 +580,14 @@ body.hide-names .store-name:hover{
           <div style="position:relative;height:260px;">
             <canvas id="menuAnalysisBarChart"></canvas>
           </div>
+          <div id="menuAnalysisBarTable" style="margin-top:14px;overflow-x:auto;"></div>
         </div>
         <div style="margin-top:20px;padding-top:16px;border-top:0.5px solid #1e3347;">
-          <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:12px;">📊 월별 누적 판매량 추이 (1월→6월, 개수 기준)</div>
+          <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:12px;">📊 월별 누적 판매량 추이 (1월→6월, 개수 기준 · 카테고리 비중 % 함께 표시)</div>
           <div style="position:relative;height:260px;">
             <canvas id="menuAnalysisStackedBarChart"></canvas>
           </div>
+          <div id="menuAnalysisStackedTable" style="margin-top:14px;overflow-x:auto;"></div>
         </div>
       </div>
     </div>
@@ -4237,7 +4239,7 @@ function renderMenuAnalysisBarChart() {
         datalabels: {
           color: '#0a1628',
           font: { weight: 700, size: 9 },
-          formatter: (v) => v >= 5 ? v.toFixed(1) + '%' : ''
+          formatter: (v) => v >= 8 ? v.toFixed(1) + '%' : ''
         },
         tooltip: {
           callbacks: {
@@ -4247,6 +4249,35 @@ function renderMenuAnalysisBarChart() {
       }
     }
   });
+
+  renderMenuAnalysisPctTable('menuAnalysisBarTable', monthly, (d, c) => d.pct[c]);
+}
+
+// 공통: 월별 x 카테고리 비율(%) 숫자를 표로 렌더링 (그래프 막대 안이 아니라 표로 보여줘서
+// 막대가 작아도 숫자가 항상 잘 보이도록 함)
+function renderMenuAnalysisPctTable(containerId, monthly, getPct) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const cols = monthly.map(d => `${d.month}월`);
+  let html = `<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:480px;">
+    <thead><tr>
+      <th style="text-align:left;padding:5px 8px;color:#6b8fa8;font-weight:600;border-bottom:1px solid #1e3347;">카테고리</th>
+      ${cols.map(c => `<th style="text-align:right;padding:5px 8px;color:#6b8fa8;font-weight:600;border-bottom:1px solid #1e3347;">${c}</th>`).join('')}
+    </tr></thead><tbody>`;
+  MENU_ANALYSIS_CATEGORIES.forEach(c => {
+    html += `<tr>
+      <td style="padding:5px 8px;color:#e0f0ff;font-weight:600;white-space:nowrap;">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${MENU_ANALYSIS_COLORS[c]};margin-right:6px;vertical-align:middle;"></span>${c}
+      </td>`;
+    monthly.forEach(d => {
+      const v = getPct(d, c);
+      const shown = d.hasData ? v.toFixed(1) + '%' : '-';
+      html += `<td style="text-align:right;padding:5px 8px;color:#c8dff0;font-variant-numeric:tabular-nums;">${shown}</td>`;
+    });
+    html += `</tr>`;
+  });
+  html += `</tbody></table>`;
+  el.innerHTML = html;
 }
 
 let menuAnalysisStackedBarChartInst = null;
@@ -4256,10 +4287,18 @@ function renderMenuAnalysisStackedBarChart() {
   if (menuAnalysisStackedBarChartInst) { try { menuAnalysisStackedBarChartInst.destroy(); } catch (e) {} menuAnalysisStackedBarChartInst = null; }
 
   const cumMonthly = computeMenuAnalysisCumulativeTotals();
-  const labels = cumMonthly.map(d => `${d.month}월`);
+  // 각 달까지의 누적 총합 대비 카테고리 비율(%)도 함께 계산 (막대 높이는 개수 그대로 유지,
+  // % 는 라벨/툴팁/표로만 보여줌)
+  const withPct = cumMonthly.map(d => {
+    const grand = MENU_ANALYSIS_CATEGORIES.reduce((s, c) => s + d.cumulative[c], 0);
+    const pct = {};
+    MENU_ANALYSIS_CATEGORIES.forEach(c => { pct[c] = grand ? (d.cumulative[c] / grand * 100) : 0; });
+    return { ...d, grand, pct };
+  });
+  const labels = withPct.map(d => `${d.month}월`);
   const datasets = MENU_ANALYSIS_CATEGORIES.map(c => ({
     label: c,
-    data: cumMonthly.map(d => Math.round(d.cumulative[c])),
+    data: withPct.map(d => Math.round(d.cumulative[c])),
     backgroundColor: MENU_ANALYSIS_COLORS[c],
     borderColor: '#0a1628',
     borderWidth: 1,
@@ -4290,15 +4329,31 @@ function renderMenuAnalysisStackedBarChart() {
           position: 'top',
           labels: { color: '#c8dff0', font: { size: 11 }, usePointStyle: true, boxWidth: 8 }
         },
-        datalabels: { display: false },
+        datalabels: {
+          color: '#fff',
+          font: { weight: 700, size: 9 },
+          textStrokeColor: 'rgba(0,0,0,0.6)',
+          textStrokeWidth: 2,
+          formatter: (v, ctx) => {
+            const d = withPct[ctx.dataIndex];
+            const pct = d.pct[ctx.dataset.label];
+            return pct >= 6 ? pct.toFixed(1) + '%' : '';
+          }
+        },
         tooltip: {
           callbacks: {
-            label: (ctx) => `${ctx.dataset.label}: ${Math.round(ctx.parsed.y).toLocaleString()}개 (누적)`
+            label: (ctx) => {
+              const d = withPct[ctx.dataIndex];
+              const pct = d.pct[ctx.dataset.label];
+              return `${ctx.dataset.label}: ${Math.round(ctx.parsed.y).toLocaleString()}개 (누적, ${pct.toFixed(1)}%)`;
+            }
           }
         }
       }
     }
   });
+
+  renderMenuAnalysisPctTable('menuAnalysisStackedTable', withPct, (d, c) => d.pct[c]);
 }
 
 function onMenuAnalysisClick() {
