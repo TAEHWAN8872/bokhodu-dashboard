@@ -4071,6 +4071,19 @@ function renderMenuMonthTabs() {
 // 분석 탭에서 다룰 5개 메뉴 카테고리 (상품명에 포함된 키워드 기준)
 const MENU_ANALYSIS_CATEGORIES = ['팥', '앙버터', '레몬버터', '딸기', '청사과'];
 const MENU_ANALYSIS_COLORS = { '팥': '#e05555', '앙버터': '#f0a04a', '레몬버터': '#facc15', '딸기': '#f472b6', '청사과': '#3db87a' };
+// 카테고리별 매칭 키워드. 호두과자 라인업은 "레몬버터"로 표기되지만 답례품 라인업은
+// "답례품(레몬)"처럼 "레몬"만 표기되므로, 레몬버터 카테고리는 "레몬"도 함께 매칭해서
+// 답례품(레몬 포함 상품) 매출/수량도 레몬버터 카테고리 집계에 합산되도록 한다.
+const MENU_ANALYSIS_MATCH_KEYWORDS = {
+  '팥': ['팥'],
+  '앙버터': ['앙버터'],
+  '레몬버터': ['레몬버터', '레몬'],
+  '딸기': ['딸기'],
+  '청사과': ['청사과']
+};
+function menuAnalysisMatchCategories(name) {
+  return MENU_ANALYSIS_CATEGORIES.filter(c => MENU_ANALYSIS_MATCH_KEYWORDS[c].some(kw => name.includes(kw)));
+}
 
 // "/"로 여러 맛이 결합된 콤보 상품(예: "팥/앙버터(20개)")은 해당 키워드 개수만큼
 // 수량을 균등 분배해서 집계한다 (단일 상품은 그대로 전량 반영).
@@ -4082,7 +4095,7 @@ function computeMenuAnalysisTotals() {
     const name = row['상품명'] || '';
     const qty = row['수량'] || 0;
     if (qty <= 0) return;
-    const matched = MENU_ANALYSIS_CATEGORIES.filter(c => name.includes(c));
+    const matched = menuAnalysisMatchCategories(name);
     if (!matched.length) return;
     const share = qty / matched.length;
     matched.forEach(c => totals[c] += share);
@@ -4103,7 +4116,7 @@ function computeMenuAnalysisCumulativeTotals() {
       const name = row['상품명'] || '';
       const qty = row['수량'] || 0;
       if (qty <= 0) return;
-      const matched = MENU_ANALYSIS_CATEGORIES.filter(c => name.includes(c));
+      const matched = menuAnalysisMatchCategories(name);
       if (!matched.length) return;
       const share = qty / matched.length;
       matched.forEach(c => running[c] += share);
@@ -4178,7 +4191,7 @@ function computeMenuAnalysisMonthlyPercents() {
       const name = row['상품명'] || '';
       const qty = row['수량'] || 0;
       if (qty <= 0) return;
-      const matched = MENU_ANALYSIS_CATEGORIES.filter(c => name.includes(c));
+      const matched = menuAnalysisMatchCategories(name);
       if (!matched.length) return;
       const share = qty / matched.length;
       matched.forEach(c => totals[c] += share);
