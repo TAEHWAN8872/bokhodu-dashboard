@@ -3208,7 +3208,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   function mkStoreAvgSales(name){
     if(!window.__mkSalesMap){
       window.__mkSalesMap = {};
-      (window.ALL||[]).forEach(b=>{ window.__mkSalesMap[b.name] = getBranchAvg(b); });
+      (window.ALL || ALL || []).forEach(b=>{ window.__mkSalesMap[b.name] = getBranchAvg(b); });
     }
     return window.__mkSalesMap.hasOwnProperty(name) ? window.__mkSalesMap[name] : null;
   }
