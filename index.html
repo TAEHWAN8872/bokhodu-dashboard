@@ -482,6 +482,7 @@ body.hide-names .store-name:hover{
         </select>
       </div>
       <div style="font-size:10px;color:#4a5f75;margin-bottom:10px;">행을 클릭하면 월별 캠페인 상세 참여내역을 볼 수 있어요. 위 지역 칩을 클릭하면 해당 지역만 볼 수 있어요.</div>
+      <div id="mkSalesSummary" style="display:none;margin-bottom:14px;"></div>
       <div class="rc-table-wrap">
         <table class="rc-table">
           <thead>
@@ -3319,6 +3320,62 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     return html;
   }
 
+  // 매출구간 선택 시 지역별 참여율 + 전체 평균을 한눈에 보여주는 요약
+  function renderMkSalesSummary(salesVal){
+    const el = document.getElementById('mkSalesSummary');
+    if(!el) return;
+    if(salesVal === 'all'){
+      el.style.display = 'none';
+      el.innerHTML = '';
+      return;
+    }
+    const salesLabels = {lt1000:'1000만원 미만', '1000to1500':'1000~1500만원', '1500to2000':'1500~2000만원', '2000to3000':'2000~3000만원', '3000to4000':'3000~4000만원', gte4000:'4000만원 이상', nodata:'매출데이터 없음'};
+    // 지역/검색 필터와 무관하게, 해당 매출구간 전체 매장 기준으로 집계
+    const bucketStores = MARKETING_DATA_RAW.filter(s => mkSalesBucketOf(mkStoreAvgSales(s[0])) === salesVal);
+    const allRates = bucketStores.map(s=>mkStoreRate(s).rate).filter(r=>r!==null);
+    const overallAvg = allRates.length ? Math.round(allRates.reduce((a,b)=>a+b,0)/allRates.length) : null;
+
+    const byRegion = {};
+    bucketStores.forEach(s=>{
+      const region = s[2] || '미지정';
+      if(!byRegion[region]) byRegion[region] = {region, count:0, rates:[]};
+      byRegion[region].count++;
+      const rate = mkStoreRate(s).rate;
+      if(rate!==null) byRegion[region].rates.push(rate);
+    });
+    const regionStats = Object.values(byRegion).map(r=>({
+      region:r.region, count:r.count,
+      avg: r.rates.length ? Math.round(r.rates.reduce((a,b)=>a+b,0)/r.rates.length) : null
+    })).sort((a,b)=> (b.avg===null?-1:b.avg) - (a.avg===null?-1:a.avg));
+
+    const overallColor = mkRateColor(overallAvg);
+    let html = `<div style="background:#0d1b2a;border:0.5px solid #2a5a8a;border-radius:10px;padding:12px 14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+        <span style="font-size:11px;color:#7eb8e8;font-weight:600;">📊 ${salesLabels[salesVal]} 구간 요약 · ${bucketStores.length}개 매장</span>
+        <span style="font-size:12px;font-weight:700;color:${overallColor};">구간 평균 참여율 ${overallAvg===null?'-':overallAvg+'%'}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;">
+        ${regionStats.map(r=>{
+          const c = mkRateColor(r.avg);
+          const rateTxt = r.avg===null ? '-' : r.avg+'%';
+          return `<div onclick="setMkRegion('${r.region.replace(/'/g,"\\'")}')"
+            style="cursor:pointer;background:#111e2e;border:0.5px solid #1a2f44;border-radius:7px;padding:7px 10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span style="font-size:11px;color:#c8dff0;font-weight:600;">${r.region}</span>
+              <span style="font-size:9px;color:#6b8fa8;">${r.count}개</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <div class="mk-bar-track" style="flex:1;"><div class="mk-bar-fill" style="width:${r.avg===null?0:r.avg}%;background:${c};"></div></div>
+              <span style="font-size:11px;font-weight:700;color:${c};">${rateTxt}</span>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+    el.innerHTML = html;
+    el.style.display = 'block';
+  }
+
   window.renderMarketingTable = function(){
     const q = (document.getElementById('mkSearch').value||'').trim().toLowerCase();
     const sortVal = document.getElementById('mkSortSel').value;
@@ -3334,6 +3391,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     if(salesVal !== 'all'){
       rows = rows.filter(x => mkSalesBucketOf(mkStoreAvgSales(x.s[0])) === salesVal);
     }
+    renderMkSalesSummary(salesVal);
     const sortFn = (a,b)=>{
       if(sortVal==='rate_asc') return (a.r.rate===null?101:a.r.rate) - (b.r.rate===null?101:b.r.rate);
       if(sortVal==='rate_desc') return (b.r.rate===null?-1:b.r.rate) - (a.r.rate===null?-1:a.r.rate);
