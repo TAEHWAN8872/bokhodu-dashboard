@@ -4040,7 +4040,14 @@ function renderMenuMonthTabs() {
     const hasData = MENU_DATA_BY_MONTH[i+1] !== undefined;
     return `<button class="tab month-tab${!hasData?' dimmed':''}" onclick="onMenuMonthClick(${i+1})">${m}</button>`;
   }).join('');
+  html += `<button class="tab month-tab" id="menuAnalysisTab" onclick="onMenuAnalysisClick()">📈 분석</button>`;
   el.innerHTML = html;
+}
+
+function onMenuAnalysisClick() {
+  document.querySelectorAll('#menuMonthTabs .tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('menuAnalysisTab').classList.add('active');
+  // TODO: 분석 탭 내용은 추후 요청사항에 맞춰 구현 예정
 }
 
 function onMenuMonthClick(monthIdx) {
