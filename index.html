@@ -581,6 +581,12 @@ body.hide-names .store-name:hover{
             <canvas id="menuAnalysisBarChart"></canvas>
           </div>
         </div>
+        <div style="margin-top:20px;padding-top:16px;border-top:0.5px solid #1e3347;">
+          <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:12px;">📊 월별 누적 판매량 추이 (1월→6월, 개수 기준)</div>
+          <div style="position:relative;height:260px;">
+            <canvas id="menuAnalysisStackedBarChart"></canvas>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -4082,6 +4088,29 @@ function computeMenuAnalysisTotals() {
   return totals;
 }
 
+// 월이 지날수록 판매량이 계속 더해지는 "누적 합계"를 카테고리별로 계산한다.
+// (1월 → 1~2월 → 1~3월 ... 순으로 커지므로 막대가 우상향/대각선으로 쌓인다)
+function computeMenuAnalysisCumulativeTotals() {
+  const months = [1, 2, 3, 4, 5, 6];
+  const running = {};
+  MENU_ANALYSIS_CATEGORIES.forEach(c => running[c] = 0);
+
+  return months.map(m => {
+    const data = MENU_DATA_BY_MONTH[m] || [];
+    data.forEach(row => {
+      const name = row['상품명'] || '';
+      const qty = row['수량'] || 0;
+      if (qty <= 0) return;
+      const matched = MENU_ANALYSIS_CATEGORIES.filter(c => name.includes(c));
+      if (!matched.length) return;
+      const share = qty / matched.length;
+      matched.forEach(c => running[c] += share);
+    });
+    // 매 반복마다 running 객체가 누적되므로, 이번 달까지의 누적값을 스냅샷으로 복사해 반환
+    return { month: m, hasData: !!MENU_DATA_BY_MONTH[m], cumulative: { ...running } };
+  });
+}
+
 let menuAnalysisPieChartInst = null;
 function renderMenuAnalysisChart() {
   const totals = computeMenuAnalysisTotals();
@@ -4220,6 +4249,58 @@ function renderMenuAnalysisBarChart() {
   });
 }
 
+let menuAnalysisStackedBarChartInst = null;
+function renderMenuAnalysisStackedBarChart() {
+  const canvas = document.getElementById('menuAnalysisStackedBarChart');
+  if (!canvas) return;
+  if (menuAnalysisStackedBarChartInst) { try { menuAnalysisStackedBarChartInst.destroy(); } catch (e) {} menuAnalysisStackedBarChartInst = null; }
+
+  const cumMonthly = computeMenuAnalysisCumulativeTotals();
+  const labels = cumMonthly.map(d => `${d.month}월`);
+  const datasets = MENU_ANALYSIS_CATEGORIES.map(c => ({
+    label: c,
+    data: cumMonthly.map(d => Math.round(d.cumulative[c])),
+    backgroundColor: MENU_ANALYSIS_COLORS[c],
+    borderColor: '#0a1628',
+    borderWidth: 1,
+    maxBarThickness: 44
+  }));
+
+  menuAnalysisStackedBarChartInst = new Chart(canvas, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          stacked: true,
+          ticks: { color: '#aac4e0', font: { size: 11 } },
+          grid: { display: false }
+        },
+        y: {
+          stacked: true,
+          beginAtZero: true,
+          ticks: { color: '#6b8fa8', font: { size: 10 }, callback: (v) => v.toLocaleString() + '개' },
+          grid: { color: 'rgba(255,255,255,0.05)' }
+        }
+      },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { color: '#c8dff0', font: { size: 11 }, usePointStyle: true, boxWidth: 8 }
+        },
+        datalabels: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.dataset.label}: ${Math.round(ctx.parsed.y).toLocaleString()}개 (누적)`
+          }
+        }
+      }
+    }
+  });
+}
+
 function onMenuAnalysisClick() {
   document.querySelectorAll('#menuMonthTabs .tab').forEach(b => b.classList.remove('active'));
   document.getElementById('menuAnalysisTab').classList.add('active');
@@ -4238,6 +4319,7 @@ function onMenuAnalysisClick() {
 
   renderMenuAnalysisChart();
   renderMenuAnalysisBarChart();
+  renderMenuAnalysisStackedBarChart();
 }
 
 function onMenuMonthClick(monthIdx) {
