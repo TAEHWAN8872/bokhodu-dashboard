@@ -566,6 +566,16 @@ body.hide-names .store-name:hover{
       <div id="menuManagerView" style="display:none;">
         <div id="menuManagerList"></div>
       </div>
+      <!-- 분석 뷰 (1월~6월 메뉴 총합 비중) -->
+      <div id="menuAnalysisView" style="display:none;">
+        <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:12px;">📈 1월~6월 메뉴 총합 비중 (팥 / 앙버터 / 레몬버터 / 딸기 / 청사과)</div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
+          <div style="position:relative;width:260px;height:260px;flex-shrink:0;">
+            <canvas id="menuAnalysisPieChart"></canvas>
+          </div>
+          <div id="menuAnalysisLegend" style="flex:1;min-width:220px;"></div>
+        </div>
+      </div>
     </div>
   </div>
   <!-- 메뉴 지역 상세 모달 -->
@@ -4044,10 +4054,98 @@ function renderMenuMonthTabs() {
   el.innerHTML = html;
 }
 
+// 분석 탭에서 다룰 5개 메뉴 카테고리 (상품명에 포함된 키워드 기준)
+const MENU_ANALYSIS_CATEGORIES = ['팥', '앙버터', '레몬버터', '딸기', '청사과'];
+const MENU_ANALYSIS_COLORS = { '팥': '#e05555', '앙버터': '#f0a04a', '레몬버터': '#facc15', '딸기': '#f472b6', '청사과': '#3db87a' };
+
+// "/"로 여러 맛이 결합된 콤보 상품(예: "팥/앙버터(20개)")은 해당 키워드 개수만큼
+// 수량을 균등 분배해서 집계한다 (단일 상품은 그대로 전량 반영).
+function computeMenuAnalysisTotals() {
+  const data = MENU_DATA_BY_MONTH[0] || []; // 0번 키 = 1월~6월 전체 합산 데이터
+  const totals = {};
+  MENU_ANALYSIS_CATEGORIES.forEach(c => totals[c] = 0);
+  data.forEach(row => {
+    const name = row['상품명'] || '';
+    const qty = row['수량'] || 0;
+    if (qty <= 0) return;
+    const matched = MENU_ANALYSIS_CATEGORIES.filter(c => name.includes(c));
+    if (!matched.length) return;
+    const share = qty / matched.length;
+    matched.forEach(c => totals[c] += share);
+  });
+  return totals;
+}
+
+let menuAnalysisPieChartInst = null;
+function renderMenuAnalysisChart() {
+  const totals = computeMenuAnalysisTotals();
+  const grand = MENU_ANALYSIS_CATEGORIES.reduce((s, c) => s + totals[c], 0);
+  const canvas = document.getElementById('menuAnalysisPieChart');
+  const legendEl = document.getElementById('menuAnalysisLegend');
+  if (!canvas) return;
+  if (menuAnalysisPieChartInst) { try { menuAnalysisPieChartInst.destroy(); } catch (e) {} menuAnalysisPieChartInst = null; }
+
+  const labels = MENU_ANALYSIS_CATEGORIES;
+  const values = labels.map(c => Math.round(totals[c]));
+  const colors = labels.map(c => MENU_ANALYSIS_COLORS[c]);
+
+  menuAnalysisPieChartInst = new Chart(canvas, {
+    type: 'pie',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: '#0a1628', borderWidth: 2 }] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        datalabels: {
+          color: '#0a1628',
+          font: { weight: 700, size: 11 },
+          formatter: (v) => grand ? (v / grand * 100).toFixed(1) + '%' : '0%'
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.parsed;
+              const pct = grand ? (v / grand * 100).toFixed(1) : '0.0';
+              return `${ctx.label}: ${Math.round(v).toLocaleString()}개 (${pct}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (legendEl) {
+    legendEl.innerHTML = labels.map((c, i) => {
+      const v = values[i];
+      const pct = grand ? (v / grand * 100).toFixed(1) : '0.0';
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;">
+        <span style="width:10px;height:10px;border-radius:3px;background:${colors[i]};flex-shrink:0;"></span>
+        <span style="color:#c8dff0;min-width:60px;">${c}</span>
+        <span style="color:#e0f0ff;font-weight:700;margin-left:auto;">${v.toLocaleString()}개</span>
+        <span style="color:#7eb8e8;font-weight:700;width:52px;text-align:right;">${pct}%</span>
+      </div>`;
+    }).join('');
+  }
+}
+
 function onMenuAnalysisClick() {
   document.querySelectorAll('#menuMonthTabs .tab').forEach(b => b.classList.remove('active'));
   document.getElementById('menuAnalysisTab').classList.add('active');
-  // TODO: 분석 탭 내용은 추후 요청사항에 맞춰 구현 예정
+
+  currentMenuMonth = null;
+  document.getElementById('menuPanelTitle').textContent = '메뉴 분석 (1월~6월)';
+  document.getElementById('menuPanel').classList.add('open');
+
+  const managerTabs = document.getElementById('menuManagerTabs');
+  const subtabRow = document.getElementById('menuSubtabRow');
+  if (managerTabs) managerTabs.style.display = 'none';
+  if (subtabRow) subtabRow.style.display = 'none';
+  document.getElementById('menuRegionView').style.display = 'none';
+  document.getElementById('menuManagerView').style.display = 'none';
+  document.getElementById('menuAnalysisView').style.display = '';
+
+  renderMenuAnalysisChart();
 }
 
 function onMenuMonthClick(monthIdx) {
@@ -4071,6 +4169,12 @@ function onMenuMonthClick(monthIdx) {
   currentMenuRegionTabMode = 'stores';
   currentMenuSubtab = 'region';
   document.querySelectorAll('#menuSubtabRow .menu-subtab').forEach(b => b.classList.toggle('active', b.dataset.subtab==='region'));
+  const managerTabsEl = document.getElementById('menuManagerTabs');
+  const subtabRowEl = document.getElementById('menuSubtabRow');
+  if (managerTabsEl) managerTabsEl.style.display = '';
+  if (subtabRowEl) subtabRowEl.style.display = '';
+  const analysisViewEl = document.getElementById('menuAnalysisView');
+  if (analysisViewEl) analysisViewEl.style.display = 'none';
   document.getElementById('menuRegionView').style.display = '';
   document.getElementById('menuManagerView').style.display = 'none';
   renderMenuView();
