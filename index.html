@@ -590,7 +590,24 @@ body.hide-names .store-name:hover{
           <div id="menuAnalysisTotalTable" style="margin-top:14px;overflow-x:auto;"></div>
         </div>
 
-        <!-- 2~10번 탭: 준비중 -->
+        <!-- 2번 탭: 호두과자/답례품 매장당 평균 판매량 (25년 vs 26년) -->
+        <div id="maTab-2" class="ma-tab-panel" style="display:none;">
+          <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:12px;">🌰 호두과자 매장당 평균 판매량 (25년 vs 26년)</div>
+          <div style="position:relative;height:280px;">
+            <canvas id="maWalnutAvgChart"></canvas>
+          </div>
+          <div id="maWalnutAvgTable" style="margin-top:14px;overflow-x:auto;"></div>
+
+          <div style="margin-top:24px;padding-top:16px;border-top:0.5px solid #1e3347;">
+            <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:12px;">🎁 답례품 매장당 평균 판매량 (25년 vs 26년)</div>
+            <div style="position:relative;height:280px;">
+              <canvas id="maGiftAvgChart"></canvas>
+            </div>
+            <div id="maGiftAvgTable" style="margin-top:14px;overflow-x:auto;"></div>
+          </div>
+        </div>
+
+        <!-- 3~10번 탭: 준비중 -->
         <div id="maTab-placeholder" class="ma-tab-panel" style="display:none;">
           <div style="text-align:center;color:#4a6070;font-size:13px;padding:60px 0;">🚧 준비 중인 분석 탭입니다.</div>
         </div>
@@ -4425,6 +4442,7 @@ function onMenuAnalysisClick() {
 // ── 메뉴 분석 세부 탭 (1~11번) ──
 const MENU_ANALYSIS_TAB_LABELS = {
   1: '매출·판매수량',
+  2: '호두과자·답례품 매장평균',
   11: '카테고리 비중'
 };
 let currentMenuAnalysisTab = 1;
@@ -4446,16 +4464,170 @@ function switchMenuAnalysisSubtab(n) {
     b.classList.toggle('active', Number(b.dataset.matab) === n);
   });
   document.getElementById('maTab-1').style.display = n === 1 ? '' : 'none';
+  document.getElementById('maTab-2').style.display = n === 2 ? '' : 'none';
   document.getElementById('maTab-11').style.display = n === 11 ? '' : 'none';
-  document.getElementById('maTab-placeholder').style.display = (n !== 1 && n !== 11) ? '' : 'none';
+  document.getElementById('maTab-placeholder').style.display = (n !== 1 && n !== 2 && n !== 11) ? '' : 'none';
 
   if (n === 1) {
     renderMenuAnalysisTotalChart();
+  } else if (n === 2) {
+    renderMenuAnalysisTab2();
   } else if (n === 11) {
     renderMenuAnalysisChart();
     renderMenuAnalysisBarChart();
     renderMenuAnalysisStackedBarChart();
   }
+}
+
+// ── 2번 탭: 호두과자 / 답례품 매장당 평균 판매량 (25년 vs 26년, 월별 꺾은선) ──
+// 25년: 운영 매장수는 ALL25(스토어별 25년 매출 배열) 기준, 26년: ALL(스토어별 26년 매출 배열) 기준
+function computeStoreCounts26_25() {
+  const storeCount25 = [1, 2, 3, 4, 5, 6].map(m => Object.values(ALL25).filter(arr => (arr[m - 1] || 0) > 0).length);
+  const storeCount26 = [1, 2, 3, 4, 5, 6].map(m => ALL.filter(b => (b.months[m - 1] || 0) > 0).length);
+  return { storeCount25, storeCount26 };
+}
+
+// data2025Const: {1:qty, 2:qty, ...} 25년 월별 총 판매수량
+// getMonthlyFn26: 26년 월별 총 판매수량을 반환하는 함수 (예: getWalnutMonthlyQty)
+function computeStoreAvgSeries(data2025Const, getMonthlyFn26) {
+  const monthly26 = getMonthlyFn26();
+  const { storeCount25, storeCount26 } = computeStoreCounts26_25();
+  const months = [1, 2, 3, 4, 5, 6];
+  const labels = months.map(m => `${m}월`);
+  const avg25 = months.map((m, i) => {
+    const v = data2025Const[m] || 0;
+    const s = storeCount25[i];
+    return s ? v / s : 0;
+  });
+  const avg26 = months.map((m, i) => {
+    const v = monthly26[m] || 0;
+    const s = storeCount26[i];
+    return s ? v / s : 0;
+  });
+  const diffPct = months.map((m, i) => {
+    const a25 = avg25[i], a26 = avg26[i];
+    return a25 ? ((a26 - a25) / a25 * 100) : null;
+  });
+  return { labels, avg25, avg26, diffPct, storeCount25, storeCount26 };
+}
+
+function renderStoreAvgLineChart(canvasId, series, color26) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return null;
+  const { labels, avg25, avg26, diffPct } = series;
+  const round1 = v => Math.round(v * 10) / 10;
+
+  return new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: '25년', data: avg25.map(round1), borderColor: '#f59e0b', backgroundColor: '#f59e0b',
+          pointBackgroundColor: '#f59e0b', pointBorderColor: '#0d1b2a', pointBorderWidth: 1.5, pointRadius: 4,
+          borderWidth: 2.5, tension: 0.3,
+          datalabels: { color: '#fde68a', anchor: 'end', align: 'bottom', offset: 8, font: { size: 10, weight: '700' },
+            formatter: v => v.toLocaleString() + '개' } },
+        { label: '26년', data: avg26.map(round1), borderColor: color26, backgroundColor: color26,
+          pointBackgroundColor: color26, pointBorderColor: '#0d1b2a', pointBorderWidth: 1.5, pointRadius: 4,
+          borderWidth: 2.5, tension: 0.3,
+          datalabels: {
+            color: (ctx) => {
+              const p = diffPct[ctx.dataIndex];
+              if (p == null) return color26;
+              return p >= 0 ? '#4ade80' : '#f87171';
+            },
+            anchor: 'end', align: 'top', offset: 8, font: { size: 10, weight: '700' },
+            formatter: (v, ctx) => {
+              const p = diffPct[ctx.dataIndex];
+              if (p == null) return v.toLocaleString() + '개';
+              const arrow = p >= 0 ? '↑' : '↓';
+              const sign = p >= 0 ? '+' : '';
+              return `${v.toLocaleString()}개\n${arrow} ${sign}${p.toFixed(1)}%`;
+            }
+          } }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: { top: 34, bottom: 24 } },
+      plugins: {
+        legend: { position: 'top', labels: { color: '#c8dff0', font: { size: 11 }, boxWidth: 10 } },
+        tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString()}개` } }
+      },
+      scales: {
+        x: { ticks: { color: '#9fc1de', font: { size: 10 } }, grid: { color: '#1e3347' } },
+        y: { ticks: { color: '#9fc1de', font: { size: 10 }, callback: v => v.toLocaleString() }, grid: { color: '#1e3347' } }
+      }
+    }
+  });
+}
+
+function renderStoreAvgTable(containerId, series, color26) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const { labels, avg25, avg26, diffPct, storeCount25, storeCount26 } = series;
+  const rows = labels.map((lb, i) => {
+    const a25 = avg25[i], a26 = avg26[i], p = diffPct[i];
+    const diff = a26 - a25;
+    const diffColor = p == null ? '#9fc1de' : (p >= 0 ? '#4ade80' : '#f87171');
+    const diffSign = diff >= 0 ? '+' : '';
+    const pctText = p == null ? '-' : `${p >= 0 ? '↑' : '↓'} ${p >= 0 ? '+' : ''}${p.toFixed(1)}%`;
+    return `<tr>
+      <td style="padding:5px 10px;color:#9fc1de;">${lb}</td>
+      <td style="padding:5px 10px;text-align:right;color:#f59e0b;">${storeCount25[i]}개 매장 · 평균 ${a25.toFixed(1)}개</td>
+      <td style="padding:5px 10px;text-align:right;color:${color26};">${storeCount26[i]}개 매장 · 평균 ${a26.toFixed(1)}개</td>
+      <td style="padding:5px 10px;text-align:right;color:${diffColor};">${diffSign}${diff.toFixed(1)}개</td>
+      <td style="padding:5px 10px;text-align:right;color:${diffColor};font-weight:700;">${pctText}</td>
+    </tr>`;
+  }).join('');
+
+  const lastIdx = storeCount25.length - 1;
+  const totalStore25 = storeCount25[lastIdx] || 0;
+  const totalStore26 = storeCount26[lastIdx] || 0;
+  const avgOf = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+  const totalAvg25 = avgOf(avg25), totalAvg26 = avgOf(avg26);
+  const totalDiff = totalAvg26 - totalAvg25;
+  const totalPct = totalAvg25 ? ((totalDiff / totalAvg25) * 100) : null;
+  const totalColor = totalPct == null ? '#9fc1de' : (totalPct >= 0 ? '#4ade80' : '#f87171');
+  const totalPctText = totalPct == null ? '-' : `${totalPct >= 0 ? '↑' : '↓'} ${totalPct >= 0 ? '+' : ''}${totalPct.toFixed(1)}%`;
+
+  el.innerHTML = `
+    <div class="ks" style="color:#6b8fa8;margin-bottom:6px;">매장당 평균 판매량 (해당 월 총 수량 ÷ 운영 매장수)</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr style="border-bottom:1px solid #2a5a8a;">
+        <th style="padding:5px 10px;text-align:left;color:#6b8fa8;">월</th>
+        <th style="padding:5px 10px;text-align:right;color:#6b8fa8;">25년</th>
+        <th style="padding:5px 10px;text-align:right;color:#6b8fa8;">26년</th>
+        <th style="padding:5px 10px;text-align:right;color:#6b8fa8;">차이</th>
+        <th style="padding:5px 10px;text-align:right;color:#6b8fa8;">증감률</th>
+      </tr></thead>
+      <tbody>${rows}
+        <tr style="border-top:1px solid #2a5a8a;font-weight:700;">
+          <td style="padding:6px 10px;color:#e0f0ff;">전체 평균</td>
+          <td style="padding:6px 10px;text-align:right;color:#f59e0b;">${totalStore25}개 매장 · 평균 ${totalAvg25.toFixed(1)}개</td>
+          <td style="padding:6px 10px;text-align:right;color:${color26};">${totalStore26}개 매장 · 평균 ${totalAvg26.toFixed(1)}개</td>
+          <td style="padding:6px 10px;text-align:right;color:${totalColor};">${totalDiff >= 0 ? '+' : ''}${totalDiff.toFixed(1)}개</td>
+          <td style="padding:6px 10px;text-align:right;color:${totalColor};">${totalPctText}</td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+}
+
+let maWalnutAvgChartInst = null;
+let maGiftAvgChartInst = null;
+function renderMenuAnalysisTab2() {
+  const walnutSeries = computeStoreAvgSeries(WALNUT_2025_MONTHLY, getWalnutMonthlyQty);
+  const giftSeries = computeStoreAvgSeries(GIFT_2025_MONTHLY, getGiftMonthlyQty);
+
+  if (maWalnutAvgChartInst) { try { maWalnutAvgChartInst.destroy(); } catch (e) {} maWalnutAvgChartInst = null; }
+  maWalnutAvgChartInst = renderStoreAvgLineChart('maWalnutAvgChart', walnutSeries, '#38bdf8');
+  renderStoreAvgTable('maWalnutAvgTable', walnutSeries, '#38bdf8');
+
+  if (maGiftAvgChartInst) { try { maGiftAvgChartInst.destroy(); } catch (e) {} maGiftAvgChartInst = null; }
+  maGiftAvgChartInst = renderStoreAvgLineChart('maGiftAvgChart', giftSeries, '#a855f7');
+  renderStoreAvgTable('maGiftAvgTable', giftSeries, '#a855f7');
 }
 
 // 월별 총 매출 / 총 판매수량 계산 (카테고리 구분 없이 전체 상품 합산)
