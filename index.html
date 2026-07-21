@@ -998,6 +998,10 @@ body.hide-names .store-name:hover{
 <script>
 // chartjs-plugin-datalabels 전역 등록 (growChart 전용)
 if(typeof ChartDataLabels !== 'undefined') Chart.register(ChartDataLabels);
+// 그래프 선명도 개선: 일부 모바일 웹뷰(카카오톡 인앱브라우저 등)는 devicePixelRatio를
+// 실제보다 낮게 보고하거나, 캔버스가 처음 그려질 때 컨테이너 크기가 작게 잡혀
+// 이후 CSS로 늘어나면서 화질이 흐려지는 경우가 있음. 최소 2배 해상도로 강제 렌더링.
+Chart.defaults.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 2);
 const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 const GOAL_GROWTH = 0.05; // 전년 대비 5% 목표
 let ALL = [];       // 26년 데이터
