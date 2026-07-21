@@ -4700,15 +4700,14 @@ function renderNewMenuMonthChart(canvasId, color, matchFn) {
         { type: 'line', label: '전체 대비 비중(%)', data: pctData, borderColor: '#facc15', backgroundColor: '#facc15', pointRadius: 4, pointBackgroundColor: '#facc15', borderWidth: 2, tension: 0.3, order: 1, yAxisID: 'y1',
           datalabels: {
             display: true,
-            color: '#fde68a',
-            backgroundColor: 'rgba(10,22,40,0.85)',
-            borderRadius: 4,
-            padding: { top: 2, bottom: 2, left: 5, right: 5 },
+            color: '#fff6d8',
+            textStrokeColor: '#0a1628',
+            textStrokeWidth: 3,
             anchor: 'end',
             align: 'top',
             offset: 6,
             clamp: true,
-            font: { size: 10, weight: 700 },
+            font: { size: 11, weight: 700 },
             formatter: (v) => v.toFixed(2) + '%'
           }
         }
