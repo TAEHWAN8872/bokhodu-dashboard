@@ -656,16 +656,18 @@ body.hide-names .store-name:hover{
 
           <div style="margin-bottom:22px;padding:14px;background:#0f2133;border-radius:10px;">
             <div style="font-size:12px;color:#f87171;font-weight:700;margin-bottom:10px;">🔴 레드벨벳 (1월~6월)</div>
-            <div style="display:flex;gap:16px;flex-wrap:wrap;">
-              <div style="position:relative;flex:1;min-width:260px;height:220px;"><canvas id="nmRedvelvetMonthChart"></canvas></div>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+              <div id="nmRedvelvetSummary" style="flex:0 0 160px;font-size:12px;color:#c8dff0;"></div>
+              <div style="position:relative;flex:1;min-width:260px;height:230px;"><canvas id="nmRedvelvetMonthChart"></canvas></div>
               <div style="position:relative;flex:1;min-width:260px;height:220px;"><canvas id="nmRedvelvetRegionChart"></canvas></div>
             </div>
           </div>
 
           <div style="margin-bottom:22px;padding:14px;background:#0f2133;border-radius:10px;">
             <div style="font-size:12px;color:#4ade80;font-weight:700;margin-bottom:10px;">🌿 쑥 (1월~6월)</div>
-            <div style="display:flex;gap:16px;flex-wrap:wrap;">
-              <div style="position:relative;flex:1;min-width:260px;height:220px;"><canvas id="nmMugwortMonthChart"></canvas></div>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+              <div id="nmMugwortSummary" style="flex:0 0 160px;font-size:12px;color:#c8dff0;"></div>
+              <div style="position:relative;flex:1;min-width:260px;height:230px;"><canvas id="nmMugwortMonthChart"></canvas></div>
               <div style="position:relative;flex:1;min-width:260px;height:220px;"><canvas id="nmMugwortRegionChart"></canvas></div>
             </div>
           </div>
@@ -4632,6 +4634,8 @@ function computeNewMenuMonthly(matchFn) {
 function computeNewMenuRegional(matchFn, monthFilter) {
   const rows = monthFilter ? (MENU_DATA_BY_MONTH[monthFilter] || []) : (MENU_DATA_BY_MONTH[0] || []);
   const reg = {};
+  // 판매량이 0인 지역도 빠짐없이 표시되도록, 존재하는 모든 지역을 먼저 0으로 초기화
+  (window.__regionList || []).forEach(r => { if (r && r !== 'all') reg[r] = 0; });
   rows.forEach(r => {
     const qty = r['수량'] || 0;
     if (qty <= 0) return;
@@ -4640,7 +4644,38 @@ function computeNewMenuRegional(matchFn, monthFilter) {
     if (!rg) return;
     reg[rg] = (reg[rg] || 0) + qty;
   });
-  return Object.entries(reg).sort((a, b) => b[1] - a[1]);
+  const total = Object.values(reg).reduce((s, v) => s + v, 0);
+  // [지역, 수량, 전체 대비 비중(%)] 형태로 반환, 비중 내림차순 정렬
+  return Object.entries(reg)
+    .map(([region, qty]) => [region, qty, total ? (qty / total * 100) : 0])
+    .sort((a, b) => b[2] - a[2]);
+}
+
+function computeNewMenuOverall(matchFn, months) {
+  const monthList = months || [1, 2, 3, 4, 5, 6];
+  let sum = 0, all = 0;
+  monthList.forEach(m => {
+    const rows = MENU_DATA_BY_MONTH[m] || [];
+    rows.forEach(r => {
+      const qty = r['수량'] || 0;
+      if (qty <= 0) return;
+      all += qty;
+      if (matchFn(r)) sum += qty;
+    });
+  });
+  return { qty: sum, pct: all ? (sum / all * 100) : 0 };
+}
+
+function renderNewMenuSummary(elId, qty, pct, color, periodLabel) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.innerHTML = '<div style="margin-bottom:10px;">'
+    + '<div style="font-size:10px;color:#5f7d95;">' + periodLabel + ' 판매수량</div>'
+    + '<div style="font-size:20px;font-weight:800;color:#e0f0ff;">' + qty.toLocaleString() + '개</div>'
+    + '</div><div>'
+    + '<div style="font-size:10px;color:#5f7d95;">' + periodLabel + ' 전체 판매 대비 비중</div>'
+    + '<div style="font-size:20px;font-weight:800;color:' + color + ';">' + pct.toFixed(2) + '%</div>'
+    + '</div>';
 }
 
 let nmMonthChartInsts = {};
@@ -4657,13 +4692,28 @@ function renderNewMenuMonthChart(canvasId, color, matchFn) {
     data: {
       labels,
       datasets: [
-        { type: 'bar', label: '판매수량', data: qtyData, backgroundColor: color + 'aa', borderRadius: 4, order: 2, yAxisID: 'y' },
-        { type: 'line', label: '전체 대비 비중(%)', data: pctData, borderColor: '#facc15', backgroundColor: '#facc15', pointRadius: 3, borderWidth: 2, tension: 0.3, order: 1, yAxisID: 'y1' }
+        { type: 'bar', label: '판매수량', data: qtyData, backgroundColor: color + 'aa', borderRadius: 4, order: 2, yAxisID: 'y', datalabels: { display: false } },
+        { type: 'line', label: '전체 대비 비중(%)', data: pctData, borderColor: '#facc15', backgroundColor: '#facc15', pointRadius: 4, pointBackgroundColor: '#facc15', borderWidth: 2, tension: 0.3, order: 1, yAxisID: 'y1',
+          datalabels: {
+            display: true,
+            color: '#fde68a',
+            backgroundColor: 'rgba(10,22,40,0.85)',
+            borderRadius: 4,
+            padding: { top: 2, bottom: 2, left: 5, right: 5 },
+            anchor: 'end',
+            align: 'top',
+            offset: 6,
+            clamp: true,
+            font: { size: 10, weight: 700 },
+            formatter: (v) => v.toFixed(2) + '%'
+          }
+        }
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      layout: { padding: { top: 14 } },
       plugins: {
         legend: { position: 'top', labels: { color: '#c8dff0', font: { size: 10 }, boxWidth: 10 } },
         tooltip: {
@@ -4677,7 +4727,8 @@ function renderNewMenuMonthChart(canvasId, color, matchFn) {
       scales: {
         x: { ticks: { color: '#9fc1de', font: { size: 10 } }, grid: { color: '#1e3347' } },
         y: { position: 'left', ticks: { color: '#9fc1de', font: { size: 9 }, callback: v => v.toLocaleString() }, grid: { color: '#1e3347' } },
-        y1: { position: 'right', ticks: { color: '#facc15', font: { size: 9 }, callback: v => v + '%' }, grid: { display: false } }
+        y1: { position: 'right', ticks: { color: '#facc15', font: { size: 9 }, callback: v => v + '%' }, grid: { display: false },
+          suggestedMax: Math.max(...pctData, 1) * 1.3 }
       }
     }
   });
@@ -4688,23 +4739,43 @@ function renderNewMenuRegionChart(canvasId, color, matchFn, monthFilter) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
   if (nmRegionChartInsts[canvasId]) { try { nmRegionChartInsts[canvasId].destroy(); } catch (e) {} }
-  const sorted = computeNewMenuRegional(matchFn, monthFilter).slice(0, 8);
+  // 상위 8개로 자르지 않고 전체 지역을 다 보여줌
+  const sorted = computeNewMenuRegional(matchFn, monthFilter);
   const labels = sorted.map(([r]) => r);
-  const values = sorted.map(([, v]) => v);
+  const qtyValues = sorted.map(([, v]) => v);
+  const pctValues = sorted.map(([, , p]) => Math.round(p * 100) / 100);
+
+  // 지역 수가 많아져도 라벨이 겹치지 않도록 캔버스 높이를 지역 개수에 맞춰 늘림
+  const wrap = canvas.parentElement;
+  if (wrap) wrap.style.height = Math.max(220, labels.length * 24) + 'px';
 
   nmRegionChartInsts[canvasId] = new Chart(canvas, {
     type: 'bar',
-    data: { labels, datasets: [{ label: '지역별 판매수량', data: values, backgroundColor: color + 'aa', borderRadius: 4 }] },
+    data: { labels, datasets: [{ label: '전체 대비 비중(%)', data: pctValues, backgroundColor: color + 'aa', borderRadius: 4 }] },
     options: {
       indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: (ctx) => ' ' + ctx.parsed.x.toLocaleString() + '개' } }
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const q = qtyValues[ctx.dataIndex] || 0;
+              return ' 비중 ' + ctx.parsed.x + '% (' + q.toLocaleString() + '개)';
+            }
+          }
+        },
+        datalabels: {
+          color: '#e0f0ff',
+          anchor: 'end',
+          align: 'right',
+          font: { size: 9, weight: 700 },
+          formatter: (v) => v > 0 ? v + '%' : '0%'
+        }
       },
       scales: {
-        x: { ticks: { color: '#9fc1de', font: { size: 9 }, callback: v => v.toLocaleString() }, grid: { color: '#1e3347' } },
+        x: { ticks: { color: '#9fc1de', font: { size: 9 }, callback: v => v + '%' }, grid: { color: '#1e3347' } },
         y: { ticks: { color: '#c8dff0', font: { size: 10 } }, grid: { display: false } }
       }
     }
@@ -4718,31 +4789,17 @@ function renderNewMenuPositionTab() {
 
   renderNewMenuMonthChart('nmRedvelvetMonthChart', '#f87171', isRedvelvet);
   renderNewMenuRegionChart('nmRedvelvetRegionChart', '#f87171', isRedvelvet);
+  const rv = computeNewMenuOverall(isRedvelvet);
+  renderNewMenuSummary('nmRedvelvetSummary', rv.qty, rv.pct, '#f87171', '1~6월');
 
   renderNewMenuMonthChart('nmMugwortMonthChart', '#4ade80', isMugwort);
   renderNewMenuRegionChart('nmMugwortRegionChart', '#4ade80', isMugwort);
+  const mw = computeNewMenuOverall(isMugwort);
+  renderNewMenuSummary('nmMugwortSummary', mw.qty, mw.pct, '#4ade80', '1~6월');
 
   renderNewMenuRegionChart('nmGreenAppleRegionChart', '#38bdf8', isGreenApple, 6);
-
-  const juneRows = MENU_DATA_BY_MONTH[6] || [];
-  let gaSum = 0, juneAll = 0;
-  juneRows.forEach(r => {
-    const qty = r['수량'] || 0;
-    if (qty <= 0) return;
-    juneAll += qty;
-    if (isGreenApple(r)) gaSum += qty;
-  });
-  const gaPct = juneAll ? (gaSum / juneAll * 100).toFixed(2) : '0.00';
-  const summaryEl = document.getElementById('nmGreenAppleSummary');
-  if (summaryEl) {
-    summaryEl.innerHTML = '<div style="margin-bottom:10px;">'
-      + '<div style="font-size:10px;color:#5f7d95;">6월 판매수량</div>'
-      + '<div style="font-size:20px;font-weight:800;color:#e0f0ff;">' + gaSum.toLocaleString() + '개</div>'
-      + '</div><div>'
-      + '<div style="font-size:10px;color:#5f7d95;">6월 전체 판매 대비 비중</div>'
-      + '<div style="font-size:20px;font-weight:800;color:#38bdf8;">' + gaPct + '%</div>'
-      + '</div>';
-  }
+  const ga = computeNewMenuOverall(isGreenApple, [6]);
+  renderNewMenuSummary('nmGreenAppleSummary', ga.qty, ga.pct, '#38bdf8', '6월');
 }
 
 
