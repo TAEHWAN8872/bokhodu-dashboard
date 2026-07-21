@@ -607,7 +607,27 @@ body.hide-names .store-name:hover{
           </div>
         </div>
 
-        <!-- 3~10번 탭: 준비중 -->
+        <!-- 3번 탭: 메뉴별 비율 (20개입/답례품/선물세트/사이드) -->
+        <div id="maTab-3" class="ma-tab-panel" style="display:none;">
+          <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:12px;">🥧 1월~6월 메뉴별 판매 비율 (20개입 · 답례품 · 선물세트 · 사이드)</div>
+          <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
+            <div style="position:relative;width:260px;height:260px;flex-shrink:0;">
+              <canvas id="productTypePieChart"></canvas>
+            </div>
+            <div id="productTypeLegend" style="flex:1;min-width:220px;"></div>
+          </div>
+          <div style="margin-top:20px;padding-top:16px;border-top:0.5px solid #1e3347;">
+            <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:12px;">🌰 20개입 내 단품 / 반반 비율</div>
+            <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
+              <div style="position:relative;width:200px;height:200px;flex-shrink:0;">
+                <canvas id="productType20PieChart"></canvas>
+              </div>
+              <div id="productType20Legend" style="flex:1;min-width:220px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4~10번 탭: 준비중 -->
         <div id="maTab-placeholder" class="ma-tab-panel" style="display:none;">
           <div style="text-align:center;color:#4a6070;font-size:13px;padding:60px 0;">🚧 준비 중인 분석 탭입니다.</div>
         </div>
@@ -4233,8 +4253,169 @@ function renderMenuAnalysisChart() {
   }
 }
 
-// 월별(1~6월)로 카테고리별 비중(%)을 계산한다. 콤보 상품은 파이차트와 동일하게
-// 포함된 카테고리 개수만큼 수량을 균등 분배해서 집계한다.
+// ── 3번 탭: 메뉴별 비율 (20개입/답례품/선물세트/사이드) ──
+const PRODUCT_TYPE_CATEGORIES = ['20개입', '답례품', '선물세트', '사이드', '팥 간식용'];
+const PRODUCT_TYPE_COLORS = {
+  '20개입': '#38bdf8',
+  '답례품': '#a855f7',
+  '선물세트': '#f59e0b',
+  '사이드': '#4ade80',
+  '팥 간식용': '#f472b6'
+};
+
+function classifyProductType(row) {
+  const cat = row['상품분류'] || '';
+  const name = row['상품명'] || '';
+  if (cat === '답례품') return '답례품';
+  if (cat === '사이드') return '사이드';
+  if (cat === '호두과자') {
+    if (name === '팥 간식용 11개') return '팥 간식용';
+    if (name.includes('선물세트')) return '선물세트';
+    return '20개입';
+  }
+  return null;
+}
+
+function computeProductTypeTotals() {
+  const data = MENU_DATA_BY_MONTH[0] || [];
+  const totals = {};
+  PRODUCT_TYPE_CATEGORIES.forEach(c => totals[c] = 0);
+  data.forEach(row => {
+    const qty = row['수량'] || 0;
+    if (qty <= 0) return;
+    const type = classifyProductType(row);
+    if (!type) return;
+    totals[type] += qty;
+  });
+  return totals;
+}
+
+// 20개입 카테고리 내에서 단품(맛 1개) vs 반반(2개 맛 조합, "/" 포함) 비율
+function computeProductType20Split() {
+  const data = MENU_DATA_BY_MONTH[0] || [];
+  let single = 0, combo = 0;
+  data.forEach(row => {
+    const qty = row['수량'] || 0;
+    if (qty <= 0) return;
+    if (classifyProductType(row) !== '20개입') return;
+    const name = row['상품명'] || '';
+    if (name.includes('/') || name.includes('&')) combo += qty; else single += qty;
+  });
+  return { '단품': single, '반반': combo };
+}
+
+let productTypePieChartInst = null;
+function renderProductTypePieChart() {
+  const totals = computeProductTypeTotals();
+  const canvas = document.getElementById('productTypePieChart');
+  const legendEl = document.getElementById('productTypeLegend');
+  if (!canvas) return;
+  if (productTypePieChartInst) { try { productTypePieChartInst.destroy(); } catch (e) {} productTypePieChartInst = null; }
+
+  const labels = PRODUCT_TYPE_CATEGORIES.filter(c => totals[c] > 0);
+  const values = labels.map(c => Math.round(totals[c]));
+  const colors = labels.map(c => PRODUCT_TYPE_COLORS[c]);
+  const grand = values.reduce((a, b) => a + b, 0);
+
+  productTypePieChartInst = new Chart(canvas, {
+    type: 'pie',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: '#0a1628', borderWidth: 2 }] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        datalabels: {
+          color: '#0a1628',
+          font: { weight: 700, size: 11 },
+          formatter: (v) => grand ? (v / grand * 100).toFixed(1) + '%' : '0%'
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.parsed;
+              const pct = grand ? (v / grand * 100).toFixed(1) : '0.0';
+              return `${ctx.label}: ${Math.round(v).toLocaleString()}개 (${pct}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (legendEl) {
+    legendEl.innerHTML = labels.map((c, i) => {
+      const v = values[i];
+      const pct = grand ? (v / grand * 100).toFixed(1) : '0.0';
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;">
+        <span style="width:10px;height:10px;border-radius:3px;background:${colors[i]};flex-shrink:0;"></span>
+        <span style="color:#c8dff0;min-width:60px;">${c}</span>
+        <span style="color:#e0f0ff;font-weight:700;margin-left:auto;">${v.toLocaleString()}개</span>
+        <span style="color:#7eb8e8;font-weight:700;width:52px;text-align:right;">${pct}%</span>
+      </div>`;
+    }).join('');
+  }
+}
+
+let productType20PieChartInst = null;
+function renderProductType20PieChart() {
+  const split = computeProductType20Split();
+  const canvas = document.getElementById('productType20PieChart');
+  const legendEl = document.getElementById('productType20Legend');
+  if (!canvas) return;
+  if (productType20PieChartInst) { try { productType20PieChartInst.destroy(); } catch (e) {} productType20PieChartInst = null; }
+
+  const labels = ['단품', '반반'];
+  const colors = ['#38bdf8', '#facc15'];
+  const values = labels.map(c => Math.round(split[c]));
+  const grand = values.reduce((a, b) => a + b, 0);
+
+  productType20PieChartInst = new Chart(canvas, {
+    type: 'pie',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: '#0a1628', borderWidth: 2 }] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        datalabels: {
+          color: '#0a1628',
+          font: { weight: 700, size: 11 },
+          formatter: (v) => grand ? (v / grand * 100).toFixed(1) + '%' : '0%'
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.parsed;
+              const pct = grand ? (v / grand * 100).toFixed(1) : '0.0';
+              return `${ctx.label}: ${Math.round(v).toLocaleString()}개 (${pct}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (legendEl) {
+    legendEl.innerHTML = labels.map((c, i) => {
+      const v = values[i];
+      const pct = grand ? (v / grand * 100).toFixed(1) : '0.0';
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;">
+        <span style="width:10px;height:10px;border-radius:3px;background:${colors[i]};flex-shrink:0;"></span>
+        <span style="color:#c8dff0;min-width:60px;">${c}</span>
+        <span style="color:#e0f0ff;font-weight:700;margin-left:auto;">${v.toLocaleString()}개</span>
+        <span style="color:#7eb8e8;font-weight:700;width:52px;text-align:right;">${pct}%</span>
+      </div>`;
+    }).join('');
+  }
+}
+
+function renderProductTypeTab() {
+  renderProductTypePieChart();
+  renderProductType20PieChart();
+}
+
+
 function computeMenuAnalysisMonthlyPercents() {
   const months = [1, 2, 3, 4, 5, 6];
   const perMonthTotals = months.map(m => {
@@ -4450,6 +4631,7 @@ function onMenuAnalysisClick() {
 const MENU_ANALYSIS_TAB_LABELS = {
   1: '매출·판매수량',
   2: '20개입·답례품 매장평균',
+  3: '메뉴별 비율',
   11: '카테고리 비중'
 };
 let currentMenuAnalysisTab = 1;
@@ -4472,13 +4654,16 @@ function switchMenuAnalysisSubtab(n) {
   });
   document.getElementById('maTab-1').style.display = n === 1 ? '' : 'none';
   document.getElementById('maTab-2').style.display = n === 2 ? '' : 'none';
+  document.getElementById('maTab-3').style.display = n === 3 ? '' : 'none';
   document.getElementById('maTab-11').style.display = n === 11 ? '' : 'none';
-  document.getElementById('maTab-placeholder').style.display = (n !== 1 && n !== 2 && n !== 11) ? '' : 'none';
+  document.getElementById('maTab-placeholder').style.display = (n !== 1 && n !== 2 && n !== 3 && n !== 11) ? '' : 'none';
 
   if (n === 1) {
     renderMenuAnalysisTotalChart();
   } else if (n === 2) {
     renderMenuAnalysisTab2();
+  } else if (n === 3) {
+    renderProductTypeTab();
   } else if (n === 11) {
     renderMenuAnalysisChart();
     renderMenuAnalysisBarChart();
