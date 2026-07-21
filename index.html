@@ -592,7 +592,7 @@ body.hide-names .store-name:hover{
 
         <!-- 2번 탭: 호두과자/답례품 매장당 평균 판매량 (25년 vs 26년) -->
         <div id="maTab-2" class="ma-tab-panel" style="display:none;">
-          <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:12px;">🌰 호두과자 매장당 평균 판매량 (25년 vs 26년)</div>
+          <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:12px;">🌰 20개입 매장당 평균 판매량 (25년 vs 26년)</div>
           <div style="position:relative;height:280px;">
             <canvas id="maWalnutAvgChart"></canvas>
           </div>
@@ -2634,7 +2634,7 @@ function getWalnutMonthlyQty(){
   const result = {};
   for(let m=1; m<=6; m++){
     const rows = MENU_DATA_BY_MONTH[m] || [];
-    result[m] = rows.filter(r => r['상품분류']==='호두과자').reduce((s,r)=> s+(r['수량']||0), 0);
+    result[m] = rows.filter(r => r['상품분류']==='호두과자' && !String(r['상품명']||'').includes('선물세트') && r['상품명']!=='팥 간식용 11개').reduce((s,r)=> s+(r['수량']||0), 0);
   }
   return result;
 }
@@ -4449,7 +4449,7 @@ function onMenuAnalysisClick() {
 // ── 메뉴 분석 세부 탭 (1~11번) ──
 const MENU_ANALYSIS_TAB_LABELS = {
   1: '매출·판매수량',
-  2: '호두과자·답례품 매장평균',
+  2: '20개입·답례품 매장평균',
   11: '카테고리 비중'
 };
 let currentMenuAnalysisTab = 1;
@@ -4486,7 +4486,7 @@ function switchMenuAnalysisSubtab(n) {
   }
 }
 
-// ── 2번 탭: 호두과자 / 답례품 매장당 평균 판매량 (25년 vs 26년, 월별 꺾은선) ──
+// ── 2번 탭: 20개입 / 답례품 매장당 평균 판매량 (25년 vs 26년, 월별 꺾은선) ──
 // 25년: 운영 매장수는 ALL25(스토어별 25년 매출 배열) 기준, 26년: ALL(스토어별 26년 매출 배열) 기준
 function computeStoreCounts26_25() {
   const storeCount25 = [1, 2, 3, 4, 5, 6].map(m => Object.values(ALL25).filter(arr => (arr[m - 1] || 0) > 0).length);
@@ -4524,40 +4524,110 @@ function renderStoreAvgLineChart(canvasId, series, color26) {
   const { labels, avg25, avg26, diffPct } = series;
   const round1 = v => Math.round(v * 10) / 10;
 
+  // 25년-26년 라인 사이 간격에 증감률 배지를 그려주는 커스텀 플러그인
+  const gapBadgePlugin = {
+    id: 'gapBadge_' + canvasId,
+    afterDatasetsDraw(chart) {
+      const meta25 = chart.getDatasetMeta(0);
+      const meta26 = chart.getDatasetMeta(1);
+      const ctx = chart.ctx;
+      const area = chart.chartArea;
+      diffPct.forEach((p, i) => {
+        if (p == null) return;
+        const pt25 = meta25.data[i];
+        const pt26 = meta26.data[i];
+        if (!pt25 || !pt26) return;
+        const x = pt25.x;
+        const yTop = Math.min(pt25.y, pt26.y);
+        const yBottom = Math.max(pt25.y, pt26.y);
+        const gap = yBottom - yTop;
+        const color = p >= 0 ? '#4ade80' : '#f87171';
+        const arrow = p >= 0 ? '▲' : '▼';
+        const sign = p >= 0 ? '+' : '';
+        const text = `${arrow} ${sign}${p.toFixed(1)}%`;
+
+        ctx.save();
+        // 두 점 사이 점선 연결
+        ctx.setLineDash([3, 3]);
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.5;
+        ctx.lineWidth = 1.25;
+        ctx.beginPath();
+        ctx.moveTo(x, yTop);
+        ctx.lineTo(x, yBottom);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+
+        // 배지 크기 (작게)
+        ctx.font = '800 11px sans-serif';
+        const textW = ctx.measureText(text).width;
+        const padX = 5, padY = 3;
+        const boxW = textW + padX * 2;
+        const boxH = 11 + padY * 2;
+
+        // 간격이 배지보다 좁으면 아래쪽 라인 바깥으로 살짝 밀어내되, 가로 위치는 점 그대로 유지(중앙 정렬 유지)
+        let midY = (yTop + yBottom) / 2;
+        if (gap < boxH + 4) {
+          midY = yBottom + boxH / 2 + 4;
+        }
+
+        // 차트 영역 밖으로 안 나가게 x, y 클램프
+        let badgeX = Math.min(Math.max(x, area.left + boxW / 2 + 2), area.right - boxW / 2 - 2);
+        let badgeY = Math.min(Math.max(midY, area.top + boxH / 2 + 2), area.bottom - boxH / 2 - 2);
+
+        ctx.fillStyle = 'rgba(9,18,28,0.92)';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        const rx = badgeX - boxW / 2, ry = badgeY - boxH / 2;
+        if (ctx.roundRect) {
+          ctx.beginPath();
+          ctx.roundRect(rx, ry, boxW, boxH, 5);
+          ctx.fill();
+          ctx.stroke();
+        } else {
+          ctx.fillRect(rx, ry, boxW, boxH);
+          ctx.strokeRect(rx, ry, boxW, boxH);
+        }
+
+        ctx.fillStyle = color;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, badgeX, badgeY + 0.5);
+        ctx.restore();
+      });
+    }
+  };
+
   return new Chart(canvas, {
     type: 'line',
+    plugins: [gapBadgePlugin],
     data: {
       labels,
       datasets: [
         { label: '25년', data: avg25.map(round1), borderColor: '#f59e0b', backgroundColor: '#f59e0b',
           pointBackgroundColor: '#f59e0b', pointBorderColor: '#0d1b2a', pointBorderWidth: 1.5, pointRadius: 4,
           borderWidth: 2.5, tension: 0.3,
-          datalabels: { color: '#fde68a', anchor: 'end', align: 'bottom', offset: 8, font: { size: 10, weight: '700' },
+          datalabels: { color: '#fde68a', anchor: 'end',
+            align: (ctx) => avg25[ctx.dataIndex] >= avg26[ctx.dataIndex] ? 'top' : 'bottom',
+            offset: 8, font: { size: 10, weight: '700' },
             formatter: v => v.toLocaleString() + '개' } },
         { label: '26년', data: avg26.map(round1), borderColor: color26, backgroundColor: color26,
           pointBackgroundColor: color26, pointBorderColor: '#0d1b2a', pointBorderWidth: 1.5, pointRadius: 4,
           borderWidth: 2.5, tension: 0.3,
           datalabels: {
-            color: (ctx) => {
-              const p = diffPct[ctx.dataIndex];
-              if (p == null) return color26;
-              return p >= 0 ? '#4ade80' : '#f87171';
-            },
-            anchor: 'end', align: 'top', offset: 8, font: { size: 10, weight: '700' },
-            formatter: (v, ctx) => {
-              const p = diffPct[ctx.dataIndex];
-              if (p == null) return v.toLocaleString() + '개';
-              const arrow = p >= 0 ? '↑' : '↓';
-              const sign = p >= 0 ? '+' : '';
-              return `${v.toLocaleString()}개\n${arrow} ${sign}${p.toFixed(1)}%`;
-            }
+            color: color26,
+            anchor: 'end',
+            align: (ctx) => avg26[ctx.dataIndex] > avg25[ctx.dataIndex] ? 'top' : 'bottom',
+            offset: 8, font: { size: 10, weight: '700' },
+            formatter: v => v.toLocaleString() + '개'
           } }
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      layout: { padding: { top: 34, bottom: 24 } },
+      layout: { padding: { top: 26, bottom: 26, left: 10, right: 10 } },
       plugins: {
         legend: { position: 'top', labels: { color: '#c8dff0', font: { size: 11 }, boxWidth: 10 } },
         tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString()}개` } }
@@ -4633,8 +4703,8 @@ function renderMenuAnalysisTab2() {
   renderStoreAvgTable('maWalnutAvgTable', walnutSeries, '#38bdf8');
 
   if (maGiftAvgChartInst) { try { maGiftAvgChartInst.destroy(); } catch (e) {} maGiftAvgChartInst = null; }
-  maGiftAvgChartInst = renderStoreAvgLineChart('maGiftAvgChart', giftSeries, '#a855f7');
-  renderStoreAvgTable('maGiftAvgTable', giftSeries, '#a855f7');
+  maGiftAvgChartInst = renderStoreAvgLineChart('maGiftAvgChart', giftSeries, '#38bdf8');
+  renderStoreAvgTable('maGiftAvgTable', giftSeries, '#38bdf8');
 }
 
 // 월별 총 매출 / 총 판매수량 계산 (카테고리 구분 없이 전체 상품 합산)
