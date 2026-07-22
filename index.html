@@ -667,11 +667,21 @@ body.hide-names .store-name:hover{
           <div style="font-size:10.5px;color:#5f7d95;margin-bottom:16px;">월별/지역별 판매 비중과 전체 판매 대비 비중(%)을 비교합니다.</div>
 
           <div style="margin-bottom:22px;padding:14px;background:#0f2133;border-radius:10px;">
-            <div style="font-size:12px;color:#f87171;font-weight:700;margin-bottom:10px;">🔴 레드벨벳 (1월~6월)</div>
+            <div style="font-size:12px;color:#f87171;font-weight:700;margin-bottom:10px;">🔴 레드벨벳 (25년 12월~26년 6월)</div>
             <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
               <div id="nmRedvelvetSummary" style="flex:0 0 160px;font-size:12px;color:#c8dff0;"></div>
               <div style="position:relative;flex:1;min-width:260px;height:230px;"><canvas id="nmRedvelvetMonthChart"></canvas></div>
               <div style="position:relative;flex:1;min-width:300px;height:220px;"><canvas id="nmRedvelvetRegionChart"></canvas></div>
+            </div>
+
+            <div style="margin-top:18px;padding-top:14px;border-top:1px dashed #234258;">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+                <div style="font-size:11.5px;color:#ff9d9d;font-weight:700;">📅 레드벨벳 주차별 추이 (25년 12월~26년 2월)</div>
+                <div id="redvelvetWeeklyMetricToggle" style="display:flex;gap:4px;"></div>
+              </div>
+              <div id="redvelvetWeeklySummary" style="display:flex;gap:24px;margin-bottom:12px;font-size:12px;color:#c8dff0;"></div>
+              <div style="position:relative;width:100%;min-width:600px;height:300px;overflow-x:auto;"><canvas id="redvelvetWeeklyChart"></canvas></div>
+              <div style="font-size:9.5px;color:#5f7d95;margin-top:6px;">* 12월 전체 메뉴 판매량 데이터가 없어, 1월·2월 평균값으로 추정한 수치입니다(그래프의 * 표시). 실제 12월 수치를 주시면 정확히 반영해드릴게요.</div>
             </div>
           </div>
 
@@ -5029,6 +5039,285 @@ function renderMugwortWeeklyChart() {
 }
 
 
+// ── 레드벨벳 주차별 추이 (25년 12월~26년 2월, 사용자 제공 수량 데이터) ──
+const REDVELVET_WEEKLY_DATA = [
+  { label: '25년 12월 1주', month: '2025-12', qty: { '레드벨벳 호두과자': 5696, '복호두 선물세트(레드벨벳)': 1617, '앙버터/레드벨벳(20개)': 12764 } },
+  { label: '25년 12월 2주', month: '2025-12', qty: { '레드벨벳 호두과자': 1161, '복호두 선물세트(레드벨벳)': 252, '앙버터/레드벨벳(20개)': 11971 } },
+  { label: '25년 12월 3주', month: '2025-12', qty: { '레드벨벳 호두과자': 1679, '복호두 선물세트(레드벨벳)': 541, '앙버터/레드벨벳(20개)': 3311 } },
+  { label: '25년 12월 4주', month: '2025-12', qty: { '레드벨벳 호두과자': 1762, '복호두 선물세트(레드벨벳)': 548, '앙버터/레드벨벳(20개)': 4847 } },
+  { label: '26년 1월 1주', month: '2026-01', qty: { '레드벨벳 호두과자': 1495, '복호두 선물세트(레드벨벳)': 332, '앙버터/레드벨벳(20개)': 2684 } },
+  { label: '26년 1월 2주', month: '2026-01', qty: { '레드벨벳 호두과자': 550, '복호두 선물세트(레드벨벳)': 96, '앙버터/레드벨벳(20개)': 933 } },
+  { label: '26년 1월 3주', month: '2026-01', qty: { '레드벨벳 호두과자': 671, '복호두 선물세트(레드벨벳)': 120, '앙버터/레드벨벳(20개)': 1532 } },
+  { label: '26년 1월 4주', month: '2026-01', qty: { '레드벨벳 호두과자': 785, '복호두 선물세트(레드벨벳)': 147, '앙버터/레드벨벳(20개)': 1422 } },
+  { label: '26년 1월 5주', month: '2026-01', qty: { '레드벨벳 호두과자': 627, '복호두 선물세트(레드벨벳)': 284, '앙버터/레드벨벳(20개)': 1403 } },
+  { label: '26년 2월 1주', month: '2026-02', qty: { '레드벨벳 호두과자': 694, '복호두 선물세트(레드벨벳)': 873, '앙버터/레드벨벳(20개)': 1417 } },
+  { label: '26년 2월 2주', month: '2026-02', qty: { '레드벨벳 호두과자': 1082, '복호두 선물세트(레드벨벳)': 2910, '앙버터/레드벨벳(20개)': 2893 } },
+  { label: '26년 2월 3주', month: '2026-02', qty: { '레드벨벳 호두과자': 387, '복호두 선물세트(레드벨벳)': 703, '앙버터/레드벨벳(20개)': 892 } },
+  { label: '26년 2월 4주', month: '2026-02', qty: { '레드벨벳 호두과자': 260, '복호두 선물세트(레드벨벳)': 112, '앙버터/레드벨벳(20개)': 708 } },
+];
+
+// 12월 전체 메뉴 판매량 데이터가 없어, 1월/2월 실제 값의 평균으로 추정치를 사용합니다 (추정값임을 화면에 표기).
+function estimateDecMenuTotal(metric) {
+  const jan = computeAllMenuMonthTotalFor(1, metric);
+  const feb = computeAllMenuMonthTotalFor(2, metric);
+  return Math.round((jan + feb) / 2);
+}
+
+let redvelvetWeeklyMetric = 'qty'; // 'qty' | 'amt'
+let redvelvetWeeklyChartInst = null;
+
+function redvelvetWeekValue(weekQtyObj, metric) {
+  const m = metric || redvelvetWeeklyMetric;
+  return Object.entries(weekQtyObj).reduce((sum, [name, qty]) => {
+    const unitPrice = m === 'amt' ? (PRICE_MAP[name] || 0) : 1;
+    return sum + qty * unitPrice;
+  }, 0);
+}
+
+// Dec/Jan/Feb 월별 합계를 주차 데이터로부터 집계 (수량 또는 금액)
+function redvelvetMonthlyFromWeekly(metric) {
+  const totals = {};
+  REDVELVET_WEEKLY_DATA.forEach(w => {
+    const v = redvelvetWeekValue(w.qty, metric);
+    totals[w.month] = (totals[w.month] || 0) + v;
+  });
+  return totals;
+}
+
+function redvelvetAllMenuMonthTotal(monthKey, metric) {
+  // 2026-01, 2026-02는 실제 임베디드 데이터에서 가져옴; 2025-12는 1월/2월 평균으로 추정
+  if (monthKey === '2026-01') return computeAllMenuMonthTotalFor(1, metric);
+  if (monthKey === '2026-02') return computeAllMenuMonthTotalFor(2, metric);
+  if (monthKey === '2025-12') return estimateDecMenuTotal(metric);
+  return null;
+}
+
+function computeAllMenuMonthTotalFor(month, metric) {
+  const rows = MENU_DATA_BY_MONTH[month] || [];
+  let sum = 0;
+  rows.forEach(r => {
+    const qty = r['수량'] || 0;
+    if (qty <= 0) return;
+    sum += metric === 'amt' ? qty * (PRICE_MAP[r['상품명']] || 0) : qty;
+  });
+  return sum;
+}
+
+function renderRedvelvetWeeklyMetricToggle() {
+  const el = document.getElementById('redvelvetWeeklyMetricToggle');
+  if (!el) return;
+  const opts = [{ v: 'qty', l: '수량 기준' }, { v: 'amt', l: '금액 기준' }];
+  el.innerHTML = opts.map(o =>
+    `<div class="analysis-tab${redvelvetWeeklyMetric === o.v ? ' active' : ''}" onclick="setRedvelvetWeeklyMetric('${o.v}')">${o.l}</div>`
+  ).join('');
+}
+
+function setRedvelvetWeeklyMetric(mode) {
+  redvelvetWeeklyMetric = mode;
+  renderRedvelvetWeeklyMetricToggle();
+  renderRedvelvetWeeklyChart();
+  renderRedvelvetMonthChart();
+}
+
+function renderRedvelvetWeeklyChart() {
+  const canvas = document.getElementById('redvelvetWeeklyChart');
+  if (!canvas) return;
+  if (redvelvetWeeklyChartInst) { try { redvelvetWeeklyChartInst.destroy(); } catch (e) {} }
+
+  const values = REDVELVET_WEEKLY_DATA.map(w => redvelvetWeekValue(w.qty));
+  const total = values.reduce((s, v) => s + v, 0);
+  const monthTotalCache = {};
+  const pctValues = REDVELVET_WEEKLY_DATA.map((w, i) => {
+    if (!(w.month in monthTotalCache)) monthTotalCache[w.month] = redvelvetAllMenuMonthTotal(w.month, redvelvetWeeklyMetric);
+    const denom = monthTotalCache[w.month];
+    if (!denom) return null; // 분모 없음 (12월)
+    return Math.round(values[i] / denom * 10000) / 100;
+  });
+  const labels = REDVELVET_WEEKLY_DATA.map(w => w.label);
+  const unit = redvelvetWeeklyMetric === 'amt' ? '원' : '개';
+  const valLabel = redvelvetWeeklyMetric === 'amt' ? '매출금액' : '판매수량';
+  const color = '#f87171';
+
+  redvelvetWeeklyChartInst = new Chart(canvas, {
+    data: {
+      labels,
+      datasets: [
+        { type: 'bar', label: valLabel, data: values, backgroundColor: color + 'aa', borderRadius: 4, order: 2, yAxisID: 'y', datalabels: { display: false } },
+        {
+          type: 'line', label: '전체 메뉴 대비 비중(%)', data: pctValues,
+          borderColor: '#facc15', backgroundColor: '#facc15', pointBackgroundColor: '#facc15',
+          pointRadius: 4, pointHoverRadius: 6, borderWidth: 2.5, tension: 0.3, order: 1, yAxisID: 'y1', spanGaps: false,
+          datalabels: {
+            display: true,
+            color: '#facc15',
+            align: 'top',
+            anchor: 'end',
+            offset: 6,
+            font: { size: 11, weight: 700 },
+            formatter: (v, ctx) => {
+              if (v === null || v === undefined) return '';
+              const isDec = REDVELVET_WEEKLY_DATA[ctx.dataIndex].month === '2025-12';
+              return isDec ? v + '%*' : v + '%';
+            }
+          }
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: { top: 24 } },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#c8dff0', font: { size: 10 } } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ctx.dataset.yAxisID === 'y1'
+              ? (ctx.parsed.y === null ? ' 전체 메뉴 대비 비중: 데이터 없음' : ' 전체 메뉴 대비 비중: ' + ctx.parsed.y + '%' + (REDVELVET_WEEKLY_DATA[ctx.dataIndex].month === '2025-12' ? ' (12월 추정치)' : ''))
+              : ' ' + valLabel + ': ' + Math.round(ctx.parsed.y).toLocaleString() + unit
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#9fc1de', font: { size: 9 } }, grid: { display: false } },
+        y: { position: 'left', ticks: { color: '#9fc1de', font: { size: 9 }, callback: v => v.toLocaleString() }, grid: { color: '#1e3347' } },
+        y1: { position: 'right', ticks: { color: '#facc15', font: { size: 9 }, callback: v => v + '%' }, grid: { display: false } }
+      }
+    }
+  });
+
+  const elSum = document.getElementById('redvelvetWeeklySummary');
+  if (elSum) {
+    const maxIdx = values.indexOf(Math.max(...values));
+    elSum.innerHTML =
+      '<div><div style="font-size:10px;color:#5f7d95;">12월~2월 합계 ' + valLabel + '</div>'
+      + '<div style="font-size:20px;font-weight:800;color:#e0f0ff;">' + Math.round(total).toLocaleString() + unit + '</div></div>'
+      + '<div><div style="font-size:10px;color:#5f7d95;">최고 판매 주차</div>'
+      + '<div style="font-size:16px;font-weight:800;color:#facc15;">' + labels[maxIdx] + '</div></div>';
+  }
+}
+
+function renderRedvelvetMonthChart() {
+  const canvas = document.getElementById('nmRedvelvetMonthChart');
+  if (!canvas) return;
+  if (nmMonthChartInsts['nmRedvelvetMonthChart']) { try { nmMonthChartInsts['nmRedvelvetMonthChart'].destroy(); } catch (e) {} }
+
+  const metric = newMenuMetric; // 상단 수량/금액 토글과 연동
+  const monthlyFromWeekly = redvelvetMonthlyFromWeekly(metric); // { '2025-12':.., '2026-01':.., '2026-02':.. }
+  const isRedvelvet = (r) => String(r['상품명'] || '').includes('레드벨벳');
+
+  // 3~6월은 기존 임베디드 데이터 기반 계산 그대로 사용
+  const labels = ['25.12', '26.1', '26.2', '26.3', '26.4', '26.5', '26.6'];
+  const values = [];
+  const pctValues = [];
+
+  ['2025-12', '2026-01', '2026-02'].forEach(mk => {
+    const val = monthlyFromWeekly[mk] || 0;
+    values.push(val);
+    const denom = redvelvetAllMenuMonthTotal(mk, metric);
+    pctValues.push(denom ? Math.round(val / denom * 10000) / 100 : null);
+  });
+  [3, 4, 5, 6].forEach(m => {
+    const rows = MENU_DATA_BY_MONTH[m] || [];
+    let sum = 0, all = 0;
+    rows.forEach(r => {
+      const qty = r['수량'] || 0;
+      if (qty <= 0) return;
+      const v = metric === 'amt' ? qty * (PRICE_MAP[r['상품명']] || 0) : qty;
+      all += v;
+      if (isRedvelvet(r)) sum += v;
+    });
+    values.push(sum);
+    pctValues.push(all ? Math.round(sum / all * 10000) / 100 : 0);
+  });
+
+  const unit = metric === 'amt' ? '원' : '개';
+  const valLabel = metric === 'amt' ? '매출금액' : '판매수량';
+  const color = '#f87171';
+
+  nmMonthChartInsts['nmRedvelvetMonthChart'] = new Chart(canvas, {
+    data: {
+      labels,
+      datasets: [
+        { type: 'bar', label: valLabel, data: values, backgroundColor: color + 'aa', borderRadius: 4, order: 2, yAxisID: 'y', datalabels: { display: false } },
+        {
+          type: 'line', label: '전체 메뉴 대비 비중(%)', data: pctValues,
+          borderColor: '#facc15', backgroundColor: '#facc15', pointBackgroundColor: '#facc15',
+          pointRadius: 4, pointHoverRadius: 6, borderWidth: 2.5, tension: 0.3, order: 1, yAxisID: 'y1', spanGaps: false,
+          datalabels: {
+            display: true,
+            color: '#facc15',
+            align: 'top',
+            anchor: 'end',
+            offset: 6,
+            font: { size: 11, weight: 700 },
+            formatter: (v, ctx) => {
+              if (v === null || v === undefined) return '';
+              return ctx.dataIndex === 0 ? v + '%*' : v + '%';
+            }
+          }
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: { top: 24 } },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#c8dff0', font: { size: 10 } } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ctx.dataset.yAxisID === 'y1'
+              ? (ctx.parsed.y === null ? ' 전체 메뉴 대비 비중: 데이터 없음' : ' 전체 메뉴 대비 비중: ' + ctx.parsed.y + '%' + (ctx.dataIndex === 0 ? ' (12월 추정치)' : ''))
+              : ' ' + valLabel + ': ' + Math.round(ctx.parsed.y).toLocaleString() + unit
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#9fc1de', font: { size: 9 } }, grid: { display: false } },
+        y: { position: 'left', ticks: { color: '#9fc1de', font: { size: 9 }, callback: v => v.toLocaleString() }, grid: { color: '#1e3347' } },
+        y1: { position: 'right', ticks: { color: '#facc15', font: { size: 9 }, callback: v => v + '%' }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+
+function renderRedvelvetSummary() {
+  const metric = newMenuMetric;
+  const isRedvelvet = (r) => String(r['상품명'] || '').includes('레드벨벳');
+  const monthlyFromWeekly = redvelvetMonthlyFromWeekly(metric);
+
+  let sum = 0;
+  ['2025-12', '2026-01', '2026-02'].forEach(mk => { sum += monthlyFromWeekly[mk] || 0; });
+  [3, 4, 5, 6].forEach(m => {
+    const rows = MENU_DATA_BY_MONTH[m] || [];
+    rows.forEach(r => {
+      const qty = r['수량'] || 0;
+      if (qty <= 0 || !isRedvelvet(r)) return;
+      sum += metric === 'amt' ? qty * (PRICE_MAP[r['상품명']] || 0) : qty;
+    });
+  });
+
+  // 비중(%): 12월(추정치 포함) ~ 6월 전체 기준
+  let sumKnown = ['2025-12', '2026-01', '2026-02'].reduce((s, mk) => s + (monthlyFromWeekly[mk] || 0), 0);
+  let allKnown = ['2025-12', '2026-01', '2026-02'].reduce((s, mk) => s + redvelvetAllMenuMonthTotal(mk, metric), 0);
+  [3, 4, 5, 6].forEach(m => {
+    const rows = MENU_DATA_BY_MONTH[m] || [];
+    rows.forEach(r => {
+      const qty = r['수량'] || 0;
+      if (qty <= 0) return;
+      const v = metric === 'amt' ? qty * (PRICE_MAP[r['상품명']] || 0) : qty;
+      allKnown += v;
+      if (isRedvelvet(r)) sumKnown += v;
+    });
+  });
+  const pct = allKnown ? (sumKnown / allKnown * 100) : 0;
+
+  renderNewMenuSummary('nmRedvelvetSummary', sum, pct, '#f87171', "25.12~26.6");
+}
+
 function renderNewMenuPositionTab() {
   renderNewMenuMetricToggle();
 
@@ -5036,10 +5325,9 @@ function renderNewMenuPositionTab() {
   const isMugwort = (r) => String(r['상품명'] || '').includes('쑥');
   const isGreenApple = (r) => String(r['상품명'] || '').includes('청사과');
 
-  renderNewMenuMonthChart('nmRedvelvetMonthChart', '#f87171', isRedvelvet);
+  renderRedvelvetMonthChart();
   renderNewMenuRegionChart('nmRedvelvetRegionChart', '#f87171', isRedvelvet);
-  const rv = computeNewMenuOverall(isRedvelvet);
-  renderNewMenuSummary('nmRedvelvetSummary', rv.val, rv.pct, '#f87171', '1~6월');
+  renderRedvelvetSummary();
 
   renderNewMenuMonthChart('nmMugwortMonthChart', '#4ade80', isMugwort);
   renderNewMenuRegionChart('nmMugwortRegionChart', '#4ade80', isMugwort);
@@ -5052,6 +5340,9 @@ function renderNewMenuPositionTab() {
 
   renderMugwortWeeklyMetricToggle();
   renderMugwortWeeklyChart();
+
+  renderRedvelvetWeeklyMetricToggle();
+  renderRedvelvetWeeklyChart();
 }
 
 
