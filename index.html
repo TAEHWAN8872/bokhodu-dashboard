@@ -632,7 +632,10 @@ body.hide-names .store-name:hover{
 
         <!-- 4번 탭: 20개입(맛별 판매비중) -->
         <div id="maTab-4" class="ma-tab-panel" style="display:none;">
-          <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:12px;">🍯 20개입 상품군 내 맛/조합별 판매 비중 (1월~6월)</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+            <div style="font-size:12px;color:#7eb8e8;font-weight:700;">🍯 20개입 상품군 내 맛/조합별 판매 비중 (1월~6월)</div>
+            <div id="productType20FlavorMetricToggle" style="display:flex;gap:4px;"></div>
+          </div>
           <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
             <div style="position:relative;width:280px;height:280px;flex-shrink:0;">
               <canvas id="productType20FlavorPieChart"></canvas>
@@ -643,7 +646,10 @@ body.hide-names .store-name:hover{
 
         <!-- 5번 탭: 답례품(맛별 판매비중) -->
         <div id="maTab-5" class="ma-tab-panel" style="display:none;">
-          <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:12px;">🎁 답례품 상품군 내 맛/조합별 판매 비중 (1월~6월)</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+            <div style="font-size:12px;color:#7eb8e8;font-weight:700;">🎁 답례품 상품군 내 맛/조합별 판매 비중 (1월~6월)</div>
+            <div id="giftFlavorMetricToggle" style="display:flex;gap:4px;"></div>
+          </div>
           <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
             <div style="position:relative;width:280px;height:280px;flex-shrink:0;">
               <canvas id="giftFlavorPieChart"></canvas>
@@ -4509,7 +4515,25 @@ const PRODUCT_TYPE_20_FLAVOR_PALETTE = [
   '#c084fc', '#fda4af', '#5eead4', '#93c5fd'
 ];
 
+let productType20FlavorMetric = 'qty'; // 'qty'(수량) | 'amt'(금액)
+
+function renderProductType20FlavorMetricToggle() {
+  const el = document.getElementById('productType20FlavorMetricToggle');
+  if (!el) return;
+  const opts = [{ v: 'qty', l: '수량 기준' }, { v: 'amt', l: '금액 기준' }];
+  el.innerHTML = opts.map(o =>
+    `<div class="analysis-tab${productType20FlavorMetric === o.v ? ' active' : ''}" onclick="setProductType20FlavorMetric('${o.v}')">${o.l}</div>`
+  ).join('');
+}
+
+function setProductType20FlavorMetric(mode) {
+  productType20FlavorMetric = mode;
+  renderProductType20FlavorMetricToggle();
+  renderProductType20FlavorPieChart();
+}
+
 function computeProductType20FlavorBreakdown() {
+  const m = productType20FlavorMetric;
   const data = MENU_DATA_BY_MONTH[0] || [];
   const byName = {};
   data.forEach(row => {
@@ -4517,7 +4541,8 @@ function computeProductType20FlavorBreakdown() {
     if (qty <= 0) return;
     if (classifyProductType(row) !== '20개입') return;
     const name = row['상품명'] || '기타';
-    byName[name] = (byName[name] || 0) + qty;
+    const val = m === 'amt' ? qty * (PRICE_MAP[name] || 0) : qty;
+    byName[name] = (byName[name] || 0) + val;
   });
   return Object.entries(byName).sort((a, b) => b[1] - a[1]);
 }
@@ -4525,6 +4550,7 @@ function computeProductType20FlavorBreakdown() {
 let productType20FlavorPieChartInst = null;
 function renderProductType20FlavorPieChart() {
   const sorted = computeProductType20FlavorBreakdown();
+  const unit = productType20FlavorMetric === 'amt' ? '원' : '개';
   const canvas = document.getElementById('productType20FlavorPieChart');
   const legendEl = document.getElementById('productType20FlavorLegend');
   if (!canvas) return;
@@ -4553,7 +4579,7 @@ function renderProductType20FlavorPieChart() {
             label: (ctx) => {
               const v = ctx.parsed;
               const pct = grand ? (v / grand * 100).toFixed(1) : '0.0';
-              return `${ctx.label}: ${Math.round(v).toLocaleString()}개 (${pct}%)`;
+              return `${ctx.label}: ${Math.round(v).toLocaleString()}${unit} (${pct}%)`;
             }
           }
         }
@@ -4568,7 +4594,7 @@ function renderProductType20FlavorPieChart() {
       return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11.5px;">
         <span style="width:9px;height:9px;border-radius:2px;background:${colors[i]};flex-shrink:0;"></span>
         <span style="color:#c8dff0;">${c}</span>
-        <span style="color:#e0f0ff;font-weight:700;margin-left:auto;">${v.toLocaleString()}개</span>
+        <span style="color:#e0f0ff;font-weight:700;margin-left:auto;">${v.toLocaleString()}${unit}</span>
         <span style="color:#7eb8e8;font-weight:700;width:48px;text-align:right;">${pct}%</span>
       </div>`;
     }).join('');
@@ -4577,7 +4603,25 @@ function renderProductType20FlavorPieChart() {
 
 
 // ── 5번 탭: 답례품 맛/조합별 판매 비중 ──
+let giftFlavorMetric = 'qty'; // 'qty'(수량) | 'amt'(금액)
+
+function renderGiftFlavorMetricToggle() {
+  const el = document.getElementById('giftFlavorMetricToggle');
+  if (!el) return;
+  const opts = [{ v: 'qty', l: '수량 기준' }, { v: 'amt', l: '금액 기준' }];
+  el.innerHTML = opts.map(o =>
+    `<div class="analysis-tab${giftFlavorMetric === o.v ? ' active' : ''}" onclick="setGiftFlavorMetric('${o.v}')">${o.l}</div>`
+  ).join('');
+}
+
+function setGiftFlavorMetric(mode) {
+  giftFlavorMetric = mode;
+  renderGiftFlavorMetricToggle();
+  renderGiftFlavorPieChart();
+}
+
 function computeGiftFlavorBreakdown() {
+  const m = giftFlavorMetric;
   const data = MENU_DATA_BY_MONTH[0] || [];
   const byName = {};
   data.forEach(row => {
@@ -4585,7 +4629,8 @@ function computeGiftFlavorBreakdown() {
     if (qty <= 0) return;
     if (classifyProductType(row) !== '답례품') return;
     const name = row['상품명'] || '기타';
-    byName[name] = (byName[name] || 0) + qty;
+    const val = m === 'amt' ? qty * (PRICE_MAP[name] || 0) : qty;
+    byName[name] = (byName[name] || 0) + val;
   });
   return Object.entries(byName).sort((a, b) => b[1] - a[1]);
 }
@@ -4593,6 +4638,7 @@ function computeGiftFlavorBreakdown() {
 let giftFlavorPieChartInst = null;
 function renderGiftFlavorPieChart() {
   const sorted = computeGiftFlavorBreakdown();
+  const unit = giftFlavorMetric === 'amt' ? '원' : '개';
   const canvas = document.getElementById('giftFlavorPieChart');
   const legendEl = document.getElementById('giftFlavorLegend');
   if (!canvas) return;
@@ -4621,7 +4667,7 @@ function renderGiftFlavorPieChart() {
             label: (ctx) => {
               const v = ctx.parsed;
               const pct = grand ? (v / grand * 100).toFixed(1) : '0.0';
-              return `${ctx.label}: ${Math.round(v).toLocaleString()}개 (${pct}%)`;
+              return `${ctx.label}: ${Math.round(v).toLocaleString()}${unit} (${pct}%)`;
             }
           }
         }
@@ -4636,7 +4682,7 @@ function renderGiftFlavorPieChart() {
       return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11.5px;">
         <span style="width:9px;height:9px;border-radius:2px;background:${colors[i]};flex-shrink:0;"></span>
         <span style="color:#c8dff0;">${c}</span>
-        <span style="color:#e0f0ff;font-weight:700;margin-left:auto;">${v.toLocaleString()}개</span>
+        <span style="color:#e0f0ff;font-weight:700;margin-left:auto;">${v.toLocaleString()}${unit}</span>
         <span style="color:#7eb8e8;font-weight:700;width:48px;text-align:right;">${pct}%</span>
       </div>`;
     }).join('');
@@ -5088,8 +5134,10 @@ function switchMenuAnalysisSubtab(n) {
   } else if (n === 3) {
     renderProductTypeTab();
   } else if (n === 4) {
+    renderProductType20FlavorMetricToggle();
     renderProductType20FlavorPieChart();
   } else if (n === 5) {
+    renderGiftFlavorMetricToggle();
     renderGiftFlavorPieChart();
   } else if (n === 6) {
     renderNewMenuPositionTab();
