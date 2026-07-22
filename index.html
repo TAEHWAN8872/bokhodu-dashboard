@@ -609,7 +609,10 @@ body.hide-names .store-name:hover{
 
         <!-- 3번 탭: 메뉴별 비율 (20개입/답례품/선물세트/사이드) -->
         <div id="maTab-3" class="ma-tab-panel" style="display:none;">
-          <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:12px;">🥧 1월~6월 메뉴별 판매 비율 (20개입 · 답례품 · 선물세트 · 사이드)</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+            <div style="font-size:12px;color:#7eb8e8;font-weight:700;">🥧 1월~6월 메뉴별 판매 비율 (20개입 · 답례품 · 선물세트 · 사이드)</div>
+            <div id="productTypeMetricToggle" style="display:flex;gap:4px;"></div>
+          </div>
           <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
             <div style="position:relative;width:260px;height:260px;flex-shrink:0;">
               <canvas id="productTypePieChart"></canvas>
@@ -4335,7 +4338,25 @@ function classifyProductType(row) {
   return null;
 }
 
-function computeProductTypeTotals() {
+let productTypeMetric = 'qty'; // 'qty'(수량) | 'amt'(금액)
+
+function renderProductTypeMetricToggle() {
+  const el = document.getElementById('productTypeMetricToggle');
+  if (!el) return;
+  const opts = [{ v: 'qty', l: '수량 기준' }, { v: 'amt', l: '금액 기준' }];
+  el.innerHTML = opts.map(o =>
+    `<div class="analysis-tab${productTypeMetric === o.v ? ' active' : ''}" onclick="setProductTypeMetric('${o.v}')">${o.l}</div>`
+  ).join('');
+}
+
+function setProductTypeMetric(mode) {
+  productTypeMetric = mode;
+  renderProductTypeMetricToggle();
+  renderProductTypeTab();
+}
+
+function computeProductTypeTotals(metric) {
+  const m = metric || productTypeMetric;
   const data = MENU_DATA_BY_MONTH[0] || [];
   const totals = {};
   PRODUCT_TYPE_CATEGORIES.forEach(c => totals[c] = 0);
@@ -4344,13 +4365,15 @@ function computeProductTypeTotals() {
     if (qty <= 0) return;
     const type = classifyProductType(row);
     if (!type) return;
-    totals[type] += qty;
+    const val = m === 'amt' ? qty * (PRICE_MAP[row['상품명']] || 0) : qty;
+    totals[type] += val;
   });
   return totals;
 }
 
 // 20개입 카테고리 내에서 단품(맛 1개) vs 반반(2개 맛 조합, "/" 포함) 비율
-function computeProductType20Split() {
+function computeProductType20Split(metric) {
+  const m = metric || productTypeMetric;
   const data = MENU_DATA_BY_MONTH[0] || [];
   let single = 0, combo = 0;
   data.forEach(row => {
@@ -4358,7 +4381,8 @@ function computeProductType20Split() {
     if (qty <= 0) return;
     if (classifyProductType(row) !== '20개입') return;
     const name = row['상품명'] || '';
-    if (name.includes('/') || name.includes('&')) combo += qty; else single += qty;
+    const val = m === 'amt' ? qty * (PRICE_MAP[name] || 0) : qty;
+    if (name.includes('/') || name.includes('&')) combo += val; else single += val;
   });
   return { '단품': single, '반반': combo };
 }
@@ -4366,6 +4390,7 @@ function computeProductType20Split() {
 let productTypePieChartInst = null;
 function renderProductTypePieChart() {
   const totals = computeProductTypeTotals();
+  const unit = productTypeMetric === 'amt' ? '원' : '개';
   const canvas = document.getElementById('productTypePieChart');
   const legendEl = document.getElementById('productTypeLegend');
   if (!canvas) return;
@@ -4394,7 +4419,7 @@ function renderProductTypePieChart() {
             label: (ctx) => {
               const v = ctx.parsed;
               const pct = grand ? (v / grand * 100).toFixed(1) : '0.0';
-              return `${ctx.label}: ${Math.round(v).toLocaleString()}개 (${pct}%)`;
+              return `${ctx.label}: ${Math.round(v).toLocaleString()}${unit} (${pct}%)`;
             }
           }
         }
@@ -4409,7 +4434,7 @@ function renderProductTypePieChart() {
       return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;">
         <span style="width:10px;height:10px;border-radius:3px;background:${colors[i]};flex-shrink:0;"></span>
         <span style="color:#c8dff0;min-width:60px;">${c}</span>
-        <span style="color:#e0f0ff;font-weight:700;margin-left:auto;">${v.toLocaleString()}개</span>
+        <span style="color:#e0f0ff;font-weight:700;margin-left:auto;">${v.toLocaleString()}${unit}</span>
         <span style="color:#7eb8e8;font-weight:700;width:52px;text-align:right;">${pct}%</span>
       </div>`;
     }).join('');
@@ -4419,6 +4444,7 @@ function renderProductTypePieChart() {
 let productType20PieChartInst = null;
 function renderProductType20PieChart() {
   const split = computeProductType20Split();
+  const unit = productTypeMetric === 'amt' ? '원' : '개';
   const canvas = document.getElementById('productType20PieChart');
   const legendEl = document.getElementById('productType20Legend');
   if (!canvas) return;
@@ -4447,7 +4473,7 @@ function renderProductType20PieChart() {
             label: (ctx) => {
               const v = ctx.parsed;
               const pct = grand ? (v / grand * 100).toFixed(1) : '0.0';
-              return `${ctx.label}: ${Math.round(v).toLocaleString()}개 (${pct}%)`;
+              return `${ctx.label}: ${Math.round(v).toLocaleString()}${unit} (${pct}%)`;
             }
           }
         }
@@ -4462,7 +4488,7 @@ function renderProductType20PieChart() {
       return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;">
         <span style="width:10px;height:10px;border-radius:3px;background:${colors[i]};flex-shrink:0;"></span>
         <span style="color:#c8dff0;min-width:60px;">${c}</span>
-        <span style="color:#e0f0ff;font-weight:700;margin-left:auto;">${v.toLocaleString()}개</span>
+        <span style="color:#e0f0ff;font-weight:700;margin-left:auto;">${v.toLocaleString()}${unit}</span>
         <span style="color:#7eb8e8;font-weight:700;width:52px;text-align:right;">${pct}%</span>
       </div>`;
     }).join('');
@@ -4470,6 +4496,7 @@ function renderProductType20PieChart() {
 }
 
 function renderProductTypeTab() {
+  renderProductTypeMetricToggle();
   renderProductTypePieChart();
   renderProductType20PieChart();
 }
