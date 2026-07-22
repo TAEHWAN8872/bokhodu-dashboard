@@ -4098,11 +4098,12 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     document.getElementById('royaltyTableTitle').textContent = `미입금 매장 목록 (${list.length}곳)`;
     document.getElementById('royaltyTableBody').innerHTML = list.length ? list.map((it,idx)=>{
       const info = (window.STORE_INFO||{})[it.store] || {};
+      const manager = (typeof mkStoreManager === 'function') ? mkStoreManager(it.store) : null;
       return `
       <tr>
         <td>${idx+1}</td>
         <td style="text-align:left;">${it.store||''}</td>
-        <td>${info.owner||'-'}</td>
+        <td>${manager||'-'}</td>
         <td>${info.phone||'-'}</td>
         <td>${fmtRoyaltyDate(it.month,false)}</td>
         <td>${it.amount ? Number(it.amount).toLocaleString()+'원' : '-'}</td>
@@ -4197,8 +4198,8 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       document.getElementById('royaltyAlertSub').textContent = `로열티 미입금 매장이 ${list.length}곳 있습니다. (입금 확인 시 목록에서 제거해주세요)`;
       document.getElementById('royaltyAlertList').innerHTML = list
         .map(it=>{
-          const info = (window.STORE_INFO||{})[it.store] || {};
-          return `<li><span class="rc-alert-name">${it.store}${info.owner ? ' ('+info.owner+')' : ''}</span><span class="rc-alert-date">${fmtRoyaltyDate(it.month,false)} 미입금${it.amount ? ' · '+Number(it.amount).toLocaleString()+'원' : ''}</span></li>`;
+          const manager = (typeof mkStoreManager === 'function') ? mkStoreManager(it.store) : null;
+          return `<li><span class="rc-alert-name">${it.store}${manager ? ' ('+manager+')' : ''}</span><span class="rc-alert-date">${fmtRoyaltyDate(it.month,false)} 미입금${it.amount ? ' · '+Number(it.amount).toLocaleString()+'원' : ''}</span></li>`;
         }).join('');
       document.getElementById('royaltyAlertBox').style.display = 'block';
       window.openNoticeOverlay();
