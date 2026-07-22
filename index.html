@@ -374,6 +374,17 @@ body.hide-names .store-name:hover{
       </div>
     </div>
 
+    <!-- 로열티 미입금 알림 모달 -->
+    <div class="rc-alert-modal" id="royaltyAlertBox" style="display:none;">
+      <div class="rc-alert-icon">💰</div>
+      <h2 id="royaltyAlertTitle">로열티 미입금 매장 안내</h2>
+      <div class="rc-alert-sub" id="royaltyAlertSub"></div>
+      <ul id="royaltyAlertList"></ul>
+      <div class="rc-alert-actions">
+        <button class="um-close-btn" onclick="closeRoyaltyAlertModal()">확인</button>
+      </div>
+    </div>
+
     <!-- 매출 급락(전달 대비 10%↑ 하락) 점검 필요 알림 모달 -->
     <div class="rc-alert-modal decline-alert-modal" id="declineAlertBox" style="display:none;">
       <div class="rc-alert-icon">🔻</div>
@@ -409,6 +420,7 @@ body.hide-names .store-name:hover{
     <div class="page-tab active" id="pageTab-sales" onclick="switchPage('sales')">📊 매출 현황판</div>
     <div class="page-tab" id="pageTab-contract" onclick="switchPage('contract')">📋 재계약 안내<span class="pt-badge" id="rcUrgentBadge" style="display:none;"></span></div>
     <div class="page-tab" id="pageTab-marketing" onclick="switchPage('marketing')">📣 마케팅 참여현황</div>
+    <div class="page-tab" id="pageTab-royalty" onclick="switchPage('royalty')">💰 로열티 미입금<span class="pt-badge" id="royaltyBadge" style="display:none;"></span></div>
     <div class="page-tab" id="pageTab-keyword" onclick="window.open('https://taehwan8872.github.io/bokhodu-keyword-tracker/', '_blank')" style="display:inline-flex;align-items:center;gap:4px;line-height:1;"><span style="display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:15px;height:15px;background:#03C75A;color:#fff;font-weight:800;font-size:10px;border-radius:3px;">N</span><span>키워드검색량</span></div>
     <div class="page-tab" id="pageTab-aichat" onclick="openAiChatWindow()" style="display:inline-flex;align-items:center;gap:4px;line-height:1;"><span>🤖</span><span>AI 챗봇</span></div>
   </div>
@@ -497,6 +509,54 @@ body.hide-names .store-name:hover{
             </tr>
           </thead>
           <tbody id="mkTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 로열티 미입금 페이지 -->
+  <div id="royaltyPage" style="display:none;">
+    <div class="rc-kpi-row" id="royaltyKpiRow"></div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="ctitle"><span>미입금 매장 등록</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+        <div style="flex:1;min-width:160px;">
+          <div style="font-size:10px;color:#6b8fa8;margin-bottom:4px;">매장명</div>
+          <input id="royaltyStoreInput" list="royaltyStoreList" type="text" placeholder="매장명 입력/선택" autocomplete="off"
+            style="width:100%;box-sizing:border-box;padding:7px 10px;background:#1a2f44;border:0.5px solid #2a5a8a;border-radius:7px;color:#e0f0ff;font-size:11px;outline:none;">
+          <datalist id="royaltyStoreList"></datalist>
+        </div>
+        <div style="width:110px;">
+          <div style="font-size:10px;color:#6b8fa8;margin-bottom:4px;">미입금 월</div>
+          <input id="royaltyMonthInput" type="month"
+            style="width:100%;box-sizing:border-box;padding:7px 10px;background:#1a2f44;border:0.5px solid #2a5a8a;border-radius:7px;color:#e0f0ff;font-size:11px;outline:none;">
+        </div>
+        <div style="width:120px;">
+          <div style="font-size:10px;color:#6b8fa8;margin-bottom:4px;">금액(선택)</div>
+          <input id="royaltyAmountInput" type="number" placeholder="원"
+            style="width:100%;box-sizing:border-box;padding:7px 10px;background:#1a2f44;border:0.5px solid #2a5a8a;border-radius:7px;color:#e0f0ff;font-size:11px;outline:none;">
+        </div>
+        <div style="flex:1;min-width:140px;">
+          <div style="font-size:10px;color:#6b8fa8;margin-bottom:4px;">메모(선택)</div>
+          <input id="royaltyNoteInput" type="text" placeholder="비고"
+            style="width:100%;box-sizing:border-box;padding:7px 10px;background:#1a2f44;border:0.5px solid #2a5a8a;border-radius:7px;color:#e0f0ff;font-size:11px;outline:none;">
+        </div>
+        <button onclick="submitRoyaltyUnpaid()"
+          style="padding:8px 18px;background:#1a3a5c;border:1px solid #7eb8e8;border-radius:7px;color:#7eb8e8;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">+ 등록</button>
+      </div>
+      <div id="royaltyFormMsg" style="font-size:10px;color:#e05555;margin-top:6px;display:none;"></div>
+    </div>
+    <div class="card">
+      <div class="ctitle"><span id="royaltyTableTitle">미입금 매장 목록</span></div>
+      <div id="royaltyLoadingMsg" style="font-size:11px;color:#6b8fa8;padding:10px 0;">불러오는 중...</div>
+      <div class="rc-table-wrap">
+        <table class="rc-table">
+          <thead>
+            <tr>
+              <th>번호</th><th>매장명</th><th>미입금 월</th><th>금액</th><th>비고</th><th>등록일</th><th>처리</th>
+            </tr>
+          </thead>
+          <tbody id="royaltyTableBody"></tbody>
         </table>
       </div>
     </div>
@@ -3816,12 +3876,15 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     document.getElementById('salesPage').style.display = (page==='sales') ? '' : 'none';
     document.getElementById('contractPage').style.display = (page==='contract') ? '' : 'none';
     document.getElementById('marketingPage').style.display = (page==='marketing') ? '' : 'none';
+    document.getElementById('royaltyPage').style.display = (page==='royalty') ? '' : 'none';
     document.getElementById('pageTab-sales').classList.toggle('active', page==='sales');
     document.getElementById('pageTab-contract').classList.toggle('active', page==='contract');
     document.getElementById('pageTab-marketing').classList.toggle('active', page==='marketing');
-    document.getElementById('brandTitle').textContent = (page==='sales') ? '복호두 매출 현황판' : (page==='contract') ? '복호두 재계약 안내' : '복호두 마케팅 참여현황';
+    document.getElementById('pageTab-royalty').classList.toggle('active', page==='royalty');
+    document.getElementById('brandTitle').textContent = (page==='sales') ? '복호두 매출 현황판' : (page==='contract') ? '복호두 재계약 안내' : (page==='marketing') ? '복호두 마케팅 참여현황' : '복호두 로열티 미입금 관리';
     if(page==='contract'){ renderContractKpis(); renderContractTable(); }
     if(page==='marketing'){ renderMarketingKpis(); renderMarketingRegionChips(); renderMarketingTable(); }
+    if(page==='royalty'){ loadRoyaltyUnpaid(); }
   };
 
   window.setRcFilter = function(status){
@@ -3981,10 +4044,150 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     window.maybeCloseNoticeOverlay();
   };
 
+  // ══════════════════════════════════════════════════════════
+  // 로열티 미입금 관리 (구글시트 + Apps Script 웹앱을 DB로 사용)
+  // 배포한 Apps Script 웹앱의 /exec URL을 아래에 붙여넣어야 동작합니다.
+  // ══════════════════════════════════════════════════════════
+  const ROYALTY_API_URL = 'https://script.google.com/macros/s/AKfycbyiwLulo2K5i7iF5IAu3qn7BOzD6qLTACnrEs1LKYSULxHS9yMQAUmLcdMcrI8Z4rzr/exec';
+
+  let ROYALTY_CACHE = [];
+
+  function royaltyApiConfigured(){
+    return ROYALTY_API_URL && ROYALTY_API_URL.indexOf('PASTE_YOUR') === -1;
+  }
+
+  function populateRoyaltyStoreList(){
+    const dl = document.getElementById('royaltyStoreList');
+    if(!dl || dl.childElementCount) return;
+    const names = Object.keys(window.STORE_INFO||{}).filter(n=>!n.startsWith('(폐점)')).sort();
+    dl.innerHTML = names.map(n=>`<option value="${n}"></option>`).join('');
+  }
+
+  function renderRoyaltyBadge(count){
+    const badge = document.getElementById('royaltyBadge');
+    if(count>0){ badge.style.display='inline-block'; badge.textContent=count; }
+    else { badge.style.display='none'; }
+  }
+
+  function renderRoyaltyKpi(count){
+    document.getElementById('royaltyKpiRow').innerHTML = `
+      <div class="rc-kpi active">
+        <div class="kl">💰 로열티 미입금 매장</div>
+        <div class="kv" style="color:#e05555;">${count}곳</div>
+      </div>`;
+  }
+
+  window.renderRoyaltyPage = function(){
+    const list = ROYALTY_CACHE.slice().sort((a,b)=> new Date(a.createdAt||0) - new Date(b.createdAt||0));
+    renderRoyaltyKpi(list.length);
+    renderRoyaltyBadge(list.length);
+    document.getElementById('royaltyTableTitle').textContent = `미입금 매장 목록 (${list.length}곳)`;
+    document.getElementById('royaltyTableBody').innerHTML = list.length ? list.map((it,idx)=>`
+      <tr>
+        <td>${idx+1}</td>
+        <td style="text-align:left;">${it.store||''}</td>
+        <td>${it.month||''}</td>
+        <td>${it.amount ? Number(it.amount).toLocaleString()+'원' : '-'}</td>
+        <td>${it.note||'-'}</td>
+        <td>${(it.createdAt||'').slice(0,10)}</td>
+        <td><button onclick="removeRoyaltyUnpaid('${it.id}')"
+          style="padding:4px 10px;background:#1a3a2c;border:1px solid #3db87a;border-radius:6px;color:#3db87a;font-size:10px;font-weight:700;cursor:pointer;">입금확인</button></td>
+      </tr>`).join('') : `<tr><td colspan="7" style="color:#4a5f75;padding:16px 0;">현재 미입금 매장이 없습니다.</td></tr>`;
+  };
+
+  window.loadRoyaltyUnpaid = async function(){
+    populateRoyaltyStoreList();
+    const loadingEl = document.getElementById('royaltyLoadingMsg');
+    if(!royaltyApiConfigured()){
+      loadingEl.textContent = '⚠ 아직 연동 설정 전이에요. (ROYALTY_API_URL을 Apps Script 웹앱 주소로 교체해주세요)';
+      loadingEl.style.color = '#f0a04a';
+      loadingEl.style.display = 'block';
+      renderRoyaltyKpi(0);
+      renderRoyaltyBadge(0);
+      return;
+    }
+    loadingEl.textContent = '불러오는 중...';
+    loadingEl.style.color = '#6b8fa8';
+    loadingEl.style.display = 'block';
+    try{
+      const res = await fetch(ROYALTY_API_URL + '?action=list');
+      const data = await res.json();
+      ROYALTY_CACHE = Array.isArray(data) ? data : (data.items||[]);
+      loadingEl.style.display = 'none';
+      window.renderRoyaltyPage();
+    }catch(e){
+      loadingEl.textContent = '목록을 불러오지 못했어요. 잠시 후 다시 시도해주세요.';
+      loadingEl.style.color = '#e05555';
+      loadingEl.style.display = 'block';
+    }
+  };
+
+  window.submitRoyaltyUnpaid = async function(){
+    const storeEl = document.getElementById('royaltyStoreInput');
+    const monthEl = document.getElementById('royaltyMonthInput');
+    const amountEl = document.getElementById('royaltyAmountInput');
+    const noteEl = document.getElementById('royaltyNoteInput');
+    const msgEl = document.getElementById('royaltyFormMsg');
+    const store = storeEl.value.trim();
+    const month = monthEl.value;
+    if(!store){ msgEl.textContent='매장명을 입력해주세요.'; msgEl.style.display='block'; return; }
+    if(!royaltyApiConfigured()){ msgEl.textContent='아직 연동 설정 전이에요. ROYALTY_API_URL을 확인해주세요.'; msgEl.style.display='block'; return; }
+    msgEl.style.display='none';
+    try{
+      await fetch(ROYALTY_API_URL, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({ action:'add', store, month, amount:amountEl.value||'', note:noteEl.value||'' })
+      });
+      storeEl.value=''; monthEl.value=''; amountEl.value=''; noteEl.value='';
+      await window.loadRoyaltyUnpaid();
+    }catch(e){
+      msgEl.textContent='등록에 실패했어요. 잠시 후 다시 시도해주세요.';
+      msgEl.style.display='block';
+    }
+  };
+
+  window.removeRoyaltyUnpaid = async function(id){
+    if(!confirm('입금이 확인되어 목록에서 제거할까요?')) return;
+    try{
+      await fetch(ROYALTY_API_URL, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({ action:'remove', id })
+      });
+      await window.loadRoyaltyUnpaid();
+    }catch(e){
+      alert('삭제에 실패했어요. 잠시 후 다시 시도해주세요.');
+    }
+  };
+
+  window.closeRoyaltyAlertModal = function(){
+    document.getElementById('royaltyAlertBox').style.display = 'none';
+    window.maybeCloseNoticeOverlay();
+  };
+
+  async function checkRoyaltyAlert(){
+    if(!royaltyApiConfigured()) return;
+    try{
+      const res = await fetch(ROYALTY_API_URL + '?action=list');
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : (data.items||[]);
+      ROYALTY_CACHE = list;
+      renderRoyaltyBadge(list.length);
+      if(list.length===0) return;
+      document.getElementById('royaltyAlertSub').textContent = `로열티 미입금 매장이 ${list.length}곳 있습니다. (입금 확인 시 목록에서 제거해주세요)`;
+      document.getElementById('royaltyAlertList').innerHTML = list
+        .map(it=>`<li><span class="rc-alert-name">${it.store}</span><span class="rc-alert-date">${it.month||''} 미입금${it.amount ? ' · '+Number(it.amount).toLocaleString()+'원' : ''}</span></li>`).join('');
+      document.getElementById('royaltyAlertBox').style.display = 'block';
+      window.openNoticeOverlay();
+    }catch(e){ /* 조용히 무시 (연동 전이거나 일시적 오류) */ }
+  }
+
   window.addEventListener('DOMContentLoaded', function(){
     renderContractKpis();
     checkContractAlert(); // 업데이트 안내 모달과 같은 화면(오버레이)에 함께 표시됨
     checkDeclineAlert(); // 전달 대비 10%↑ 매출 하락 매장 점검 필요 알림
+    checkRoyaltyAlert(); // 로열티 미입금 매장 알림 (새로고침마다 항상)
   });
 })();
 
@@ -7614,7 +7817,8 @@ window.maybeCloseNoticeOverlay = function(){
   const u = document.getElementById('updateModalBox');
   const r = document.getElementById('rcAlertBox');
   const d = document.getElementById('declineAlertBox');
-  if (u.style.display === 'none' && r.style.display === 'none' && d.style.display === 'none') {
+  const y = document.getElementById('royaltyAlertBox');
+  if (u.style.display === 'none' && r.style.display === 'none' && d.style.display === 'none' && y.style.display === 'none') {
     document.getElementById('noticeOverlay').classList.remove('open');
   }
 };
