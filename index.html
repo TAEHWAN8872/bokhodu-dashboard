@@ -660,7 +660,10 @@ body.hide-names .store-name:hover{
 
         <!-- 6번 탭: 신메뉴 포지션 (레드벨벳/쑥/청사과) -->
         <div id="maTab-6" class="ma-tab-panel" style="display:none;">
-          <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:4px;">🆕 신메뉴 포지션 — 레드벨벳 · 쑥 · 청사과</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
+            <div style="font-size:12px;color:#7eb8e8;font-weight:700;">🆕 신메뉴 포지션 — 레드벨벳 · 쑥 · 청사과</div>
+            <div id="newMenuMetricToggle" style="display:flex;gap:4px;"></div>
+          </div>
           <div style="font-size:10.5px;color:#5f7d95;margin-bottom:16px;">월별/지역별 판매 비중과 전체 판매 대비 비중(%)을 비교합니다.</div>
 
           <div style="margin-bottom:22px;padding:14px;background:#0f2133;border-radius:10px;">
@@ -4691,6 +4694,28 @@ function renderGiftFlavorPieChart() {
 
 
 // ── 6번 탭: 신메뉴 포지션 (레드벨벳/쑥/청사과) ──
+let newMenuMetric = 'qty'; // 'qty'(수량) | 'amt'(금액)
+
+function renderNewMenuMetricToggle() {
+  const el = document.getElementById('newMenuMetricToggle');
+  if (!el) return;
+  const opts = [{ v: 'qty', l: '수량 기준' }, { v: 'amt', l: '금액 기준' }];
+  el.innerHTML = opts.map(o =>
+    `<div class="analysis-tab${newMenuMetric === o.v ? ' active' : ''}" onclick="setNewMenuMetric('${o.v}')">${o.l}</div>`
+  ).join('');
+}
+
+function setNewMenuMetric(mode) {
+  newMenuMetric = mode;
+  renderNewMenuMetricToggle();
+  renderNewMenuPositionTab();
+}
+
+function newMenuVal(row) {
+  const qty = row['수량'] || 0;
+  return newMenuMetric === 'amt' ? qty * (PRICE_MAP[row['상품명']] || 0) : qty;
+}
+
 function computeNewMenuMonthly(matchFn) {
   const monthly = {}, pct = {};
   for (let m = 1; m <= 6; m++) {
@@ -4699,8 +4724,9 @@ function computeNewMenuMonthly(matchFn) {
     rows.forEach(r => {
       const qty = r['수량'] || 0;
       if (qty <= 0) return;
-      all += qty;
-      if (matchFn(r)) sum += qty;
+      const val = newMenuVal(r);
+      all += val;
+      if (matchFn(r)) sum += val;
     });
     monthly[m] = sum;
     pct[m] = all ? (sum / all * 100) : 0;
@@ -4719,12 +4745,12 @@ function computeNewMenuRegional(matchFn, monthFilter) {
     if (!matchFn(r)) return;
     const rg = getRegionForStore(r['매장']);
     if (!rg) return;
-    reg[rg] = (reg[rg] || 0) + qty;
+    reg[rg] = (reg[rg] || 0) + newMenuVal(r);
   });
   const total = Object.values(reg).reduce((s, v) => s + v, 0);
-  // [지역, 수량, 전체 대비 비중(%)] 형태로 반환, 비중 내림차순 정렬
+  // [지역, 값, 전체 대비 비중(%)] 형태로 반환, 비중 내림차순 정렬
   return Object.entries(reg)
-    .map(([region, qty]) => [region, qty, total ? (qty / total * 100) : 0])
+    .map(([region, val]) => [region, val, total ? (val / total * 100) : 0])
     .sort((a, b) => b[2] - a[2]);
 }
 
@@ -4736,19 +4762,22 @@ function computeNewMenuOverall(matchFn, months) {
     rows.forEach(r => {
       const qty = r['수량'] || 0;
       if (qty <= 0) return;
-      all += qty;
-      if (matchFn(r)) sum += qty;
+      const val = newMenuVal(r);
+      all += val;
+      if (matchFn(r)) sum += val;
     });
   });
-  return { qty: sum, pct: all ? (sum / all * 100) : 0 };
+  return { val: sum, pct: all ? (sum / all * 100) : 0 };
 }
 
-function renderNewMenuSummary(elId, qty, pct, color, periodLabel) {
+function renderNewMenuSummary(elId, val, pct, color, periodLabel) {
   const el = document.getElementById(elId);
   if (!el) return;
+  const unit = newMenuMetric === 'amt' ? '원' : '개';
+  const label = newMenuMetric === 'amt' ? ' 매출금액' : ' 판매수량';
   el.innerHTML = '<div style="margin-bottom:10px;">'
-    + '<div style="font-size:10px;color:#5f7d95;">' + periodLabel + ' 판매수량</div>'
-    + '<div style="font-size:20px;font-weight:800;color:#e0f0ff;">' + qty.toLocaleString() + '개</div>'
+    + '<div style="font-size:10px;color:#5f7d95;">' + periodLabel + label + '</div>'
+    + '<div style="font-size:20px;font-weight:800;color:#e0f0ff;">' + Math.round(val).toLocaleString() + unit + '</div>'
     + '</div><div>'
     + '<div style="font-size:10px;color:#5f7d95;">' + periodLabel + ' 전체 판매 대비 비중</div>'
     + '<div style="font-size:20px;font-weight:800;color:' + color + ';">' + pct.toFixed(2) + '%</div>'
@@ -4761,6 +4790,8 @@ function renderNewMenuMonthChart(canvasId, color, matchFn) {
   if (!canvas) return;
   if (nmMonthChartInsts[canvasId]) { try { nmMonthChartInsts[canvasId].destroy(); } catch (e) {} }
   const { monthly, pct } = computeNewMenuMonthly(matchFn);
+  const unit = newMenuMetric === 'amt' ? '원' : '개';
+  const valLabel = newMenuMetric === 'amt' ? '매출금액' : '판매수량';
   const labels = [1, 2, 3, 4, 5, 6].map(m => m + '월');
   const qtyData = [1, 2, 3, 4, 5, 6].map(m => monthly[m]);
   const pctData = [1, 2, 3, 4, 5, 6].map(m => Math.round(pct[m] * 100) / 100);
@@ -4769,7 +4800,7 @@ function renderNewMenuMonthChart(canvasId, color, matchFn) {
     data: {
       labels,
       datasets: [
-        { type: 'bar', label: '판매수량', data: qtyData, backgroundColor: color + 'aa', borderRadius: 4, order: 2, yAxisID: 'y', datalabels: { display: false } },
+        { type: 'bar', label: valLabel, data: qtyData, backgroundColor: color + 'aa', borderRadius: 4, order: 2, yAxisID: 'y', datalabels: { display: false } },
         { type: 'line', label: '전체 대비 비중(%)', data: pctData, borderColor: '#facc15', backgroundColor: '#facc15', pointRadius: 4, pointBackgroundColor: '#facc15', borderWidth: 2, tension: 0.3, order: 1, yAxisID: 'y1',
           datalabels: {
             display: true,
@@ -4796,7 +4827,7 @@ function renderNewMenuMonthChart(canvasId, color, matchFn) {
           callbacks: {
             label: (ctx) => ctx.dataset.yAxisID === 'y1'
               ? ' 전체 대비 비중: ' + ctx.parsed.y + '%'
-              : ' 판매수량: ' + ctx.parsed.y.toLocaleString() + '개'
+              : ' ' + valLabel + ': ' + Math.round(ctx.parsed.y).toLocaleString() + unit
           }
         }
       },
@@ -4817,6 +4848,7 @@ function renderNewMenuRegionChart(canvasId, color, matchFn, monthFilter) {
   if (nmRegionChartInsts[canvasId]) { try { nmRegionChartInsts[canvasId].destroy(); } catch (e) {} }
   // 상위 8개로 자르지 않고 전체 지역을 다 보여줌
   const sorted = computeNewMenuRegional(matchFn, monthFilter);
+  const unit = newMenuMetric === 'amt' ? '원' : '개';
   const labels = sorted.map(([r]) => r);
   const qtyValues = sorted.map(([, v]) => v);
   const pctValues = sorted.map(([, , p]) => Math.round(p * 100) / 100);
@@ -4838,7 +4870,7 @@ function renderNewMenuRegionChart(canvasId, color, matchFn, monthFilter) {
           callbacks: {
             label: (ctx) => {
               const q = qtyValues[ctx.dataIndex] || 0;
-              return ' 비중 ' + ctx.parsed.x + '% (' + q.toLocaleString() + '개)';
+              return ' 비중 ' + ctx.parsed.x + '% (' + Math.round(q).toLocaleString() + unit + ')';
             }
           }
         },
@@ -4859,6 +4891,8 @@ function renderNewMenuRegionChart(canvasId, color, matchFn, monthFilter) {
 }
 
 function renderNewMenuPositionTab() {
+  renderNewMenuMetricToggle();
+
   const isRedvelvet = (r) => String(r['상품명'] || '').includes('레드벨벳');
   const isMugwort = (r) => String(r['상품명'] || '').includes('쑥');
   const isGreenApple = (r) => String(r['상품명'] || '').includes('청사과');
@@ -4866,16 +4900,16 @@ function renderNewMenuPositionTab() {
   renderNewMenuMonthChart('nmRedvelvetMonthChart', '#f87171', isRedvelvet);
   renderNewMenuRegionChart('nmRedvelvetRegionChart', '#f87171', isRedvelvet);
   const rv = computeNewMenuOverall(isRedvelvet);
-  renderNewMenuSummary('nmRedvelvetSummary', rv.qty, rv.pct, '#f87171', '1~6월');
+  renderNewMenuSummary('nmRedvelvetSummary', rv.val, rv.pct, '#f87171', '1~6월');
 
   renderNewMenuMonthChart('nmMugwortMonthChart', '#4ade80', isMugwort);
   renderNewMenuRegionChart('nmMugwortRegionChart', '#4ade80', isMugwort);
   const mw = computeNewMenuOverall(isMugwort);
-  renderNewMenuSummary('nmMugwortSummary', mw.qty, mw.pct, '#4ade80', '1~6월');
+  renderNewMenuSummary('nmMugwortSummary', mw.val, mw.pct, '#4ade80', '1~6월');
 
   renderNewMenuRegionChart('nmGreenAppleRegionChart', '#38bdf8', isGreenApple, 6);
   const ga = computeNewMenuOverall(isGreenApple, [6]);
-  renderNewMenuSummary('nmGreenAppleSummary', ga.qty, ga.pct, '#38bdf8', '6월');
+  renderNewMenuSummary('nmGreenAppleSummary', ga.val, ga.pct, '#38bdf8', '6월');
 }
 
 
