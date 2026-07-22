@@ -682,6 +682,15 @@ body.hide-names .store-name:hover{
               <div style="position:relative;flex:1;min-width:260px;height:230px;"><canvas id="nmMugwortMonthChart"></canvas></div>
               <div style="position:relative;flex:1;min-width:300px;height:220px;"><canvas id="nmMugwortRegionChart"></canvas></div>
             </div>
+
+            <div style="margin-top:18px;padding-top:14px;border-top:1px dashed #234258;">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+                <div style="font-size:11.5px;color:#8fe0ac;font-weight:700;">📅 쑥 주차별 추이 (3월~5월)</div>
+                <div id="mugwortWeeklyMetricToggle" style="display:flex;gap:4px;"></div>
+              </div>
+              <div id="mugwortWeeklySummary" style="display:flex;gap:24px;margin-bottom:12px;font-size:12px;color:#c8dff0;"></div>
+              <div style="position:relative;width:100%;min-width:600px;height:300px;overflow-x:auto;"><canvas id="mugwortWeeklyChart"></canvas></div>
+            </div>
           </div>
 
           <div style="padding:14px;background:#0f2133;border-radius:10px;">
@@ -4891,6 +4900,135 @@ function renderNewMenuRegionChart(canvasId, color, matchFn, monthFilter) {
   });
 }
 
+// ── 쑥 주차별 추이 (3월~5월, 사용자 제공 수량 데이터) ──
+const MUGWORT_WEEKLY_DATA = [
+  { label: '3월 1주', qty: { '쑥 호두과자': 1038, '쑥&앙버터 호두과자': 1857, '복호두 선물세트(쑥)': 136, '답례품(쑥 호두과자)': 76, '답례품(쑥&앙버터 호두과자)': 350 } },
+  { label: '3월 2주', qty: { '쑥 호두과자': 1920, '쑥&앙버터 호두과자': 3458, '복호두 선물세트(쑥)': 253, '답례품(쑥 호두과자)': 172, '답례품(쑥&앙버터 호두과자)': 845 } },
+  { label: '3월 3주', qty: { '쑥 호두과자': 2337, '쑥&앙버터 호두과자': 3946, '복호두 선물세트(쑥)': 225, '답례품(쑥 호두과자)': 108, '답례품(쑥&앙버터 호두과자)': 745 } },
+  { label: '3월 4주', qty: { '쑥 호두과자': 2287, '쑥&앙버터 호두과자': 3932, '복호두 선물세트(쑥)': 263, '답례품(쑥 호두과자)': 167, '답례품(쑥&앙버터 호두과자)': 819 } },
+  { label: '4월 1주', qty: { '쑥 호두과자': 2090, '쑥&앙버터 호두과자': 3857, '복호두 선물세트(쑥)': 255, '답례품(쑥 호두과자)': 109, '답례품(쑥&앙버터 호두과자)': 732 } },
+  { label: '4월 2주', qty: { '쑥 호두과자': 1989, '쑥&앙버터 호두과자': 3745, '복호두 선물세트(쑥)': 228, '답례품(쑥 호두과자)': 116, '답례품(쑥&앙버터 호두과자)': 1318 } },
+  { label: '4월 3주', qty: { '쑥 호두과자': 1853, '쑥&앙버터 호두과자': 3456, '복호두 선물세트(쑥)': 208, '답례품(쑥 호두과자)': 70, '답례품(쑥&앙버터 호두과자)': 1102 } },
+  { label: '4월 4주', qty: { '쑥 호두과자': 1746, '쑥&앙버터 호두과자': 3526, '복호두 선물세트(쑥)': 136, '답례품(쑥 호두과자)': 346, '답례품(쑥&앙버터 호두과자)': 796 } },
+  { label: '4월 5주', qty: { '쑥 호두과자': 1526, '쑥&앙버터 호두과자': 2858, '복호두 선물세트(쑥)': 152, '답례품(쑥 호두과자)': 130, '답례품(쑥&앙버터 호두과자)': 459 } },
+  { label: '5월 1주', qty: { '쑥 호두과자': 1148, '쑥&앙버터 호두과자': 2024, '복호두 선물세트(쑥)': 60, '답례품(쑥 호두과자)': 342, '답례품(쑥&앙버터 호두과자)': 134 } },
+  { label: '5월 2주', qty: { '쑥 호두과자': 1136, '쑥&앙버터 호두과자': 2155, '복호두 선물세트(쑥)': 116, '답례품(쑥 호두과자)': 80, '답례품(쑥&앙버터 호두과자)': 513 } },
+  { label: '5월 3주', qty: { '쑥 호두과자': 585, '쑥&앙버터 호두과자': 1182, '복호두 선물세트(쑥)': 17, '답례품(쑥 호두과자)': 87, '답례품(쑥&앙버터 호두과자)': 226 } },
+  { label: '5월 4주', qty: { '쑥 호두과자': 271, '쑥&앙버터 호두과자': 663, '복호두 선물세트(쑥)': 131, '답례품(쑥 호두과자)': 18, '답례품(쑥&앙버터 호두과자)': 139 } },
+];
+
+let mugwortWeeklyMetric = 'qty'; // 'qty' | 'amt'
+let mugwortWeeklyChartInst = null;
+
+function renderMugwortWeeklyMetricToggle() {
+  const el = document.getElementById('mugwortWeeklyMetricToggle');
+  if (!el) return;
+  const opts = [{ v: 'qty', l: '수량 기준' }, { v: 'amt', l: '금액 기준' }];
+  el.innerHTML = opts.map(o =>
+    `<div class="analysis-tab${mugwortWeeklyMetric === o.v ? ' active' : ''}" onclick="setMugwortWeeklyMetric('${o.v}')">${o.l}</div>`
+  ).join('');
+}
+
+function setMugwortWeeklyMetric(mode) {
+  mugwortWeeklyMetric = mode;
+  renderMugwortWeeklyMetricToggle();
+  renderMugwortWeeklyChart();
+}
+
+function mugwortWeekValue(weekQtyObj) {
+  return Object.entries(weekQtyObj).reduce((sum, [name, qty]) => {
+    const unitPrice = mugwortWeeklyMetric === 'amt' ? (PRICE_MAP[name] || 0) : 1;
+    return sum + qty * unitPrice;
+  }, 0);
+}
+
+function computeAllMenuMonthTotal(month) {
+  const rows = MENU_DATA_BY_MONTH[month] || [];
+  let sum = 0;
+  rows.forEach(r => {
+    const qty = r['수량'] || 0;
+    if (qty <= 0) return;
+    sum += mugwortWeeklyMetric === 'amt' ? qty * (PRICE_MAP[r['상품명']] || 0) : qty;
+  });
+  return sum;
+}
+
+function renderMugwortWeeklyChart() {
+  const canvas = document.getElementById('mugwortWeeklyChart');
+  if (!canvas) return;
+  if (mugwortWeeklyChartInst) { try { mugwortWeeklyChartInst.destroy(); } catch (e) {} }
+
+  const values = MUGWORT_WEEKLY_DATA.map(w => mugwortWeekValue(w.qty));
+  const total = values.reduce((s, v) => s + v, 0);
+  // 전체 메뉴 판매량(그 주가 속한 달의 전체 메뉴 총계) 대비 비중으로 계산
+  const monthTotalCache = {};
+  const pctValues = MUGWORT_WEEKLY_DATA.map((w, i) => {
+    const month = parseInt(w.label, 10); // '3월 1주' -> 3
+    if (!(month in monthTotalCache)) monthTotalCache[month] = computeAllMenuMonthTotal(month);
+    const denom = monthTotalCache[month];
+    return denom ? Math.round(values[i] / denom * 10000) / 100 : 0;
+  });
+  const labels = MUGWORT_WEEKLY_DATA.map(w => w.label);
+  const unit = mugwortWeeklyMetric === 'amt' ? '원' : '개';
+  const valLabel = mugwortWeeklyMetric === 'amt' ? '매출금액' : '판매수량';
+  const color = '#4ade80';
+
+  mugwortWeeklyChartInst = new Chart(canvas, {
+    data: {
+      labels,
+      datasets: [
+        { type: 'bar', label: valLabel, data: values, backgroundColor: color + 'aa', borderRadius: 4, order: 2, yAxisID: 'y', datalabels: { display: false } },
+        {
+          type: 'line', label: '전체 메뉴 대비 비중(%)', data: pctValues,
+          borderColor: '#facc15', backgroundColor: '#facc15', pointBackgroundColor: '#facc15',
+          pointRadius: 4, pointHoverRadius: 6, borderWidth: 2.5, tension: 0.3, order: 1, yAxisID: 'y1',
+          datalabels: {
+            display: true,
+            color: '#facc15',
+            align: 'top',
+            anchor: 'end',
+            offset: 6,
+            font: { size: 11, weight: 700 },
+            formatter: (v) => v + '%'
+          }
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: { top: 24 } },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#c8dff0', font: { size: 10 } } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ctx.dataset.yAxisID === 'y1'
+              ? ' 전체 메뉴 대비 비중: ' + ctx.parsed.y + '%'
+              : ' ' + valLabel + ': ' + Math.round(ctx.parsed.y).toLocaleString() + unit
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#9fc1de', font: { size: 9 } }, grid: { display: false } },
+        y: { position: 'left', ticks: { color: '#9fc1de', font: { size: 9 }, callback: v => v.toLocaleString() }, grid: { color: '#1e3347' } },
+        y1: { position: 'right', suggestedMax: Math.max(...pctValues) * 1.35, ticks: { color: '#facc15', font: { size: 9 }, callback: v => v + '%' }, grid: { display: false } }
+      }
+    }
+  });
+
+  const elSum = document.getElementById('mugwortWeeklySummary');
+  if (elSum) {
+    const maxIdx = values.indexOf(Math.max(...values));
+    elSum.innerHTML =
+      '<div><div style="font-size:10px;color:#5f7d95;">3~5월 합계 ' + valLabel + '</div>'
+      + '<div style="font-size:20px;font-weight:800;color:#e0f0ff;">' + Math.round(total).toLocaleString() + unit + '</div></div>'
+      + '<div><div style="font-size:10px;color:#5f7d95;">최고 판매 주차</div>'
+      + '<div style="font-size:16px;font-weight:800;color:#facc15;">' + labels[maxIdx] + ' (' + pctValues[maxIdx] + '%)</div></div>';
+  }
+}
+
+
 function renderNewMenuPositionTab() {
   renderNewMenuMetricToggle();
 
@@ -4911,6 +5049,9 @@ function renderNewMenuPositionTab() {
   renderNewMenuRegionChart('nmGreenAppleRegionChart', '#38bdf8', isGreenApple, 6);
   const ga = computeNewMenuOverall(isGreenApple, [6]);
   renderNewMenuSummary('nmGreenAppleSummary', ga.val, ga.pct, '#38bdf8', '6월');
+
+  renderMugwortWeeklyMetricToggle();
+  renderMugwortWeeklyChart();
 }
 
 
