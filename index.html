@@ -368,7 +368,7 @@ body.hide-names .store-name:hover{
       <ul id="rcAlertList"></ul>
       <div class="rc-alert-actions">
         <label class="um-dontshow">
-          <input type="checkbox" id="rcAlertDontShowCheck"> 이번 달은 다시 보지 않기
+          <input type="checkbox" id="rcAlertDontShowCheck"> 이 매장 안내는 다시 보지 않기
         </label>
         <button class="um-close-btn" onclick="closeContractAlertModal()">확인</button>
       </div>
@@ -3787,18 +3787,27 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   const STATUS_BADGE_CLASS = {urgent:'rc-urgent', soon:'rc-soon', normal:'rc-normal', check:'rc-check'};
   const STATUS_DDAY_CLASS = {urgent:'rc-dday-urgent', soon:'rc-dday-soon', normal:'rc-dday-normal', check:''};
 
-  // 오늘 기준 '다음 달'에 종료되는 매장 목록 (달력상 월이 1개월 차이)
-  function getNextMonthExpiring(){
+  // 아직 만료되지 않은 매장 중 '가장 빠른 계약종료일' 그룹(동일 날짜 여러 곳이면 함께)과
+  // 그 날짜의 1개월 전 시점(알림 시작일)을 계산
+  function getNearestExpiringGroup(){
     const today = todayMidnight();
-    let targetMonth = today.getMonth()+1;
-    let targetYear = today.getFullYear();
-    if(targetMonth > 11){ targetMonth = 0; targetYear += 1; }
-    return CONTRACT_DATA.filter(r=>{
+    let minTime = null;
+    CONTRACT_DATA.forEach(r=>{
       const endStr = r[5];
-      if(!endStr) return false;
+      if(!endStr) return;
       const end = new Date(endStr+'T00:00:00');
-      return end.getFullYear()===targetYear && end.getMonth()===targetMonth;
+      if(end < today) return; // 이미 만료된 계약은 대상에서 자동 제외
+      if(minTime===null || end < minTime) minTime = end;
     });
+    if(minTime===null) return {list:[], minEnd:null, windowStart:null};
+    const list = CONTRACT_DATA.filter(r=>{
+      if(!r[5]) return false;
+      const end = new Date(r[5]+'T00:00:00');
+      return end.getTime()===minTime.getTime();
+    });
+    const windowStart = new Date(minTime);
+    windowStart.setMonth(windowStart.getMonth()-1);
+    return {list, minEnd:minTime, windowStart};
   }
 
   window.__rcFilterStatus = 'all';
@@ -3889,21 +3898,22 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       `재계약 현황 (${rows.length}개 매장)`;
   };
 
-  // ── 재계약 만료 임박(다음 달 만료) 알림 모달 ──
+  // ── 재계약 만료 임박(가장 빠른 종료일 1개월 전부터) 알림 모달 ──
   function checkContractAlert(){
-    const list = getNextMonthExpiring();
-    if(list.length===0) return;
+    const {list, minEnd, windowStart} = getNearestExpiringGroup();
+    if(list.length===0 || !minEnd) return;
     const today = todayMidnight();
-    let targetMonth = today.getMonth()+1, targetYear = today.getFullYear();
-    if(targetMonth>11){ targetMonth=0; targetYear+=1; }
-    const ymKey = `${targetYear}-${String(targetMonth+1).padStart(2,'0')}`;
-    const STORAGE_KEY = 'contract_alert_dismissed_'+ymKey;
+    if(today < windowStart) return; // 아직 알림 시작 시점 전
+
+    const fmt = d => `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+    const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const STORAGE_KEY = 'contract_alert_dismissed_'+ymd(minEnd);
     let dismissed = false;
     try{ dismissed = localStorage.getItem(STORAGE_KEY)==='1'; }catch(e){}
     if(dismissed) return;
 
-    document.getElementById('rcAlertTitle').textContent = `${targetMonth+1}월 재계약 만료 예정 매장 안내`;
-    document.getElementById('rcAlertSub').textContent = `오늘(${today.getFullYear()}.${today.getMonth()+1}.${today.getDate()}) 기준, 다음 달 계약이 종료되는 매장이 ${list.length}곳 있습니다.`;
+    document.getElementById('rcAlertTitle').textContent = `재계약 만료 임박 안내 (${fmt(minEnd)} 종료)`;
+    document.getElementById('rcAlertSub').textContent = `오늘(${fmt(today)}) 기준, 가장 빠르게 계약이 종료되는 매장이 ${list.length}곳 있습니다. (1개월 전부터 자동 안내)`;
     document.getElementById('rcAlertList').innerHTML = list
       .sort((a,b)=> new Date(a[5]) - new Date(b[5]))
       .map(r=>`<li><span class="rc-alert-name">${r[1]}</span><span class="rc-alert-date">${r[5]} 종료</span></li>`).join('');
