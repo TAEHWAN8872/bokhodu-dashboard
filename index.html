@@ -4069,11 +4069,26 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     return ROYALTY_API_URL && ROYALTY_API_URL.indexOf('PASTE_YOUR') === -1;
   }
 
+  // 로열티 입력용 매장명은 매출 현황판(ALL)에 나오는 매장명 기준으로 표시
+  // (STORE_INFO 키는 "복호두 광주 수완점"처럼 접두어가 붙어 있어 매출 현황판 이름과 달라서
+  //  담당자 매칭이 헷갈릴 수 있으므로, 여기서는 ALL의 매장명을 그대로 노출한다)
   function populateRoyaltyStoreList(){
     const dl = document.getElementById('royaltyStoreList');
-    if(!dl || dl.childElementCount) return;
-    const names = Object.keys(window.STORE_INFO||{}).filter(n=>!n.startsWith('(폐점)')).sort();
+    if(!dl) return;
+    const names = (window.ALL || (typeof ALL !== 'undefined' ? ALL : []))
+      .map(b=>b.name).filter(Boolean).sort();
     dl.innerHTML = names.map(n=>`<option value="${n}"></option>`).join('');
+  }
+  // STORE_INFO는 접두어가 붙은 이름을 키로 쓰므로, 정규화한 이름으로 매칭해서 조회
+  function getStoreInfoByNameNormalized(name){
+    if(!window.__storeInfoNormMap){
+      window.__storeInfoNormMap = {};
+      Object.keys(window.STORE_INFO||{}).forEach(k=>{
+        window.__storeInfoNormMap[normalizeStoreNameForManagerMatch(k)] = window.STORE_INFO[k];
+      });
+    }
+    const key = normalizeStoreNameForManagerMatch(name);
+    return window.__storeInfoNormMap.hasOwnProperty(key) ? window.__storeInfoNormMap[key] : null;
   }
 
   function renderRoyaltyBadge(count){
@@ -4110,7 +4125,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     renderRoyaltyBadge(list.length);
     document.getElementById('royaltyTableTitle').textContent = `미입금 매장 목록 (${list.length}곳)`;
     document.getElementById('royaltyTableBody').innerHTML = list.length ? list.map((it,idx)=>{
-      const info = (window.STORE_INFO||{})[it.store] || {};
+      const info = getStoreInfoByNameNormalized(it.store) || {};
       const manager = (typeof mkStoreManager === 'function') ? mkStoreManager(it.store) : null;
       return `
       <tr>
