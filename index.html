@@ -3473,13 +3473,26 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     if(avg < 40000000) return '3000to4000';
     return 'gte4000';
   }
-  // 매장별 담당자(ALL 26년 데이터 기준) 조회 - 마케팅 데이터엔 담당자가 비어있어서 매장명으로 매칭
+  // 매장명 표기 차이 흡수용 정규화: "복호두 " 접두어, 공백, (폐점) 표시 등을 제거하고 비교
+  // 예) "복호두 광주 수완점" (STORE_INFO/로열티 입력용 이름) === "광주수완점" (ALL 매출데이터 이름)
+  function normalizeStoreNameForManagerMatch(name){
+    if(!name) return '';
+    return String(name)
+      .replace(/^\(폐점\)/, '')
+      .replace(/복호두\s*/g, '')
+      .replace(/\s+/g, '')
+      .trim();
+  }
+  // 매장별 담당자(ALL 26년 데이터 기준) 조회 - 마케팅 데이터/로열티 데이터엔 담당자가 비어있어서 매장명으로 매칭
   function mkStoreManager(name){
     if(!window.__mkManagerMap){
       window.__mkManagerMap = {};
-      (window.ALL || (typeof ALL !== 'undefined' ? ALL : [])).forEach(b=>{ window.__mkManagerMap[b.name] = b.manager || null; });
+      (window.ALL || (typeof ALL !== 'undefined' ? ALL : [])).forEach(b=>{
+        window.__mkManagerMap[normalizeStoreNameForManagerMatch(b.name)] = b.manager || null;
+      });
     }
-    return window.__mkManagerMap.hasOwnProperty(name) ? window.__mkManagerMap[name] : null;
+    const key = normalizeStoreNameForManagerMatch(name);
+    return window.__mkManagerMap.hasOwnProperty(key) ? window.__mkManagerMap[key] : null;
   }
   function mkPopulateManagerSel(){
     const sel = document.getElementById('mkManagerSel');
