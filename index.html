@@ -801,7 +801,7 @@ body.hide-names .store-name:hover{
           </div>
 
           <div style="margin-top:20px;padding-top:16px;border-top:0.5px solid #1e3347;">
-            <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:8px;">⚖️ 출시 초기(25년 12월~26년 2월) vs 최근(3~6월) 비중 비교 — 카니발리즘 핵심 지표</div>
+            <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:8px;">⚖️ 출시 전(25년 9~11월) vs 출시 초기(12월~26년 2월) vs 최근(3~6월) 비중 비교 — 카니발리즘 핵심 지표</div>
             <div style="font-size:11px;color:#6b8fa8;margin-bottom:12px;">각 맛의 비중이 최근 감소했다면(음수, 빨간색) 레드벨벳이 해당 맛의 수요를 잠식했을 가능성이 있습니다. 12월은 추정치가 일부 포함됩니다.</div>
             <div id="cannibalPeriodTable" style="overflow-x:auto;"></div>
           </div>
@@ -4643,6 +4643,14 @@ function renderMenuAnalysisChart() {
 }
 
 // ── 7번 탭: 기본메뉴(앙버터/팥/레몬버터/딸기) + 신메뉴(레드벨벳) 카니발리즘 ──
+// 레드벨벳 출시 전(25년 9~11월) 상품명별 전사 합산 판매량 — 매장 구분 없이 전체 합계로 제공된 데이터
+// 레드벨벳 출시 전이므로 레드벨벳 관련 상품은 존재하지 않음(0)
+const CANNIBAL_PRELAUNCH_MONTHLY = {
+  '9월': { '팥 20개': 43838, '앙버터 20개': 89463, '팥/앙버터(20개)': 61571, '레몬버터 20개': 7618, '팥/레몬버터(20개)': 4482, '앙버터/레몬버터(20개)': 11127, '딸기버터 호두과자': 3175, '팥앙금/딸기버터 호두과자': 2402, '앙버터/딸기버터 호두과자': 8203, '레몬버터/딸기버터 호두과자': 6180, '팥 간식용 11개': 19000, '답례품(딸기)': 246, '답례품(레몬/딸기)': 921, '답례품(앙버터/딸기)': 2701, '답례품(팥/딸기)': 773, '답례품(팥앙금)': 16685, '답례품(팥/앙버터)': 98321, '답례품(앙버터)': 14544, '답례품(팥/레몬)': 2136, '답례품(앙버터/레몬)': 3330, '답례품(레몬)': 418 },
+  '10월': { '팥 20개': 46642, '앙버터 20개': 108899, '팥/앙버터(20개)': 67249, '레몬버터 20개': 8577, '팥/레몬버터(20개)': 5122, '앙버터/레몬버터(20개)': 12571, '딸기버터 호두과자': 3613, '팥앙금/딸기버터 호두과자': 2805, '앙버터/딸기버터 호두과자': 9960, '레몬버터/딸기버터 호두과자': 6798, '팥 간식용 11개': 19344, '답례품(딸기)': 272, '답례품(레몬/딸기)': 607, '답례품(앙버터/딸기)': 3007, '답례품(팥/딸기)': 2059, '답례품(팥앙금)': 16410, '답례품(팥/앙버터)': 81614, '답례품(앙버터)': 16458, '답례품(팥/레몬)': 2113, '답례품(앙버터/레몬)': 3375, '답례품(레몬)': 564 },
+  '11월': { '팥 20개': 44445, '앙버터 20개': 114547, '팥/앙버터(20개)': 66855, '레몬버터 20개': 8112, '팥/레몬버터(20개)': 5001, '앙버터/레몬버터(20개)': 12068, '딸기버터 호두과자': 3811, '팥앙금/딸기버터 호두과자': 2729, '앙버터/딸기버터 호두과자': 9982, '레몬버터/딸기버터 호두과자': 7328, '팥 간식용 11개': 20387, '답례품(딸기)': 295, '답례품(레몬/딸기)': 985, '답례품(앙버터/딸기)': 4093, '답례품(팥/딸기)': 997, '답례품(팥앙금)': 18422, '답례품(팥/앙버터)': 100656, '답례품(앙버터)': 20662, '답례품(팥/레몬)': 4264, '답례품(앙버터/레몬)': 2759, '답례품(레몬)': 519 }
+};
+
 const CANNIBAL_CATEGORIES = ['앙버터', '팥', '레몬버터', '딸기', '레드벨벳'];
 const CANNIBAL_COLORS = { '앙버터': '#f0a04a', '팥': '#e05555', '레몬버터': '#facc15', '딸기': '#f472b6', '레드벨벳': '#c026d3' };
 // 레몬버터 계열은 답례품에서 "레몬"으로만 표기되는 경우가 있어 함께 매칭.
@@ -4979,6 +4987,29 @@ function renderCannibalStackedBarChart() {
   renderCannibalPctTable('cannibalStackedTable', withPct, (d, c) => d.pct[c]);
 }
 
+// 레드벨벳 출시 전(25년 9~11월) 3개월 평균 비중 — 매장 구분 없는 전사 합산 데이터 기반
+function computeCannibalPreLaunchAvgPct() {
+  const months = Object.keys(CANNIBAL_PRELAUNCH_MONTHLY);
+  const sumTotals = {};
+  CANNIBAL_CATEGORIES.forEach(c => sumTotals[c] = 0);
+  months.forEach(m => {
+    const data = CANNIBAL_PRELAUNCH_MONTHLY[m];
+    Object.entries(data).forEach(([name, qty]) => {
+      if (qty <= 0) return;
+      const matched = cannibalMatchCategories(name);
+      if (!matched.length) return;
+      const share = qty / matched.length;
+      matched.forEach(c => sumTotals[c] += share);
+    });
+  });
+  const avgTotals = {};
+  CANNIBAL_CATEGORIES.forEach(c => avgTotals[c] = sumTotals[c] / months.length);
+  const grand = CANNIBAL_CATEGORIES.reduce((s, c) => s + avgTotals[c], 0);
+  const pct = {};
+  CANNIBAL_CATEGORIES.forEach(c => { pct[c] = grand ? (avgTotals[c] / grand * 100) : 0; });
+  return { totals: avgTotals, pct };
+}
+
 // 레드벨벳 도입 전(1~3월) vs 도입 후(4~6월) 평균 비중 비교 — 카니발리즘 핵심 지표 테이블
 function renderCannibalPeriodTable() {
   const el = document.getElementById('cannibalPeriodTable');
@@ -4988,30 +5019,36 @@ function renderCannibalPeriodTable() {
   const before = monthly.filter(d => d.month <= 2 && d.hasData); // 출시 초기: 12월~2월
   const after = monthly.filter(d => d.month >= 3 && d.hasData); // 최근: 3월~6월
   const avgPct = (arr, c) => arr.length ? arr.reduce((s, d) => s + d.pct[c], 0) / arr.length : 0;
+  const preLaunch = computeCannibalPreLaunchAvgPct(); // 출시 전: 25년 9~11월 평균 (레드벨벳 없음)
 
-  let html = `<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:420px;">
+  let html = `<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:520px;">
     <thead><tr>
       <th style="text-align:left;padding:6px 8px;color:#6b8fa8;font-weight:600;border-bottom:1px solid #1e3347;">카테고리</th>
+      <th style="text-align:right;padding:6px 8px;color:#6b8fa8;font-weight:600;border-bottom:1px solid #1e3347;">출시 전 평균(9~11월)</th>
       <th style="text-align:right;padding:6px 8px;color:#6b8fa8;font-weight:600;border-bottom:1px solid #1e3347;">출시 초기 평균(12~2월)</th>
       <th style="text-align:right;padding:6px 8px;color:#6b8fa8;font-weight:600;border-bottom:1px solid #1e3347;">최근 평균(3~6월)</th>
-      <th style="text-align:right;padding:6px 8px;color:#6b8fa8;font-weight:600;border-bottom:1px solid #1e3347;">변동(%p)</th>
+      <th style="text-align:right;padding:6px 8px;color:#6b8fa8;font-weight:600;border-bottom:1px solid #1e3347;">변동(출시전→출시초기, %p)</th>
     </tr></thead><tbody>`;
   CANNIBAL_CATEGORIES.forEach(c => {
+    const p = preLaunch.pct[c];
     const b = avgPct(before, c);
     const a = avgPct(after, c);
-    const diff = a - b;
+    const diff = b - p;
     const diffColor = c === '레드벨벳' ? '#c026d3' : (diff < 0 ? '#e05555' : '#4ade80');
     const sign = diff >= 0 ? '+' : '';
+    const preShown = c === '레드벨벳' ? '0.0%(출시 전)' : p.toFixed(1) + '%';
     html += `<tr>
       <td style="padding:6px 8px;color:#e0f0ff;font-weight:600;white-space:nowrap;">
         <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${CANNIBAL_COLORS[c]};margin-right:6px;vertical-align:middle;"></span>${c}
       </td>
+      <td style="text-align:right;padding:6px 8px;color:#c8dff0;">${preShown}</td>
       <td style="text-align:right;padding:6px 8px;color:#c8dff0;">${before.length ? b.toFixed(1) + '%' : '-'}</td>
       <td style="text-align:right;padding:6px 8px;color:#c8dff0;">${after.length ? a.toFixed(1) + '%' : '-'}</td>
-      <td style="text-align:right;padding:6px 8px;color:${diffColor};font-weight:700;">${before.length && after.length ? sign + diff.toFixed(1) + '%p' : '-'}</td>
+      <td style="text-align:right;padding:6px 8px;color:${diffColor};font-weight:700;">${before.length ? sign + diff.toFixed(1) + '%p' : '-'}</td>
     </tr>`;
   });
-  html += `</tbody></table>`;
+  html += `</tbody></table>
+  <div style="font-size:9.5px;color:#5f7d95;margin-top:8px;">* 9~11월 데이터는 매장 구분 없는 전사 합산치이며, 해당 기간에는 레드벨벳이 아직 출시되지 않아 판매량이 없습니다(0%).</div>`;
   el.innerHTML = html;
 }
 
