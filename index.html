@@ -775,7 +775,7 @@ body.hide-names .store-name:hover{
         <!-- 7번 탭: 기본메뉴(앙버터/팥/레몬버터/딸기) + 신메뉴(레드벨벳) 카니발리즘 -->
         <div id="maTab-7" class="ma-tab-panel" style="display:none;">
           <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:4px;">🍽️ 기본메뉴(앙버터·팥·레몬버터·딸기) + 신메뉴(레드벨벳) 카니발리즘 분석</div>
-          <div style="font-size:11px;color:#6b8fa8;margin-bottom:14px;">레드벨벳은 4월부터 등장한 신메뉴입니다. 기존 4개 맛의 비중이 레드벨벳 도입 이후 얼마나 잠식됐는지 확인하는 탭입니다.</div>
+          <div style="font-size:11px;color:#6b8fa8;margin-bottom:14px;">레드벨벳은 25년 12월에 출시된 신메뉴입니다(12월 데이터는 6번 탭과 동일하게 실제 레드벨벳 판매량 + 나머지 맛 1·2월 평균 추정치 기준, * 표시). 기존 4개 맛의 비중이 레드벨벳 출시 이후 얼마나 잠식됐는지 확인하는 탭입니다.</div>
 
           <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
             <div style="position:relative;width:260px;height:260px;flex-shrink:0;">
@@ -801,8 +801,8 @@ body.hide-names .store-name:hover{
           </div>
 
           <div style="margin-top:20px;padding-top:16px;border-top:0.5px solid #1e3347;">
-            <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:8px;">⚖️ 레드벨벳 도입 전(1~3월) vs 도입 후(4~6월) 비중 비교 — 카니발리즘 핵심 지표</div>
-            <div style="font-size:11px;color:#6b8fa8;margin-bottom:12px;">각 맛의 비중이 도입 후 감소했다면(음수, 빨간색) 레드벨벳이 해당 맛의 수요를 잠식했을 가능성이 있습니다.</div>
+            <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:8px;">⚖️ 출시 초기(25년 12월~26년 2월) vs 최근(3~6월) 비중 비교 — 카니발리즘 핵심 지표</div>
+            <div style="font-size:11px;color:#6b8fa8;margin-bottom:12px;">각 맛의 비중이 최근 감소했다면(음수, 빨간색) 레드벨벳이 해당 맛의 수요를 잠식했을 가능성이 있습니다. 12월은 추정치가 일부 포함됩니다.</div>
             <div id="cannibalPeriodTable" style="overflow-x:auto;"></div>
           </div>
         </div>
@@ -4658,13 +4658,45 @@ function cannibalMatchCategories(name) {
 }
 
 function computeCannibalTotals() {
-  const data = MENU_DATA_BY_MONTH[0] || [];
   const totals = {};
   CANNIBAL_CATEGORIES.forEach(c => totals[c] = 0);
-  data.forEach(row => {
-    const name = row['상품명'] || '';
-    const qty = row['수량'] || 0;
-    if (qty <= 0) return;
+  // 25년 12월(레드벨벳 출시월) 추정 데이터 포함
+  const decTotals = computeCannibalDecTotals();
+  CANNIBAL_CATEGORIES.forEach(c => totals[c] += decTotals[c]);
+  [1, 2, 3, 4, 5, 6].forEach(m => {
+    const data = MENU_DATA_BY_MONTH[m] || [];
+    data.forEach(row => {
+      const name = row['상품명'] || '';
+      const qty = row['수량'] || 0;
+      if (qty <= 0) return;
+      const matched = cannibalMatchCategories(name);
+      if (!matched.length) return;
+      const share = qty / matched.length;
+      matched.forEach(c => totals[c] += share);
+    });
+  });
+  return totals;
+}
+
+// 25년 12월(레드벨벳 출시월) 카테고리별 판매량 추정
+// - 레드벨벳: REDVELVET_DEC_TOTAL_QTY의 실제 12월 판매량 사용 (콤보 상품은 매칭 카테고리 수만큼 분배)
+// - 나머지 4개 맛(앙버터/팥/레몬버터/딸기): 12월 전체 메뉴 데이터가 없어 1월·2월 평균으로 추정
+function computeCannibalDecTotals() {
+  const totals = {};
+  CANNIBAL_CATEGORIES.forEach(c => totals[c] = 0);
+  [1, 2].forEach(m => {
+    const data = MENU_DATA_BY_MONTH[m] || [];
+    data.forEach(row => {
+      const name = row['상품명'] || '';
+      const qty = row['수량'] || 0;
+      if (qty <= 0) return;
+      const matched = cannibalMatchCategories(name);
+      if (!matched.length || matched.includes('레드벨벳')) return; // 레드벨벳 관련 상품은 실제 12월 데이터로 대체하므로 제외
+      const share = qty / matched.length / 2;
+      matched.forEach(c => totals[c] += share);
+    });
+  });
+  Object.entries(REDVELVET_DEC_TOTAL_QTY).forEach(([name, qty]) => {
     const matched = cannibalMatchCategories(name);
     if (!matched.length) return;
     const share = qty / matched.length;
@@ -4691,20 +4723,35 @@ function computeCannibalMonthlyPercents() {
     return totals;
   });
 
-  return months.map((m, i) => {
+  const monthEntries = months.map((m, i) => {
     const totals = perMonthTotals[i];
     const grand = CANNIBAL_CATEGORIES.reduce((s, c) => s + totals[c], 0);
     const pct = {};
     CANNIBAL_CATEGORIES.forEach(c => { pct[c] = grand ? (totals[c] / grand * 100) : 0; });
-    return { month: m, hasData: !!MENU_DATA_BY_MONTH[m], totals, pct };
+    return { month: m, label: `${m}월`, hasData: !!MENU_DATA_BY_MONTH[m], totals, pct };
   });
+
+  // 25년 12월(레드벨벳 실제 출시월) 추정 데이터를 맨 앞에 추가
+  const decTotals = computeCannibalDecTotals();
+  const decGrand = CANNIBAL_CATEGORIES.reduce((s, c) => s + decTotals[c], 0);
+  const decPct = {};
+  CANNIBAL_CATEGORIES.forEach(c => { decPct[c] = decGrand ? (decTotals[c] / decGrand * 100) : 0; });
+  const decEntry = { month: 0, label: '25년 12월*', hasData: true, totals: decTotals, pct: decPct };
+
+  return [decEntry, ...monthEntries];
 }
 
 function computeCannibalCumulativeTotals() {
   const months = [1, 2, 3, 4, 5, 6];
   const running = {};
   CANNIBAL_CATEGORIES.forEach(c => running[c] = 0);
-  return months.map(m => {
+
+  // 25년 12월(레드벨벳 실제 출시월) 추정치를 누적의 시작점으로 포함
+  const decTotals = computeCannibalDecTotals();
+  CANNIBAL_CATEGORIES.forEach(c => running[c] += decTotals[c]);
+  const decEntry = { month: 0, label: '25년 12월*', hasData: true, cumulative: { ...running } };
+
+  const monthEntries = months.map(m => {
     const data = MENU_DATA_BY_MONTH[m] || [];
     data.forEach(row => {
       const name = row['상품명'] || '';
@@ -4715,8 +4762,10 @@ function computeCannibalCumulativeTotals() {
       const share = qty / matched.length;
       matched.forEach(c => running[c] += share);
     });
-    return { month: m, hasData: !!MENU_DATA_BY_MONTH[m], cumulative: { ...running } };
+    return { month: m, label: `${m}월`, hasData: !!MENU_DATA_BY_MONTH[m], cumulative: { ...running } };
   });
+
+  return [decEntry, ...monthEntries];
 }
 
 let cannibalPieChartInst = null;
@@ -4775,7 +4824,7 @@ function renderCannibalPieChart() {
 function renderCannibalPctTable(containerId, monthly, getPct) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  const cols = monthly.map(d => `${d.month}월`);
+  const cols = monthly.map(d => d.label || `${d.month}월`);
   let html = `<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:480px;">
     <thead><tr>
       <th style="text-align:left;padding:5px 8px;color:#6b8fa8;font-weight:600;border-bottom:1px solid #1e3347;">카테고리</th>
@@ -4804,7 +4853,7 @@ function renderCannibalBarChart() {
   if (cannibalBarChartInst) { try { cannibalBarChartInst.destroy(); } catch (e) {} cannibalBarChartInst = null; }
 
   const monthly = computeCannibalMonthlyPercents();
-  const labels = monthly.map(d => `${d.month}월`);
+  const labels = monthly.map(d => d.label || `${d.month}월`);
   const datasets = CANNIBAL_CATEGORIES.map(c => ({
     label: c,
     data: monthly.map(d => Math.round(d.pct[c] * 10) / 10),
@@ -4869,7 +4918,7 @@ function renderCannibalStackedBarChart() {
     CANNIBAL_CATEGORIES.forEach(c => { pct[c] = grand ? (d.cumulative[c] / grand * 100) : 0; });
     return { ...d, grand, pct };
   });
-  const labels = withPct.map(d => `${d.month}월`);
+  const labels = withPct.map(d => d.label || `${d.month}월`);
   const datasets = CANNIBAL_CATEGORIES.map(c => ({
     label: c,
     data: withPct.map(d => Math.round(d.cumulative[c])),
@@ -4935,15 +4984,16 @@ function renderCannibalPeriodTable() {
   const el = document.getElementById('cannibalPeriodTable');
   if (!el) return;
   const monthly = computeCannibalMonthlyPercents();
-  const before = monthly.filter(d => d.month <= 3 && d.hasData);
-  const after = monthly.filter(d => d.month >= 4 && d.hasData);
+  // month: 0=25년12월(추정 포함), 1~6=26년 1~6월
+  const before = monthly.filter(d => d.month <= 2 && d.hasData); // 출시 초기: 12월~2월
+  const after = monthly.filter(d => d.month >= 3 && d.hasData); // 최근: 3월~6월
   const avgPct = (arr, c) => arr.length ? arr.reduce((s, d) => s + d.pct[c], 0) / arr.length : 0;
 
   let html = `<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:420px;">
     <thead><tr>
       <th style="text-align:left;padding:6px 8px;color:#6b8fa8;font-weight:600;border-bottom:1px solid #1e3347;">카테고리</th>
-      <th style="text-align:right;padding:6px 8px;color:#6b8fa8;font-weight:600;border-bottom:1px solid #1e3347;">도입 전 평균(1~3월)</th>
-      <th style="text-align:right;padding:6px 8px;color:#6b8fa8;font-weight:600;border-bottom:1px solid #1e3347;">도입 후 평균(4~6월)</th>
+      <th style="text-align:right;padding:6px 8px;color:#6b8fa8;font-weight:600;border-bottom:1px solid #1e3347;">출시 초기 평균(12~2월)</th>
+      <th style="text-align:right;padding:6px 8px;color:#6b8fa8;font-weight:600;border-bottom:1px solid #1e3347;">최근 평균(3~6월)</th>
       <th style="text-align:right;padding:6px 8px;color:#6b8fa8;font-weight:600;border-bottom:1px solid #1e3347;">변동(%p)</th>
     </tr></thead><tbody>`;
   CANNIBAL_CATEGORIES.forEach(c => {
