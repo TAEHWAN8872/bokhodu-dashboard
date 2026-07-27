@@ -5078,20 +5078,26 @@ function computeCannibalPreLaunchAvgPct() {
   const monthly = computeCannibalMonthlyPercents();
   const arr = monthly.filter(d => cfg.preMonths.includes(d.month) && d.hasData);
   const pct = {};
-  CANNIBAL_CATEGORIES.forEach(c => { pct[c] = arr.length ? arr.reduce((s, d) => s + d.pct[c], 0) / arr.length : 0; });
-  return { pct };
+  const totals = {};
+  CANNIBAL_CATEGORIES.forEach(c => {
+    pct[c] = arr.length ? arr.reduce((s, d) => s + d.pct[c], 0) / arr.length : 0;
+    totals[c] = arr.length ? arr.reduce((s, d) => s + d.totals[c], 0) / arr.length : 0;
+  });
+  return { pct, totals };
 }
 
 // 신메뉴 도입 전 vs 도입 초기 vs 최근 평균 비중 비교 — 카니발리즘 핵심 지표 테이블
 function renderCannibalPeriodTable() {
   const el = document.getElementById('cannibalPeriodTable');
   if (!el) return;
+  const unit = cannibalUnitLabel();
   const cfg = CANNIBAL_PRODUCT_CONFIGS[cannibalProduct];
   const monthly = computeCannibalMonthlyPercents();
   // month: 레드벨벳은 0=25년12월(추정 포함), 1~6=26년 1~6월. 그 외 신메뉴는 1~6월만 존재.
   const early = monthly.filter(d => cfg.earlyMonths.includes(d.month) && d.hasData); // 출시 초기
   const recent = monthly.filter(d => cfg.recentMonths.includes(d.month) && d.hasData); // 최근
   const avgPct = (arr, c) => arr.length ? arr.reduce((s, d) => s + d.pct[c], 0) / arr.length : 0;
+  const avgVal = (arr, c) => arr.length ? arr.reduce((s, d) => s + d.totals[c], 0) / arr.length : 0;
   const preLaunch = computeCannibalPreLaunchAvgPct(); // 출시 전 평균
 
   let html = `<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:520px;">
@@ -5104,19 +5110,25 @@ function renderCannibalPeriodTable() {
     </tr></thead><tbody>`;
   CANNIBAL_CATEGORIES.forEach(c => {
     const p = preLaunch.pct[c];
+    const pVal = preLaunch.totals ? preLaunch.totals[c] : 0;
     const b = avgPct(early, c);
+    const bVal = avgVal(early, c);
     const a = avgPct(recent, c);
+    const aVal = avgVal(recent, c);
     const diff = b - p;
     const diffColor = c === cannibalProduct ? cfg.color : (diff < 0 ? '#e05555' : '#4ade80');
     const sign = diff >= 0 ? '+' : '';
-    const preShown = c === cannibalProduct ? '0.0%(출시 전)' : p.toFixed(1) + '%';
+    const fmt = (val, pctVal, isZero) => isZero
+      ? `0${unit}<br><span style="color:#6b8fa8;font-size:10px;">(출시 전)</span>`
+      : `${Math.round(val).toLocaleString()}${unit}<br><span style="color:#6b8fa8;font-size:10px;">${pctVal.toFixed(1)}%</span>`;
+    const preShown = c === cannibalProduct ? fmt(0, 0, true) : fmt(pVal, p, false);
     html += `<tr>
       <td style="padding:6px 8px;color:#e0f0ff;font-weight:600;white-space:nowrap;">
         <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${CANNIBAL_COLORS[c]};margin-right:6px;vertical-align:middle;"></span>${c}
       </td>
-      <td style="text-align:right;padding:6px 8px;color:#c8dff0;">${preShown}</td>
-      <td style="text-align:right;padding:6px 8px;color:#c8dff0;">${early.length ? b.toFixed(1) + '%' : '-'}</td>
-      <td style="text-align:right;padding:6px 8px;color:#c8dff0;">${recent.length ? a.toFixed(1) + '%' : '-'}</td>
+      <td style="text-align:right;padding:6px 8px;color:#c8dff0;line-height:1.5;">${preShown}</td>
+      <td style="text-align:right;padding:6px 8px;color:#c8dff0;line-height:1.5;">${early.length ? fmt(bVal, b, false) : '-'}</td>
+      <td style="text-align:right;padding:6px 8px;color:#c8dff0;line-height:1.5;">${recent.length ? fmt(aVal, a, false) : '-'}</td>
       <td style="text-align:right;padding:6px 8px;color:${diffColor};font-weight:700;">${early.length ? sign + diff.toFixed(1) + '%p' : '-'}</td>
     </tr>`;
   });
