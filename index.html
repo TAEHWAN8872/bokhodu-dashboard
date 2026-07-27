@@ -4699,11 +4699,9 @@ function cannibalMatchCategories(name) {
 function computeCannibalTotals() {
   const totals = {};
   CANNIBAL_CATEGORIES.forEach(c => totals[c] = 0);
-  // 25년 12월(레드벨벳 출시월) 추정 데이터 포함 — 레드벨벳 선택 시에만 해당
-  if (CANNIBAL_PRODUCT_CONFIGS[cannibalProduct].hasDecEstimate) {
-    const decTotals = computeCannibalDecTotals();
-    CANNIBAL_CATEGORIES.forEach(c => totals[c] += decTotals[c]);
-  }
+  // 25년 12월 추정 데이터 포함 — 신메뉴 선택과 무관하게 항상 포함(해당 신메뉴가 아직 출시 전이면 0으로 반영됨)
+  const decTotals = computeCannibalDecTotals();
+  CANNIBAL_CATEGORIES.forEach(c => totals[c] += decTotals[c]);
   [1, 2, 3, 4, 5, 6].forEach(m => {
     const data = MENU_DATA_BY_MONTH[m] || [];
     data.forEach(row => {
@@ -4719,31 +4717,33 @@ function computeCannibalTotals() {
   return totals;
 }
 
-// 25년 12월(레드벨벳 출시월) 카테고리별 판매량 추정
-// - 레드벨벳: REDVELVET_DEC_TOTAL_QTY의 실제 12월 판매량 사용 (콤보 상품은 매칭 카테고리 수만큼 분배)
-// - 나머지 4개 맛(앙버터/팥/레몬버터/딸기): 12월 전체 메뉴 데이터가 없어 1월·2월 평균으로 추정
+// 25년 12월 카테고리별 판매량 추정 — 신메뉴 선택과 무관하게 항상 계산
+// - 앙버터/팥/레몬버터/딸기: 12월 전체 메뉴 데이터가 없어 1월·2월 평균으로 추정
+// - 레드벨벳: 25년 12월 실제 출시 데이터(REDVELVET_DEC_TOTAL_QTY) 사용 (CANNIBAL_CATEGORIES에 포함된 경우, 메인 상품이든 쑥 탭의 비교 카테고리든)
+// - 쑥/청사과: 아직 출시 전이므로 12월 판매량은 0
 function computeCannibalDecTotals() {
   const totals = {};
   CANNIBAL_CATEGORIES.forEach(c => totals[c] = 0);
-  if (!CANNIBAL_PRODUCT_CONFIGS[cannibalProduct].hasDecEstimate) return totals; // 쑥/청사과는 12월 추정 데이터가 존재하지 않음(레드벨벳 전용)
   [1, 2].forEach(m => {
     const data = MENU_DATA_BY_MONTH[m] || [];
     data.forEach(row => {
       const name = row['상품명'] || '';
       const qty = row['수량'] || 0;
       if (qty <= 0) return;
-      const matched = cannibalMatchCategories(name);
-      if (!matched.length || matched.includes(cannibalProduct)) return; // 신메뉴 관련 상품은 실제 12월 데이터로 대체하므로 제외
+      const matched = cannibalMatchCategories(name).filter(c => c !== '레드벨벳'); // 레드벨벳은 아래 실제 12월 데이터로 대체
+      if (!matched.length) return;
       const share = qty / matched.length / 2;
       matched.forEach(c => totals[c] += share);
     });
   });
-  Object.entries(REDVELVET_DEC_TOTAL_QTY).forEach(([name, qty]) => {
-    const matched = cannibalMatchCategories(name);
-    if (!matched.length) return;
-    const share = qty / matched.length;
-    matched.forEach(c => totals[c] += share);
-  });
+  if (CANNIBAL_CATEGORIES.includes('레드벨벳')) {
+    Object.entries(REDVELVET_DEC_TOTAL_QTY).forEach(([name, qty]) => {
+      const matched = cannibalMatchCategories(name);
+      if (!matched.length) return;
+      const share = qty / matched.length;
+      matched.forEach(c => totals[c] += share);
+    });
+  }
   return totals;
 }
 
@@ -4773,8 +4773,7 @@ function computeCannibalMonthlyPercents() {
     return { month: m, label: `${m}월`, hasData: !!MENU_DATA_BY_MONTH[m], totals, pct };
   });
 
-  // 25년 12월(레드벨벳 실제 출시월) 추정 데이터를 맨 앞에 추가 — 레드벨벳 선택 시에만
-  if (!CANNIBAL_PRODUCT_CONFIGS[cannibalProduct].hasDecEstimate) return monthEntries;
+  // 25년 12월 추정 데이터를 맨 앞에 추가 — 신메뉴 선택과 무관하게 항상 포함
   const decTotals = computeCannibalDecTotals();
   const decGrand = CANNIBAL_CATEGORIES.reduce((s, c) => s + decTotals[c], 0);
   const decPct = {};
@@ -4789,13 +4788,11 @@ function computeCannibalCumulativeTotals() {
   const running = {};
   CANNIBAL_CATEGORIES.forEach(c => running[c] = 0);
 
-  // 25년 12월(레드벨벳 실제 출시월) 추정치를 누적의 시작점으로 포함 — 레드벨벳 선택 시에만
+  // 25년 12월 추정치를 누적의 시작점으로 포함 — 신메뉴 선택과 무관하게 항상 포함
   const entries = [];
-  if (CANNIBAL_PRODUCT_CONFIGS[cannibalProduct].hasDecEstimate) {
-    const decTotals = computeCannibalDecTotals();
-    CANNIBAL_CATEGORIES.forEach(c => running[c] += decTotals[c]);
-    entries.push({ month: 0, label: '25년 12월*', hasData: true, cumulative: { ...running } });
-  }
+  const decTotals = computeCannibalDecTotals();
+  CANNIBAL_CATEGORIES.forEach(c => running[c] += decTotals[c]);
+  entries.push({ month: 0, label: '25년 12월*', hasData: true, cumulative: { ...running } });
 
   const monthEntries = months.map(m => {
     const data = MENU_DATA_BY_MONTH[m] || [];
@@ -5100,7 +5097,8 @@ function renderCannibalPeriodTable() {
   html += `</tbody></table>
   <div style="font-size:9.5px;color:#5f7d95;margin-top:8px;">${cfg.hasDecEstimate
     ? '* 9~11월 데이터는 매장 구분 없는 전사 합산치이며, 해당 기간에는 레드벨벳이 아직 출시되지 않아 판매량이 없습니다(0%).'
-    : `* ${cannibalProduct}은(는) ${cfg.launchLabel}에 출시된 신메뉴입니다. 출시 전 기간에는 판매량이 없어 0%로 표시됩니다.`}</div>`;
+    : `* ${cannibalProduct}은(는) ${cfg.launchLabel}에 출시된 신메뉴입니다. 출시 전 기간에는 판매량이 없어 0%로 표시됩니다.`}<br>
+  * 25년 12월 데이터 중 앙버터/팥/레몬버터/딸기는 12월 전체 데이터가 없어 1·2월 평균으로 추정했고, 레드벨벳은 12월 실제 출시 데이터를 사용했습니다. ${cannibalProduct !== '레드벨벳' ? `${cannibalProduct}은(는) 12월 시점 미출시로 0%입니다.` : ''}</div>`;
   el.innerHTML = html;
 }
 
