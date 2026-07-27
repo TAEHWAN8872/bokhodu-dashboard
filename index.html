@@ -4660,8 +4660,10 @@ const CANNIBAL_PRODUCT_CONFIGS = {
     periodLabels: { pre: '출시 전 평균(9~11월)', early: '출시 초기 평균(12~2월)', recent: '최근 평균(3~6월)' },
     preMonths: [], earlyMonths: [0, 1, 2], recentMonths: [3, 4, 5, 6] },
   '쑥': { emoji: '🌿', color: '#4ade80', keywords: ['쑥'], launchLabel: '26년 3월', hasDecEstimate: false,
-    periodLabels: { pre: '출시 전 평균(1~2월)', early: '출시 초기 평균(3~4월)', recent: '최근 평균(5~6월)' },
-    preMonths: [1, 2], earlyMonths: [3, 4], recentMonths: [5, 6] },
+    periodLabels: { pre: '출시 전 평균(12~2월)', early: '출시 초기 평균(3~5월)', recent: '최근 평균(6~8월)' },
+    preMonths: [0, 1, 2], earlyMonths: [3, 4, 5], recentMonths: [6, 7, 8],
+    // 쑥 탭에서는 레드벨벳도 함께 누적 비교 — 레드벨벳은 25년 12월 출시라 26년 1~6월 전 구간에 실데이터 존재
+    extraCategories: [{ name: '레드벨벳', color: '#c026d3', keywords: ['레드벨벳'] }] },
   '청사과': { emoji: '🍏', color: '#38bdf8', keywords: ['청사과'], launchLabel: '26년 6월', hasDecEstimate: false,
     periodLabels: { pre: '출시 전 평균(1~5월)', early: '출시월(6월)', recent: '출시월(6월)' },
     preMonths: [1, 2, 3, 4, 5], earlyMonths: [6], recentMonths: [6] }
@@ -4682,6 +4684,12 @@ function updateCannibalCategoryConfig() {
     '딸기': ['딸기'],
     [cannibalProduct]: cfg.keywords
   };
+  // 신메뉴 탭 중 일부(예: 쑥)는 다른 신메뉴(예: 레드벨벳)도 함께 누적 비교 대상에 포함
+  (cfg.extraCategories || []).forEach(ec => {
+    CANNIBAL_CATEGORIES.push(ec.name);
+    CANNIBAL_COLORS[ec.name] = ec.color;
+    CANNIBAL_MATCH_KEYWORDS[ec.name] = ec.keywords;
+  });
 }
 updateCannibalCategoryConfig();
 function cannibalMatchCategories(name) {
@@ -5108,16 +5116,17 @@ function renderCannibalProductToggle() {
 
 function updateCannibalTexts() {
   const cfg = CANNIBAL_PRODUCT_CONFIGS[cannibalProduct];
+  const newMenuLabel = [cannibalProduct, ...(cfg.extraCategories || []).map(e => e.name)].join('·');
   const titleEl = document.getElementById('cannibalTitle');
   const descEl = document.getElementById('cannibalDesc');
   const barTitleEl = document.getElementById('cannibalBarTitle');
   const periodTitleEl = document.getElementById('cannibalPeriodTitle');
   const periodDescEl = document.getElementById('cannibalPeriodDesc');
-  if (titleEl) titleEl.textContent = `🍽️ 기본메뉴(앙버터·팥·레몬버터·딸기) + 신메뉴(${cannibalProduct}) 카니발리즘 분석`;
-  if (descEl) descEl.textContent = `${cannibalProduct}은(는) ${cfg.launchLabel}에 출시된 신메뉴입니다. 기존 4개 맛의 비중이 ${cannibalProduct} 출시 이후 얼마나 잠식됐는지 확인하는 탭입니다.`;
-  if (barTitleEl) barTitleEl.textContent = `📊 월별 비중 추이 (%기준) — ${cannibalProduct} 등장 이후 다른 맛의 비중 변화 확인`;
+  if (titleEl) titleEl.textContent = `🍽️ 기본메뉴(앙버터·팥·레몬버터·딸기) + 신메뉴(${newMenuLabel}) 카니발리즘 분석`;
+  if (descEl) descEl.textContent = `${cannibalProduct}은(는) ${cfg.launchLabel}에 출시된 신메뉴입니다. 기존 4개 맛의 비중이 ${newMenuLabel} 출시 이후 얼마나 잠식됐는지 확인하는 탭입니다.`;
+  if (barTitleEl) barTitleEl.textContent = `📊 월별 비중 추이 (%기준) — ${newMenuLabel} 등장 이후 다른 맛의 비중 변화 확인`;
   if (periodTitleEl) periodTitleEl.textContent = `⚖️ ${cfg.periodLabels.pre} vs ${cfg.periodLabels.early} vs ${cfg.periodLabels.recent} 비중 비교 — 카니발리즘 핵심 지표`;
-  if (periodDescEl) periodDescEl.textContent = `각 맛의 비중이 최근 감소했다면(음수, 빨간색) ${cannibalProduct}이(가) 해당 맛의 수요를 잠식했을 가능성이 있습니다.${cfg.hasDecEstimate ? ' 12월은 추정치가 일부 포함됩니다.' : ''}`;
+  if (periodDescEl) periodDescEl.textContent = `각 맛의 비중이 최근 감소했다면(음수, 빨간색) ${newMenuLabel}이(가) 해당 맛의 수요를 잠식했을 가능성이 있습니다.${cfg.hasDecEstimate ? ' 12월은 추정치가 일부 포함됩니다.' : ''}`;
 }
 
 function setCannibalProduct(key) {
