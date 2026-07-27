@@ -776,7 +776,10 @@ body.hide-names .store-name:hover{
         <div id="maTab-7" class="ma-tab-panel" style="display:none;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
             <div id="cannibalTitle" style="font-size:12px;color:#7eb8e8;font-weight:700;">🍽️ 기본메뉴(앙버터·팥·레몬버터·딸기) + 신메뉴(레드벨벳) 카니발리즘 분석</div>
-            <div id="cannibalProductToggle" style="display:flex;gap:4px;"></div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <div id="cannibalMetricToggle" style="display:flex;gap:4px;"></div>
+              <div id="cannibalProductToggle" style="display:flex;gap:4px;"></div>
+            </div>
           </div>
           <div id="cannibalDesc" style="font-size:11px;color:#6b8fa8;margin-bottom:14px;">레드벨벳은 25년 12월에 출시된 신메뉴입니다. 기존 4개 맛의 비중이 레드벨벳 출시 이후 얼마나 잠식됐는지 확인하는 탭입니다.</div>
 
@@ -796,7 +799,7 @@ body.hide-names .store-name:hover{
           </div>
 
           <div style="margin-top:20px;padding-top:16px;border-top:0.5px solid #1e3347;">
-            <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:12px;">📈 월별 누적 판매량 추이 (개수 기준 · 비중 % 함께 표시)</div>
+            <div id="cannibalStackedTitle" style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:12px;">📈 월별 누적 판매량 추이 (개수 기준 · 비중 % 함께 표시)</div>
             <div style="position:relative;height:260px;">
               <canvas id="cannibalStackedBarChart"></canvas>
             </div>
@@ -4669,6 +4672,10 @@ const CANNIBAL_PRODUCT_CONFIGS = {
     preMonths: [1, 2, 3, 4, 5], earlyMonths: [6], recentMonths: [6] }
 };
 let cannibalProduct = '레드벨벳';
+let cannibalMetric = 'qty'; // 'qty' | 'amt'
+function cannibalValue(name, qty) {
+  return cannibalMetric === 'amt' ? qty * (PRICE_MAP[name] || 0) : qty;
+}
 let CANNIBAL_CATEGORIES = [];
 let CANNIBAL_COLORS = {};
 let CANNIBAL_MATCH_KEYWORDS = {};
@@ -4710,7 +4717,7 @@ function computeCannibalTotals() {
       if (qty <= 0) return;
       const matched = cannibalMatchCategories(name);
       if (!matched.length) return;
-      const share = qty / matched.length;
+      const share = cannibalValue(name, qty) / matched.length;
       matched.forEach(c => totals[c] += share);
     });
   });
@@ -4732,7 +4739,7 @@ function computeCannibalDecTotals() {
       if (qty <= 0) return;
       const matched = cannibalMatchCategories(name).filter(c => c !== '레드벨벳'); // 레드벨벳은 아래 실제 12월 데이터로 대체
       if (!matched.length) return;
-      const share = qty / matched.length / 2;
+      const share = cannibalValue(name, qty) / matched.length / 2;
       matched.forEach(c => totals[c] += share);
     });
   });
@@ -4740,7 +4747,7 @@ function computeCannibalDecTotals() {
     Object.entries(REDVELVET_DEC_TOTAL_QTY).forEach(([name, qty]) => {
       const matched = cannibalMatchCategories(name);
       if (!matched.length) return;
-      const share = qty / matched.length;
+      const share = cannibalValue(name, qty) / matched.length;
       matched.forEach(c => totals[c] += share);
     });
   }
@@ -4759,7 +4766,7 @@ function computeCannibalMonthlyPercents() {
       if (qty <= 0) return;
       const matched = cannibalMatchCategories(name);
       if (!matched.length) return;
-      const share = qty / matched.length;
+      const share = cannibalValue(name, qty) / matched.length;
       matched.forEach(c => totals[c] += share);
     });
     return totals;
@@ -4802,13 +4809,17 @@ function computeCannibalCumulativeTotals() {
       if (qty <= 0) return;
       const matched = cannibalMatchCategories(name);
       if (!matched.length) return;
-      const share = qty / matched.length;
+      const share = cannibalValue(name, qty) / matched.length;
       matched.forEach(c => running[c] += share);
     });
     return { month: m, label: `${m}월`, hasData: !!MENU_DATA_BY_MONTH[m], cumulative: { ...running } };
   });
 
   return [...entries, ...monthEntries];
+}
+
+function cannibalUnitLabel() {
+  return cannibalMetric === 'amt' ? '원' : '개';
 }
 
 let cannibalPieChartInst = null;
@@ -4842,7 +4853,7 @@ function renderCannibalPieChart() {
             label: (ctx) => {
               const v = ctx.parsed;
               const pct = grand ? (v / grand * 100).toFixed(1) : '0.0';
-              return `${ctx.label}: ${Math.round(v).toLocaleString()}개 (${pct}%)`;
+              return `${ctx.label}: ${Math.round(v).toLocaleString()}${cannibalUnitLabel()} (${pct}%)`;
             }
           }
         }
@@ -4857,7 +4868,7 @@ function renderCannibalPieChart() {
       return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;">
         <span style="width:10px;height:10px;border-radius:3px;background:${colors[i]};flex-shrink:0;"></span>
         <span style="color:#c8dff0;min-width:60px;">${c}</span>
-        <span style="color:#e0f0ff;font-weight:700;margin-left:auto;">${v.toLocaleString()}개</span>
+        <span style="color:#e0f0ff;font-weight:700;margin-left:auto;">${v.toLocaleString()}${cannibalUnitLabel()}</span>
         <span style="color:#7eb8e8;font-weight:700;width:52px;text-align:right;">${pct}%</span>
       </div>`;
     }).join('');
@@ -4986,7 +4997,7 @@ function renderCannibalStackedBarChart() {
         y: {
           stacked: true,
           beginAtZero: true,
-          ticks: { color: '#6b8fa8', font: { size: 10 }, callback: (v) => v.toLocaleString() + '개' },
+          ticks: { color: '#6b8fa8', font: { size: 10 }, callback: (v) => v.toLocaleString() + cannibalUnitLabel() },
           grid: { color: 'rgba(255,255,255,0.05)' }
         }
       },
@@ -5011,7 +5022,7 @@ function renderCannibalStackedBarChart() {
             label: (ctx) => {
               const d = withPct[ctx.dataIndex];
               const pct = d.pct[ctx.dataset.label];
-              return `${ctx.dataset.label}: ${Math.round(ctx.parsed.y).toLocaleString()}개 (누적, ${pct.toFixed(1)}%)`;
+              return `${ctx.dataset.label}: ${Math.round(ctx.parsed.y).toLocaleString()}${cannibalUnitLabel()} (누적, ${pct.toFixed(1)}%)`;
             }
           }
         }
@@ -5037,7 +5048,7 @@ function computeCannibalPreLaunchAvgPct() {
         if (qty <= 0) return;
         const matched = cannibalMatchCategories(name);
         if (!matched.length) return;
-        const share = qty / matched.length;
+        const share = cannibalValue(name, qty) / matched.length;
         matched.forEach(c => sumTotals[c] += share);
       });
     });
@@ -5118,13 +5129,36 @@ function updateCannibalTexts() {
   const titleEl = document.getElementById('cannibalTitle');
   const descEl = document.getElementById('cannibalDesc');
   const barTitleEl = document.getElementById('cannibalBarTitle');
+  const stackedTitleEl = document.getElementById('cannibalStackedTitle');
   const periodTitleEl = document.getElementById('cannibalPeriodTitle');
   const periodDescEl = document.getElementById('cannibalPeriodDesc');
+  const unitWord = cannibalMetric === 'amt' ? '매출금액' : '판매수량';
   if (titleEl) titleEl.textContent = `🍽️ 기본메뉴(앙버터·팥·레몬버터·딸기) + 신메뉴(${newMenuLabel}) 카니발리즘 분석`;
   if (descEl) descEl.textContent = `${cannibalProduct}은(는) ${cfg.launchLabel}에 출시된 신메뉴입니다. 기존 4개 맛의 비중이 ${newMenuLabel} 출시 이후 얼마나 잠식됐는지 확인하는 탭입니다.`;
   if (barTitleEl) barTitleEl.textContent = `📊 월별 비중 추이 (%기준) — ${newMenuLabel} 등장 이후 다른 맛의 비중 변화 확인`;
+  if (stackedTitleEl) stackedTitleEl.textContent = `📈 월별 누적 ${unitWord} 추이 (${cannibalMetric === 'amt' ? '원' : '개수'} 기준 · 비중 % 함께 표시)`;
   if (periodTitleEl) periodTitleEl.textContent = `⚖️ ${cfg.periodLabels.pre} vs ${cfg.periodLabels.early} vs ${cfg.periodLabels.recent} 비중 비교 — 카니발리즘 핵심 지표`;
   if (periodDescEl) periodDescEl.textContent = `각 맛의 비중이 최근 감소했다면(음수, 빨간색) ${newMenuLabel}이(가) 해당 맛의 수요를 잠식했을 가능성이 있습니다.${cfg.hasDecEstimate ? ' 12월은 추정치가 일부 포함됩니다.' : ''}`;
+}
+
+// ── 7번 탭: 수량/금액 지표 토글 ──
+function renderCannibalMetricToggle() {
+  const el = document.getElementById('cannibalMetricToggle');
+  if (!el) return;
+  const options = [{ v: 'qty', l: '수량' }, { v: 'amt', l: '금액' }];
+  el.innerHTML = options.map(o =>
+    `<div class="analysis-tab${cannibalMetric === o.v ? ' active' : ''}" onclick="setCannibalMetric('${o.v}')">${o.l}</div>`
+  ).join('');
+}
+
+function setCannibalMetric(mode) {
+  cannibalMetric = mode;
+  renderCannibalMetricToggle();
+  updateCannibalTexts();
+  renderCannibalPieChart();
+  renderCannibalBarChart();
+  renderCannibalStackedBarChart();
+  renderCannibalPeriodTable();
 }
 
 function setCannibalProduct(key) {
@@ -6446,6 +6480,7 @@ function switchMenuAnalysisSubtab(n) {
     renderNewMenuPositionTab();
   } else if (n === 7) {
     renderCannibalProductToggle();
+    renderCannibalMetricToggle();
     updateCannibalTexts();
     renderCannibalPieChart();
     renderCannibalBarChart();
