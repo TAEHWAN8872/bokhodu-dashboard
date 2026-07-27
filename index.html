@@ -4902,7 +4902,7 @@ function renderCannibalPctTable(containerId, monthly, getPct, getVal) {
         if (getVal) {
           const raw = getVal(d, c);
           const valStr = Math.round(raw).toLocaleString() + unit;
-          shown = `${valStr}<br><span style="color:#6b8fa8;font-size:10px;">${p.toFixed(1)}%</span>`;
+          shown = `<span style="font-size:13px;font-weight:800;color:#facc15;">${p.toFixed(1)}%</span><br><span style="color:#6b8fa8;font-size:10px;">${valStr}</span>`;
         } else {
           shown = p.toFixed(1) + '%';
         }
@@ -5119,8 +5119,8 @@ function renderCannibalPeriodTable() {
     const diffColor = c === cannibalProduct ? cfg.color : (diff < 0 ? '#e05555' : '#4ade80');
     const sign = diff >= 0 ? '+' : '';
     const fmt = (val, pctVal, isZero) => isZero
-      ? `0${unit}<br><span style="color:#6b8fa8;font-size:10px;">(출시 전)</span>`
-      : `${Math.round(val).toLocaleString()}${unit}<br><span style="color:#6b8fa8;font-size:10px;">${pctVal.toFixed(1)}%</span>`;
+      ? `<span style="font-size:13px;font-weight:800;color:#facc15;">0.0%</span><br><span style="color:#6b8fa8;font-size:10px;">(출시 전)</span>`
+      : `<span style="font-size:13px;font-weight:800;color:#facc15;">${pctVal.toFixed(1)}%</span><br><span style="color:#6b8fa8;font-size:10px;">${Math.round(val).toLocaleString()}${unit}</span>`;
     const preShown = c === cannibalProduct ? fmt(0, 0, true) : fmt(pVal, p, false);
     html += `<tr>
       <td style="padding:6px 8px;color:#e0f0ff;font-weight:600;white-space:nowrap;">
