@@ -4700,7 +4700,12 @@ function updateCannibalCategoryConfig() {
 }
 updateCannibalCategoryConfig();
 function cannibalMatchCategories(name) {
-  return CANNIBAL_CATEGORIES.filter(c => CANNIBAL_MATCH_KEYWORDS[c].some(kw => name.includes(kw)));
+  const matched = CANNIBAL_CATEGORIES.filter(c => CANNIBAL_MATCH_KEYWORDS[c].some(kw => name.includes(kw)));
+  // "쑥&앙버터 호두과자"처럼 신메뉴+기존메뉴 콤보 상품명은 기존메뉴와 절반씩 나누지 않고
+  // 신메뉴(쑥/레드벨벳/청사과) 쪽으로 전량 귀속시킨다 — 6번 탭(신메뉴 포지션)과 동일한 집계 기준.
+  const newMenuNames = [cannibalProduct, ...(CANNIBAL_PRODUCT_CONFIGS[cannibalProduct].extraCategories || []).map(ec => ec.name)];
+  const newMenuMatched = matched.filter(c => newMenuNames.includes(c));
+  return newMenuMatched.length ? newMenuMatched : matched;
 }
 
 function computeCannibalTotals() {
