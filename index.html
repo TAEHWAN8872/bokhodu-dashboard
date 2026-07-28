@@ -580,6 +580,7 @@ body.hide-names .store-name:hover{
       <div style="font-size:26px;margin-bottom:6px;">📤</div>
       <div style="font-size:13px;color:#c8dff0;font-weight:600;" id="rtDropText">여기로 매출 엑셀 파일(.xlsx)을 끌어다 놓거나 클릭해서 업로드하세요</div>
       <div style="font-size:11px;color:#6b8fa8;margin-top:4px;" id="rtDropSub">파일을 넣으면 오늘 날짜에 맞는 담당 매장 매출이 자동으로 표시됩니다</div>
+      <div style="font-size:10.5px;color:#facc15;margin-top:8px;">📌 사용법: ACON 판매관리 &gt; 매장별 판매분석 &gt; 일자/매장별 판매분석 다운로드 파일 업로드</div>
       <input type="file" id="rtFileInput" accept=".xlsx,.xls" style="display:none;" onchange="window.handleRtFileSelect(event)">
     </div>
 
@@ -607,7 +608,10 @@ body.hide-names .store-name:hover{
         <button class="upload-btn" id="rtQuick30Btn" style="display:none;flex-shrink:0;cursor:pointer;white-space:nowrap;" onclick="window.setRtQuickRange(30)">최근 30일</button>
         <button class="upload-btn" id="rtQuickAllBtn" style="display:none;flex-shrink:0;cursor:pointer;white-space:nowrap;" onclick="window.setRtQuickRange('all')">전체기간</button>
         <span style="font-size:11px;color:#6b8fa8;margin-left:8px;white-space:nowrap;flex-shrink:0;" id="rtFileLabel"></span>
-        <button class="upload-btn" style="margin-left:auto;flex-shrink:0;cursor:pointer;white-space:nowrap;" onclick="document.getElementById('rtFileInput').click()">📤 다른 파일 업로드</button>
+        <div style="margin-left:auto;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+          <button class="upload-btn" style="cursor:pointer;white-space:nowrap;" onclick="document.getElementById('rtFileInput').click()">📤 다른 파일 업로드</button>
+          <div style="font-size:9.5px;color:#facc15;white-space:nowrap;">📌 ACON 판매관리 &gt; 매장별 판매분석 &gt; 일자/매장별 판매분석 다운로드</div>
+        </div>
       </div>
 
       <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
