@@ -9684,10 +9684,21 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     return { stores, dateList };
   }
 
-  // 매출 현황판(ALL)에서 매장명 -> 담당자/지역 매핑을 만든다 (동일 매장명 기준 매칭)
+  // 매장명 표기 차이 흡수용 정규화 (다른 탭의 normalizeStoreNameForManagerMatch와 동일 규칙)
+  // 예) "복호두 광주 수완점"(실시간 매출 엑셀 표기) === "광주수완점"(ALL 매출데이터 이름)
+  function rtNormalizeStoreName(name){
+    if(!name) return '';
+    return String(name)
+      .replace(/^\(폐점\)/, '')
+      .replace(/복호두\s*/g, '')
+      .replace(/\s+/g, '')
+      .trim();
+  }
+
+  // 매출 현황판(ALL)에서 매장명 -> 담당자/지역 매핑을 만든다 (정규화한 매장명 기준 매칭)
   function buildMgrRegionMap(){
     const map = {};
-    (window.ALL||[]).forEach(b=>{ map[b.name] = { manager: b.manager, region: b.region }; });
+    (window.ALL||[]).forEach(b=>{ map[rtNormalizeStoreName(b.name)] = { manager: b.manager, region: b.region }; });
     return map;
   }
 
@@ -9802,7 +9813,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     wrap.style.display='';
 
     let rows = window.__RT_DATA.stores.map(s=>{
-      const info = mgrmap[s.name] || {manager:'미배정', region:'-'};
+      const info = mgrmap[rtNormalizeStoreName(s.name)] || {manager:'미배정', region:'-'};
       const d = s.byDate[date] || {net:null, cnt:null};
       return { name:s.name, code:s.code, manager:info.manager, region:info.region, net:d.net, cnt:d.cnt, closed: (d.net===null || d.net===0) };
     });
