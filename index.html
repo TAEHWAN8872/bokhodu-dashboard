@@ -624,6 +624,12 @@ body.hide-names .store-name:hover{
         <div class="tabs" id="rtRegionTabs" style="margin-bottom:0;"></div>
       </div>
 
+      <!-- 주차별 탭 (조회일자가 속한 달 기준 자동 생성, 월~일 기준) -->
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center;" id="rtWeekRow">
+        <span style="font-size:10px;color:#6b8fa8;white-space:nowrap;" id="rtWeekMonthLabel">주&nbsp;&nbsp;&nbsp;&nbsp;차</span>
+        <div class="tabs" id="rtWeekTabs" style="margin-bottom:0;"></div>
+      </div>
+
       <!-- KPI -->
       <div class="kpi-row" id="rtKpiRow" style="margin-bottom:14px;"></div>
 
@@ -9666,6 +9672,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   window.__rtMode = 'day';
   window.__rtRangeStart = null;
   window.__rtRangeEnd = null;
+  window.__rtActiveWeek = null; // 선택된 주차 (담당자/지역 탭 아래 자동 생성되는 주차 탭)
 
   // ── 오늘 날짜 (YYYY-MM-DD, 로컬 기준) ──
   window.__rtTodayStr = function(){
@@ -9692,6 +9699,89 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     const d = new Date(utcMs);
     const y = d.getUTCFullYear(), m = String(d.getUTCMonth()+1).padStart(2,'0'), day = String(d.getUTCDate()).padStart(2,'0');
     return `${y}-${m}-${day}`;
+  }
+
+  // ── 주차(월~일) 계산 유틸 ──
+  // 규칙: 월~일 1주 단위이며, 그 주의 "수요일"이 속한 달이 그 주의 소속 달이 된다.
+  // (예: 7/1이 수요일 → 6/29(월)~7/5(일)은 수요일이 7월 → 7월 1주차.
+  //  7/1이 목요일 → 6/28(월)~7/4(일)은 수요일이 6/30(6월) → 6월 마지막 주차, 7월 1주차는 다음주 월요일부터.)
+  function rtParseYMD(str){
+    const [y,m,d] = String(str).split('-').map(Number);
+    return new Date(y, m-1, d);
+  }
+  function rtFmtYMD(date){
+    const y = date.getFullYear(), m = String(date.getMonth()+1).padStart(2,'0'), d = String(date.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+  function rtAddDays(date, n){
+    const d = new Date(date);
+    d.setDate(d.getDate()+n);
+    return d;
+  }
+  // 해당 연/월에 속하는 주(월~일) 목록을 시간순으로 반환
+  function rtMonthWeeks(year, month){
+    const targetKey = year*12 + (month-1);
+    let cur = new Date(year, month-1, 1);
+    cur.setDate(cur.getDate()-10); // 넉넉히 이전으로 이동
+    const dow = (cur.getDay()+6)%7; // 월=0 ... 일=6
+    cur.setDate(cur.getDate()-dow); // 그 주의 월요일로 정렬
+    const weeks = [];
+    let guard = 0;
+    while(guard++ < 20){
+      const wed = rtAddDays(cur, 2);
+      const key = wed.getFullYear()*12 + wed.getMonth();
+      if(key === targetKey){
+        weeks.push({ start: new Date(cur), end: rtAddDays(cur, 6) });
+      } else if(key > targetKey){
+        break;
+      }
+      cur = rtAddDays(cur, 7);
+    }
+    return weeks;
+  }
+
+  // 특정 주차의 "월마감예상 매출" 계산
+  // 방식: 선택한 주차 중 "이번 달"에 해당하는 마지막 날짜(주가 전월/익월로 걸치면 이번 달 범위로 클리핑)까지의
+  // 누적매출을 경과일수로 나눠 일평균을 낸 뒤, 월 전체일수를 곱함.
+  // (예: 1주차=6/29~7/5 → 7월분(7/1~7/5)만 누적, 경과일수=5 / 2주차=7/6~7/12 → 경과일수=12)
+  function computeRtMonthProjection(wk, filter, regionFilter, search){
+    const year = wk.year, month = wk.month;
+    const monthStartStr = rtFmtYMD(new Date(year, month-1, 1));
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const monthEndStr = rtFmtYMD(new Date(year, month-1, daysInMonth));
+    // 선택한 주차의 종료일을 "이번 달" 범위로 클리핑 (주가 전월/익월로 걸치는 경우 대비)
+    let weekEndInMonth = wk.endStr;
+    if(weekEndInMonth > monthEndStr) weekEndInMonth = monthEndStr;
+    if(weekEndInMonth < monthStartStr) weekEndInMonth = monthStartStr;
+
+    const allDates = (window.__RT_DATA && window.__RT_DATA.dateList) || [];
+    // 실제 업로드된 데이터 중 weekEndInMonth를 넘지 않는 가장 최근 날짜를 기준일로 사용 (아직 데이터 없는 미래 날짜 방지)
+    let asOfDate = null;
+    for(let i=allDates.length-1;i>=0;i--){
+      if(allDates[i] <= weekEndInMonth){ asOfDate = allDates[i]; break; }
+    }
+    const monthLabel = `${year}년 ${month}월`;
+    if(!asOfDate || asOfDate < monthStartStr){
+      return { available:false, monthLabel, daysInMonth };
+    }
+    const elapsedDays = rtParseYMD(asOfDate).getDate();
+    const mgrmap = window.__RT_MGRMAP || {};
+    let cumulative = 0;
+    (window.__RT_DATA.stores || []).forEach(s=>{
+      const info = mgrmap[rtNormalizeStoreName(s.name)] || {manager:'미배정', region:'-'};
+      if(filter && filter!=='all' && info.manager!==filter) return;
+      if(regionFilter && regionFilter!=='all' && info.region!==regionFilter) return;
+      if(search && !s.name.includes(search)) return;
+      Object.keys(s.byDate).forEach(d=>{
+        if(d>=monthStartStr && d<=asOfDate){
+          const day = s.byDate[d];
+          if(day && day.net!==null) cumulative += day.net;
+        }
+      });
+    });
+    const dailyAvg = elapsedDays>0 ? cumulative/elapsedDays : 0;
+    const projected = dailyAvg * daysInMonth;
+    return { available:true, cumulative, elapsedDays, daysInMonth, dailyAvg, projected, monthLabel, asOfDate };
   }
 
   // 매출.xlsx 특유의 구조를 파싱:
@@ -9785,6 +9875,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         window.__rtCurrentFilter = 'all';
         window.__rtCurrentRegionFilter = 'all';
         window.__rtSortOption = 'default';
+        window.__rtActiveWeek = null;
         document.getElementById('rtDropzone').style.display = 'none';
         document.getElementById('rtContent').style.display = '';
         label.textContent = `📄 ${file.name} · ${parsed.stores.length}개 매장 · ${parsed.dateList[0]} ~ ${parsed.dateList[parsed.dateList.length-1]}`;
@@ -9827,16 +9918,21 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   window.setRtDate = function(dateStr){
     if(!window.__RT_DATA) return;
     if(!dateStr) return;
+    window.__rtActiveWeek = null;
     window.__rtSelectedDate = dateStr;
     document.getElementById('rtDateInput').value = dateStr;
+    rtSyncWeekBaseMonth(dateStr);
     renderRtTabs();
     window.renderRtTable();
   };
 
   // 시작일(rtDateInput) 값이 바뀔 때: 일별 모드면 조회일자로, 기간별 모드면 시작일로 처리
   window.onRtStartDateChange = function(v){
+    window.__rtActiveWeek = null;
     if(window.__rtMode === 'range'){
       window.__rtRangeStart = v;
+      rtSyncWeekBaseMonth(v);
+      renderRtWeekTabs();
       window.renderRtTable();
     } else {
       window.setRtDate(v);
@@ -9845,14 +9941,14 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 
   // 종료일(rtDateInputEnd) 값이 바뀔 때
   window.onRtEndDateChange = function(v){
+    window.__rtActiveWeek = null;
     window.__rtRangeEnd = v;
+    renderRtWeekTabs();
     window.renderRtTable();
   };
 
-  // 조회모드 전환: 일별 <-> 기간별
-  window.setRtMode = function(mode){
-    window.__rtMode = mode;
-    const isRange = mode === 'range';
+  // 조회모드(일별/기간별) UI 토글 (버튼/라벨/입력창 표시 전환만 담당)
+  function applyRtModeUI(isRange){
     document.getElementById('rtModeDayBtn').classList.toggle('active', !isRange);
     document.getElementById('rtModeRangeBtn').classList.toggle('active', isRange);
     document.getElementById('rtDateLabel').textContent = isRange ? '조회기간' : '조회일자';
@@ -9864,6 +9960,14 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     document.getElementById('rtQuickAllBtn').style.display = isRange ? '' : 'none';
     document.getElementById('rtColAmountLabel').textContent = isRange ? '순판매금액(기간합계)' : '순판매금액(오늘)';
     document.getElementById('rtColCntLabel').textContent = isRange ? '주문횟수(합계)' : '주문횟수';
+  }
+
+  // 조회모드 전환: 일별 <-> 기간별
+  window.setRtMode = function(mode){
+    window.__rtActiveWeek = null;
+    window.__rtMode = mode;
+    const isRange = mode === 'range';
+    applyRtModeUI(isRange);
 
     if(isRange && window.__RT_DATA){
       // 기간별 모드로 처음 전환 시 기본값: 현재 선택된 날짜 ~ 최근 7일
@@ -9876,12 +9980,14 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     } else if(!isRange){
       document.getElementById('rtDateInput').value = window.__rtSelectedDate || '';
     }
+    renderRtWeekTabs();
     window.renderRtTable();
   };
 
   // 빠른 기간 선택: 최근 n일 또는 전체기간('all')
   window.setRtQuickRange = function(n){
     if(!window.__RT_DATA) return;
+    window.__rtActiveWeek = null;
     const dates = window.__RT_DATA.dateList;
     let start, end;
     if(n === 'all'){
@@ -9896,6 +10002,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     window.__rtRangeEnd = end;
     document.getElementById('rtDateInput').value = start;
     document.getElementById('rtDateInputEnd').value = end;
+    rtSyncWeekBaseMonth(end);
+    renderRtWeekTabs();
     window.renderRtTable();
   };
 
@@ -9945,7 +10053,73 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     }
 
     updateRtTabActive();
+    renderRtWeekTabs();
   }
+
+  // 조회일자(일별 모드) 또는 조회기간 시작일(기간별 모드)이 속한 달 기준으로 1~5주차 탭을 자동 생성
+  // 주의: 주차 탭을 클릭한 뒤에는 그 주가 이전 달로 걸쳐도(예: 1주차가 6/29~7/5) 기준월이 바뀌면 안 되므로,
+  // 기준월은 window.__rtWeekBaseMonth에 별도로 고정해두고, "사용자가 직접" 날짜/기간을 바꿀 때만 갱신한다.
+  function renderRtWeekTabs(){
+    const rowEl = document.getElementById('rtWeekRow');
+    const el = document.getElementById('rtWeekTabs');
+    if(!el || !rowEl) return;
+    if(!window.__RT_DATA){ rowEl.style.display = 'none'; return; }
+    rowEl.style.display = '';
+
+    if(!window.__rtWeekBaseMonth){
+      const baseStr = (window.__rtMode === 'range' ? (window.__rtRangeStart || window.__rtSelectedDate) : window.__rtSelectedDate) || window.__rtTodayStr();
+      rtSyncWeekBaseMonth(baseStr);
+    }
+    const { year, month } = window.__rtWeekBaseMonth;
+
+    const weeks = rtMonthWeeks(year, month);
+    window.__rtWeekList = weeks.map((w,i)=>({
+      weekNum: i+1,
+      year, month,
+      startStr: rtFmtYMD(w.start),
+      endStr: rtFmtYMD(w.end)
+    }));
+
+    const active = window.__rtActiveWeek;
+    const labelEl = document.getElementById('rtWeekMonthLabel');
+    if(labelEl) labelEl.textContent = `${month}월 주차`;
+
+    const tabsHtml = window.__rtWeekList.map((w,i)=>{
+      const isActive = !!(active && active.year===w.year && active.month===w.month && active.weekNum===w.weekNum);
+      return `<div class="tab${isActive?' active':''}" data-color="전체" title="${w.startStr} ~ ${w.endStr}" onclick="window.setRtWeekFilter(${i})">${w.weekNum}주차</div>`;
+    }).join('');
+    const allActive = !active;
+    el.innerHTML = tabsHtml + `<div class="tab${allActive?' active':''}" data-color="전체" onclick="window.clearRtWeekFilter()">전체</div>`;
+  }
+
+  // 주차 기준월을 특정 날짜가 속한 달로 동기화 (사용자가 직접 날짜/기간을 바꿀 때만 호출)
+  function rtSyncWeekBaseMonth(dateStr){
+    if(!dateStr) return;
+    const d = rtParseYMD(dateStr);
+    window.__rtWeekBaseMonth = { year: d.getFullYear(), month: d.getMonth()+1 };
+  }
+
+  // 주차 탭 클릭: 해당 주(월~일)를 기간별 조회로 전환 (기준월(__rtWeekBaseMonth)은 건드리지 않는다)
+  window.setRtWeekFilter = function(idx){
+    const w = window.__rtWeekList && window.__rtWeekList[idx];
+    if(!w) return;
+    window.__rtActiveWeek = w;
+    window.__rtMode = 'range';
+    window.__rtRangeStart = w.startStr;
+    window.__rtRangeEnd = w.endStr;
+    applyRtModeUI(true);
+    document.getElementById('rtDateInput').value = w.startStr;
+    document.getElementById('rtDateInputEnd').value = w.endStr;
+    renderRtWeekTabs();
+    window.renderRtTable();
+  };
+
+  // 주차 선택 해제
+  window.clearRtWeekFilter = function(){
+    window.__rtActiveWeek = null;
+    renderRtWeekTabs();
+    window.renderRtTable();
+  };
 
   function updateRtTabActive(){
     const mgrs = window.__rtTabMgrs || [];
@@ -10168,6 +10342,27 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       {label:'기간 총매출(순판매)', val: fmtWon(total), color:'#e0f0ff'},
       {label:'매장 평균매출', val: fmtWon(avg), color:'#7eb8e8'},
     ];
+
+    // 주차 탭이 선택된 경우: 주차 일평균매출(매장당) + 월마감예상 매출 카드 추가
+    const wk = window.__rtActiveWeek;
+    if(wk){
+      const storeCount = rows.length; // 담당 매장수(휴무 포함 전체)
+      const rangeDates = (window.__RT_DATA.dateList || []).filter(d=> d>=start && d<=end);
+      const dayCount = rangeDates.length;
+      const dayAvg = (storeCount>0 && dayCount>0) ? Math.round(total/storeCount/dayCount) : 0;
+      cards.push({label:`${wk.weekNum}주차 일평균매출(매장당)`, val: fmtWon(dayAvg), color:'#facc15'});
+
+      const filter = window.__rtCurrentFilter || 'all';
+      const regionFilter = window.__rtCurrentRegionFilter || 'all';
+      const search = (document.getElementById('rtSearch').value||'').trim();
+      const proj = computeRtMonthProjection(wk, filter, regionFilter, search);
+      if(proj.available){
+        cards.push({label:`${proj.monthLabel} 마감예상 매출`, val: fmtWon(proj.projected), color:'#a855f7'});
+      } else {
+        cards.push({label:`${proj.monthLabel} 마감예상 매출`, val: '데이터 없음', color:'#6b8fa8'});
+      }
+    }
+
     renderRtKpiCards(cards);
   }
 
