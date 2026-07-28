@@ -10010,20 +10010,11 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       const badge = r.closed
         ? `<span class="badge fl">휴무</span>`
         : `<span class="badge ok">영업</span>`;
-      const mgrColor = (filter!=='all' && r.manager===filter) ? (RT_MGR_COLORS[r.manager]||'#aac4e0') : '#aac4e0';
-      const regColor = (regionFilter!=='all' && r.region===regionFilter) ? (RT_REGION_COLORS[r.region]||'#aac4e0') : '#aac4e0';
-      const mgrWeight = (filter!=='all' && r.manager===filter) ? '700' : '400';
-      const regWeight = (regionFilter!=='all' && r.region===regionFilter) ? '700' : '400';
-      // 담당자 탭을 클릭해 필터링된 상태면 담당자 색으로, 지역 탭이면 지역 색으로 행 전체를 강조
-      const hlColor = (filter!=='all') ? (RT_MGR_COLORS[filter]||null) : ((regionFilter!=='all') ? (RT_REGION_COLORS[regionFilter]||null) : null);
-      const rowStyle = hlColor
-        ? `border-bottom:0.5px solid #16232f;background:${rtHexToRgba(hlColor,0.12)};border-left:3px solid ${hlColor};`
-        : `border-bottom:0.5px solid #16232f;`;
-      return `<tr style="${rowStyle}">
+      return `<tr style="border-bottom:0.5px solid #16232f;">
         <td style="padding:6px 8px;color:#6b8fa8;text-align:center;white-space:nowrap;">${i+1}</td>
-        <td style="padding:6px 8px;text-align:center;color:${hlColor||'#c8dff0'};font-weight:${hlColor?'700':'400'};" class="store-name">${r.name}</td>
-        <td style="padding:6px 8px;text-align:center;color:${mgrColor};font-weight:${mgrWeight};">${r.manager}</td>
-        <td style="padding:6px 8px;text-align:center;color:${regColor};font-weight:${regWeight};">${r.region}</td>
+        <td style="padding:6px 8px;text-align:center;" class="store-name">${r.name}</td>
+        <td style="padding:6px 8px;text-align:center;color:#aac4e0;">${r.manager}</td>
+        <td style="padding:6px 8px;text-align:center;color:#aac4e0;">${r.region}</td>
         <td style="padding:6px 8px;text-align:right;font-weight:600;color:${r.closed?'#6b8fa8':'#e0f0ff'};">${r.closed?'-':fmtWon(r.net)}</td>
         <td style="padding:6px 8px;text-align:right;color:#aac4e0;">${(r.cnt!==null&&r.cnt!==undefined)?r.cnt.toLocaleString():'-'}</td>
         <td style="padding:6px 8px;text-align:center;">${badge}</td>
@@ -10108,22 +10099,16 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 
     const body = document.getElementById('rtTableBody');
     body.innerHTML = rows.map((r,i)=>{
+      const closedDays = r.totalDays - r.openDays;
       const badge = r.closed
         ? `<span class="badge fl">전체휴무</span>`
-        : `<span class="badge ok">영업 ${r.openDays}/${r.totalDays}일</span>`;
-      const mgrColor = (filter!=='all' && r.manager===filter) ? (RT_MGR_COLORS[r.manager]||'#aac4e0') : '#aac4e0';
-      const regColor = (regionFilter!=='all' && r.region===regionFilter) ? (RT_REGION_COLORS[r.region]||'#aac4e0') : '#aac4e0';
-      const mgrWeight = (filter!=='all' && r.manager===filter) ? '700' : '400';
-      const regWeight = (regionFilter!=='all' && r.region===regionFilter) ? '700' : '400';
-      const hlColor = (filter!=='all') ? (RT_MGR_COLORS[filter]||null) : ((regionFilter!=='all') ? (RT_REGION_COLORS[regionFilter]||null) : null);
-      const rowStyle = hlColor
-        ? `border-bottom:0.5px solid #16232f;background:${rtHexToRgba(hlColor,0.12)};border-left:3px solid ${hlColor};`
-        : `border-bottom:0.5px solid #16232f;`;
-      return `<tr style="${rowStyle}">
+        : `<span class="badge ok">영업 <b style="color:#facc15;">${r.openDays}</b>/${r.totalDays}일</span>` +
+          (closedDays>0 ? ` <span class="badge fl" style="margin-left:4px;">휴무 ${closedDays}일</span>` : '');
+      return `<tr style="border-bottom:0.5px solid #16232f;">
         <td style="padding:6px 8px;color:#6b8fa8;text-align:center;white-space:nowrap;">${i+1}</td>
-        <td style="padding:6px 8px;text-align:center;color:${hlColor||'#c8dff0'};font-weight:${hlColor?'700':'400'};" class="store-name">${r.name}</td>
-        <td style="padding:6px 8px;text-align:center;color:${mgrColor};font-weight:${mgrWeight};">${r.manager}</td>
-        <td style="padding:6px 8px;text-align:center;color:${regColor};font-weight:${regWeight};">${r.region}</td>
+        <td style="padding:6px 8px;text-align:center;" class="store-name">${r.name}</td>
+        <td style="padding:6px 8px;text-align:center;color:#aac4e0;">${r.manager}</td>
+        <td style="padding:6px 8px;text-align:center;color:#aac4e0;">${r.region}</td>
         <td style="padding:6px 8px;text-align:right;font-weight:600;color:${r.closed?'#6b8fa8':'#e0f0ff'};">${r.closed?'-':fmtWon(r.net)}</td>
         <td style="padding:6px 8px;text-align:right;color:#aac4e0;">${r.cnt?r.cnt.toLocaleString():'-'}</td>
         <td style="padding:6px 8px;text-align:center;">${badge}</td>
