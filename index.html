@@ -24,6 +24,10 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 .last-update{font-size:11px;color:#6b8fa8;}
 .upload-btn{font-size:11px;padding:5px 12px;background:#1a3a5c;border:0.5px solid #2a5a8a;color:#7eb8e8;border-radius:6px;cursor:pointer;}
 .upload-btn:hover{background:#1e4a70;}
+/* 날짜 선택 input: 다크 테마에서도 달력 아이콘/텍스트가 보이도록 */
+#rtDateInput{color-scheme:dark;}
+#rtDateInput::-webkit-calendar-picker-indicator{cursor:pointer;filter:invert(0.85);opacity:0.9;}
+#rtDateInput::-webkit-calendar-picker-indicator:hover{opacity:1;}
 /* 매장명 가리기 */
 body.hide-names .store-name{
   filter:blur(5px);
@@ -9659,7 +9663,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       const row = aoa[r];
       if(!row) continue;
       const name = row[nameCol];
-      if(!name || typeof name!=='string') continue; // '평균','합계' 등 요약행 스킵
+      if(!name || typeof name!=='string') continue;
+      if(name.includes('합계') || name.includes('평균')) continue; // 요약행 스킵
       const code = row[codeCol] || '';
       const byDate = {};
       dateGroups.forEach(g=>{
