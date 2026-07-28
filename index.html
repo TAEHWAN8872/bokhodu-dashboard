@@ -595,24 +595,29 @@ body.hide-names .store-name:hover{
       </div>
 
       <!-- 조회일자 + 담당자 필터 -->
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
-        <span style="font-size:11px;color:#6b8fa8;" id="rtDateLabel">조회일자</span>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;">
+        <span style="font-size:11px;color:#6b8fa8;white-space:nowrap;flex-shrink:0;" id="rtDateLabel">조회일자</span>
         <input type="date" id="rtDateInput" onchange="window.onRtStartDateChange(this.value)"
-          style="font-size:12px;background:#1a2f44;border:0.5px solid #2a5a8a;color:#e0f0ff;padding:6px 10px;border-radius:6px;outline:none;">
-        <span style="font-size:11px;color:#6b8fa8;display:none;" id="rtDateRangeSep">~</span>
-        <input type="date" id="rtDateInputEnd" style="display:none;font-size:12px;background:#1a2f44;border:0.5px solid #2a5a8a;color:#e0f0ff;padding:6px 10px;border-radius:6px;outline:none;"
+          style="flex-shrink:0;font-size:12px;background:#1a2f44;border:0.5px solid #2a5a8a;color:#e0f0ff;padding:6px 10px;border-radius:6px;outline:none;">
+        <span style="font-size:11px;color:#6b8fa8;display:none;flex-shrink:0;" id="rtDateRangeSep">~</span>
+        <input type="date" id="rtDateInputEnd" style="display:none;flex-shrink:0;font-size:12px;background:#1a2f44;border:0.5px solid #2a5a8a;color:#e0f0ff;padding:6px 10px;border-radius:6px;outline:none;"
           onchange="window.onRtEndDateChange(this.value)">
-        <button class="upload-btn" id="rtTodayBtn" onclick="window.setRtDate(window.__rtTodayStr())" style="cursor:pointer;">오늘</button>
-        <button class="upload-btn" id="rtQuick7Btn" style="display:none;cursor:pointer;" onclick="window.setRtQuickRange(7)">최근 7일</button>
-        <button class="upload-btn" id="rtQuick30Btn" style="display:none;cursor:pointer;" onclick="window.setRtQuickRange(30)">최근 30일</button>
-        <button class="upload-btn" id="rtQuickAllBtn" style="display:none;cursor:pointer;" onclick="window.setRtQuickRange('all')">전체기간</button>
-        <span style="font-size:11px;color:#6b8fa8;margin-left:8px;" id="rtFileLabel"></span>
-        <button class="upload-btn" style="margin-left:auto;cursor:pointer;" onclick="document.getElementById('rtFileInput').click()">📤 다른 파일 업로드</button>
+        <button class="upload-btn" id="rtTodayBtn" onclick="window.setRtDate(window.__rtTodayStr())" style="flex-shrink:0;cursor:pointer;white-space:nowrap;">오늘</button>
+        <button class="upload-btn" id="rtQuick7Btn" style="display:none;flex-shrink:0;cursor:pointer;white-space:nowrap;" onclick="window.setRtQuickRange(7)">최근 7일</button>
+        <button class="upload-btn" id="rtQuick30Btn" style="display:none;flex-shrink:0;cursor:pointer;white-space:nowrap;" onclick="window.setRtQuickRange(30)">최근 30일</button>
+        <button class="upload-btn" id="rtQuickAllBtn" style="display:none;flex-shrink:0;cursor:pointer;white-space:nowrap;" onclick="window.setRtQuickRange('all')">전체기간</button>
+        <span style="font-size:11px;color:#6b8fa8;margin-left:8px;white-space:nowrap;flex-shrink:0;" id="rtFileLabel"></span>
+        <button class="upload-btn" style="margin-left:auto;flex-shrink:0;cursor:pointer;white-space:nowrap;" onclick="document.getElementById('rtFileInput').click()">📤 다른 파일 업로드</button>
       </div>
 
       <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
         <span style="font-size:10px;color:#6b8fa8;white-space:nowrap;">담당자</span>
         <div class="tabs" id="rtTabs" style="margin-bottom:0;"></div>
+      </div>
+
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+        <span style="font-size:10px;color:#6b8fa8;white-space:nowrap;">지&nbsp;&nbsp;&nbsp;&nbsp;역</span>
+        <div class="tabs" id="rtRegionTabs" style="margin-bottom:0;"></div>
       </div>
 
       <!-- KPI -->
@@ -629,10 +634,10 @@ body.hide-names .store-name:hover{
           <table style="width:100%;border-collapse:collapse;font-size:12px;">
             <thead>
               <tr style="color:#6b8fa8;text-align:left;border-bottom:0.5px solid #1e3347;">
-                <th style="padding:6px 8px;width:36px;">순위</th>
-                <th style="padding:6px 8px;">매장명</th>
-                <th style="padding:6px 8px;">담당자</th>
-                <th style="padding:6px 8px;">지역</th>
+                <th style="padding:6px 8px;width:36px;text-align:center;white-space:nowrap;">순위</th>
+                <th style="padding:6px 8px;text-align:center;">매장명</th>
+                <th style="padding:6px 8px;text-align:center;">담당자</th>
+                <th style="padding:6px 8px;text-align:center;">지역</th>
                 <th style="padding:6px 8px;text-align:right;" id="rtColAmountLabel">순판매금액(오늘)</th>
                 <th style="padding:6px 8px;text-align:right;" id="rtColCntLabel">주문횟수</th>
                 <th style="padding:6px 8px;text-align:center;">상태</th>
@@ -9762,6 +9767,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         window.__RT_DATA = parsed;
         window.__RT_MGRMAP = buildMgrRegionMap();
         window.__rtCurrentFilter = 'all';
+        window.__rtCurrentRegionFilter = 'all';
         document.getElementById('rtDropzone').style.display = 'none';
         document.getElementById('rtContent').style.display = '';
         label.textContent = `📄 ${file.name} · ${parsed.stores.length}개 매장 · ${parsed.dateList[0]} ~ ${parsed.dateList[parsed.dateList.length-1]}`;
@@ -9876,6 +9882,19 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     window.renderRtTable();
   };
 
+  // 담당자/지역 강조색 (탭 색상과 동일하게 맞춤)
+  const RT_MGR_COLORS = {
+    '김태환 과장':'#22c55e','임도형 과장':'#ef4444',
+    '이중섭 대리':'#facc15','박영태 대리':'#3b82f6',
+    '강동우 사원':'#a855f7','이현민 사원':'#f472b6'
+  };
+  const RT_REGION_COLORS = {
+    '서울':'#3b82f6','경기':'#22c55e','인천':'#06b6d4','부산':'#f97316',
+    '대구':'#a855f7','광주':'#ec4899','대전':'#facc15','울산':'#14b8a6',
+    '세종':'#84cc16','충북':'#fb923c','충남':'#f43f5e','경북':'#8b5cf6',
+    '경남':'#0ea5e9','전북':'#d946ef','전남':'#10b981','강원':'#f59e0b'
+  };
+
   function renderRtTabs(){
     const ORDER=['김태환 과장','임도형 과장','이중섭 대리','박영태 대리','강동우 사원','이현민 사원'];
     const mgrmap = window.__RT_MGRMAP || {};
@@ -9889,6 +9908,19 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       const label = m==='all' ? '전체' : m;
       return `<div class="tab" data-color="${label}" onclick="window.setRtFilter(window.__rtTabMgrs[${i}])">${label}</div>`;
     }).join('');
+
+    // 지역 탭도 함께 렌더링
+    const regions = ['all', ...Array.from(new Set(Object.values(mgrmap).map(v=>v.region).filter(r=>r && r!=='-')))
+      .sort((a,b)=>a.localeCompare(b,'ko'))];
+    window.__rtTabRegions = regions;
+    const relEl = document.getElementById('rtRegionTabs');
+    if(relEl){
+      relEl.innerHTML = regions.map((r,i)=>{
+        const label = r==='all' ? '전체' : r;
+        return `<div class="tab" data-region="${r}" onclick="window.setRtRegionFilter(window.__rtTabRegions[${i}])">${label}</div>`;
+      }).join('');
+    }
+
     updateRtTabActive();
   }
 
@@ -9897,10 +9929,20 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     document.querySelectorAll('#rtTabs .tab').forEach((t,i)=>{
       t.classList.toggle('active', mgrs[i]===window.__rtCurrentFilter);
     });
+    const regions = window.__rtTabRegions || [];
+    document.querySelectorAll('#rtRegionTabs .tab').forEach((t,i)=>{
+      t.classList.toggle('active', regions[i]===window.__rtCurrentRegionFilter);
+    });
   }
 
   window.setRtFilter = function(f){
     window.__rtCurrentFilter = f;
+    updateRtTabActive();
+    window.renderRtTable();
+  };
+
+  window.setRtRegionFilter = function(r){
+    window.__rtCurrentRegionFilter = r;
     updateRtTabActive();
     window.renderRtTable();
   };
@@ -9937,6 +9979,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     noMsg.style.display='none';
     wrap.style.display='';
 
+    const regionFilter = window.__rtCurrentRegionFilter || 'all';
+
     let rows = window.__RT_DATA.stores.map(s=>{
       const info = mgrmap[rtNormalizeStoreName(s.name)] || {manager:'미배정', region:'-'};
       const d = s.byDate[date] || {net:null, cnt:null};
@@ -9944,6 +9988,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     });
 
     if(filter!=='all') rows = rows.filter(r=>r.manager===filter);
+    if(regionFilter!=='all') rows = rows.filter(r=>r.region===regionFilter);
     if(search) rows = rows.filter(r=>r.name.includes(search));
 
     // 영업 매장(매출 있는 곳) 매출 높은 순, 휴무 매장은 맨 아래
@@ -9959,11 +10004,15 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       const badge = r.closed
         ? `<span class="badge fl">휴무</span>`
         : `<span class="badge ok">영업</span>`;
+      const mgrColor = (filter!=='all' && r.manager===filter) ? (RT_MGR_COLORS[r.manager]||'#aac4e0') : '#aac4e0';
+      const regColor = (regionFilter!=='all' && r.region===regionFilter) ? (RT_REGION_COLORS[r.region]||'#aac4e0') : '#aac4e0';
+      const mgrWeight = (filter!=='all' && r.manager===filter) ? '700' : '400';
+      const regWeight = (regionFilter!=='all' && r.region===regionFilter) ? '700' : '400';
       return `<tr style="border-bottom:0.5px solid #16232f;">
-        <td style="padding:6px 8px;color:#6b8fa8;">${i+1}</td>
-        <td style="padding:6px 8px;" class="store-name">${r.name}</td>
-        <td style="padding:6px 8px;color:#aac4e0;">${r.manager}</td>
-        <td style="padding:6px 8px;color:#aac4e0;">${r.region}</td>
+        <td style="padding:6px 8px;color:#6b8fa8;text-align:center;white-space:nowrap;">${i+1}</td>
+        <td style="padding:6px 8px;text-align:center;" class="store-name">${r.name}</td>
+        <td style="padding:6px 8px;text-align:center;color:${mgrColor};font-weight:${mgrWeight};">${r.manager}</td>
+        <td style="padding:6px 8px;text-align:center;color:${regColor};font-weight:${regWeight};">${r.region}</td>
         <td style="padding:6px 8px;text-align:right;font-weight:600;color:${r.closed?'#6b8fa8':'#e0f0ff'};">${r.closed?'-':fmtWon(r.net)}</td>
         <td style="padding:6px 8px;text-align:right;color:#aac4e0;">${(r.cnt!==null&&r.cnt!==undefined)?r.cnt.toLocaleString():'-'}</td>
         <td style="padding:6px 8px;text-align:center;">${badge}</td>
@@ -10020,6 +10069,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     noMsg.style.display='none';
     wrap.style.display='';
 
+    const regionFilter = window.__rtCurrentRegionFilter || 'all';
+
     let rows = window.__RT_DATA.stores.map(s=>{
       const info = mgrmap[rtNormalizeStoreName(s.name)] || {manager:'미배정', region:'-'};
       let netSum=0, cntSum=0, openDays=0;
@@ -10033,6 +10084,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     });
 
     if(filter!=='all') rows = rows.filter(r=>r.manager===filter);
+    if(regionFilter!=='all') rows = rows.filter(r=>r.region===regionFilter);
     if(search) rows = rows.filter(r=>r.name.includes(search));
 
     // 영업일이 있는 매장을 매출 높은 순으로, 기간 내 전체휴무 매장은 맨 아래
@@ -10048,11 +10100,15 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       const badge = r.closed
         ? `<span class="badge fl">전체휴무</span>`
         : `<span class="badge ok">영업 ${r.openDays}/${r.totalDays}일</span>`;
+      const mgrColor = (filter!=='all' && r.manager===filter) ? (RT_MGR_COLORS[r.manager]||'#aac4e0') : '#aac4e0';
+      const regColor = (regionFilter!=='all' && r.region===regionFilter) ? (RT_REGION_COLORS[r.region]||'#aac4e0') : '#aac4e0';
+      const mgrWeight = (filter!=='all' && r.manager===filter) ? '700' : '400';
+      const regWeight = (regionFilter!=='all' && r.region===regionFilter) ? '700' : '400';
       return `<tr style="border-bottom:0.5px solid #16232f;">
-        <td style="padding:6px 8px;color:#6b8fa8;">${i+1}</td>
-        <td style="padding:6px 8px;" class="store-name">${r.name}</td>
-        <td style="padding:6px 8px;color:#aac4e0;">${r.manager}</td>
-        <td style="padding:6px 8px;color:#aac4e0;">${r.region}</td>
+        <td style="padding:6px 8px;color:#6b8fa8;text-align:center;white-space:nowrap;">${i+1}</td>
+        <td style="padding:6px 8px;text-align:center;" class="store-name">${r.name}</td>
+        <td style="padding:6px 8px;text-align:center;color:${mgrColor};font-weight:${mgrWeight};">${r.manager}</td>
+        <td style="padding:6px 8px;text-align:center;color:${regColor};font-weight:${regWeight};">${r.region}</td>
         <td style="padding:6px 8px;text-align:right;font-weight:600;color:${r.closed?'#6b8fa8':'#e0f0ff'};">${r.closed?'-':fmtWon(r.net)}</td>
         <td style="padding:6px 8px;text-align:right;color:#aac4e0;">${r.cnt?r.cnt.toLocaleString():'-'}</td>
         <td style="padding:6px 8px;text-align:center;">${badge}</td>
