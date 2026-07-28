@@ -9624,12 +9624,23 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   };
 
   function excelCellDateToStr(v){
-    // cellDates:true 옵션으로 읽으면 Date 객체로 들어옴
-    if(v instanceof Date && !isNaN(v)){
-      const y=v.getFullYear(), m=String(v.getMonth()+1).padStart(2,'0'), d=String(v.getDate()).padStart(2,'0');
-      return `${y}-${m}-${d}`;
+    // 주의: cellDates:true로 읽은 Date 객체의 로컬 getter(getFullYear 등)를 쓰면
+    // 브라우저 시간대에 따라 날짜가 하루 밀리는 버그가 생긴다 (예: 한국(KST)에서 하루 당겨짐).
+    // 그래서 Date 객체를 만들지 않고, 엑셀 원본 시리얼 넘버(숫자)를 시간대 영향 없는
+    // UTC 기준으로 직접 변환한다.
+    let serial = null;
+    if(typeof v === 'number' && !isNaN(v)){
+      serial = v;
+    } else if(v instanceof Date && !isNaN(v)){
+      // 혹시 Date 객체로 들어온 경우를 대비한 안전장치: UTC 컴포넌트로 시리얼 재계산
+      serial = (Date.UTC(v.getFullYear(), v.getMonth(), v.getDate()) / 86400000) + 25569;
+    } else {
+      return null;
     }
-    return null;
+    const utcMs = Math.round((serial - 25569) * 86400 * 1000);
+    const d = new Date(utcMs);
+    const y = d.getUTCFullYear(), m = String(d.getUTCMonth()+1).padStart(2,'0'), day = String(d.getUTCDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
   }
 
   // 매출.xlsx 특유의 구조를 파싱:
@@ -9710,7 +9721,11 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     reader.onload = function(e){
       try {
         const data = new Uint8Array(e.target.result);
-        const wb = XLSX.read(data, {type:'array', cellDates:true});
+        // cellDates:true를 쓰지 않는다: 켜면 날짜 셀이 Date 객체로 변환되는데,
+        // 이 변환이 브라우저 시간대(예: 한국 KST)에 영향을 받아 날짜가 하루 밀리는
+        // 버그가 있었다. 대신 raw:true로 원본 시리얼 숫자를 그대로 받아
+        // excelCellDateToStr에서 시간대 영향 없는 UTC 계산으로 직접 변환한다.
+        const wb = XLSX.read(data, {type:'array'});
         const sheetName = wb.SheetNames.includes('매출') ? '매출' : wb.SheetNames[0];
         const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, raw:true});
         const parsed = parseSalesSheet(aoa);
