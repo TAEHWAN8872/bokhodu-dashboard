@@ -10,6 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-serif;min-height:100vh;padding:16px;}
@@ -418,6 +419,7 @@ body.hide-names .store-name:hover{
   <!-- 페이지 탭 -->
   <div class="page-tabs">
     <div class="page-tab active" id="pageTab-sales" onclick="switchPage('sales')">📊 매출 현황판</div>
+    <div class="page-tab" id="pageTab-realtime" onclick="switchPage('realtime')">⚡ 실시간매출</div>
     <div class="page-tab" id="pageTab-contract" onclick="switchPage('contract')">📋 재계약 안내<span class="pt-badge" id="rcUrgentBadge" style="display:none;"></span></div>
     <div class="page-tab" id="pageTab-marketing" onclick="switchPage('marketing')">📣 마케팅 참여현황</div>
     <div class="page-tab" id="pageTab-royalty" onclick="switchPage('royalty')">💰 로열티 미입금<span class="pt-badge" id="royaltyBadge" style="display:none;"></span></div>
@@ -558,6 +560,68 @@ body.hide-names .store-name:hover{
           </thead>
           <tbody id="royaltyTableBody"></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 실시간매출 페이지 -->
+  <div id="realtimePage" style="display:none;">
+
+    <!-- 업로드 영역 -->
+    <div class="card" id="rtDropzone" style="margin-bottom:14px;border:1.5px dashed #2a5a8a;text-align:center;cursor:pointer;padding:22px 16px;transition:background .2s,border-color .2s;"
+      onclick="document.getElementById('rtFileInput').click()"
+      ondragover="event.preventDefault();this.style.background='#132840';this.style.borderColor='#7eb8e8';"
+      ondragleave="this.style.background='';this.style.borderColor='#2a5a8a';"
+      ondrop="window.handleRtDrop(event)">
+      <div style="font-size:26px;margin-bottom:6px;">📤</div>
+      <div style="font-size:13px;color:#c8dff0;font-weight:600;" id="rtDropText">여기로 매출 엑셀 파일(.xlsx)을 끌어다 놓거나 클릭해서 업로드하세요</div>
+      <div style="font-size:11px;color:#6b8fa8;margin-top:4px;" id="rtDropSub">파일을 넣으면 오늘 날짜에 맞는 담당 매장 매출이 자동으로 표시됩니다</div>
+      <input type="file" id="rtFileInput" accept=".xlsx,.xls" style="display:none;" onchange="window.handleRtFileSelect(event)">
+    </div>
+
+    <div id="rtContent" style="display:none;">
+
+      <!-- 조회일자 + 담당자 필터 -->
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+        <span style="font-size:11px;color:#6b8fa8;">조회일자</span>
+        <input type="date" id="rtDateInput" onchange="window.setRtDate(this.value)"
+          style="font-size:12px;background:#1a2f44;border:0.5px solid #2a5a8a;color:#e0f0ff;padding:6px 10px;border-radius:6px;outline:none;">
+        <button class="upload-btn" onclick="window.setRtDate(window.__rtTodayStr())" style="cursor:pointer;">오늘</button>
+        <span style="font-size:11px;color:#6b8fa8;margin-left:8px;" id="rtFileLabel"></span>
+        <button class="upload-btn" style="margin-left:auto;cursor:pointer;" onclick="document.getElementById('rtFileInput').click()">📤 다른 파일 업로드</button>
+      </div>
+
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+        <span style="font-size:10px;color:#6b8fa8;white-space:nowrap;">담당자</span>
+        <div class="tabs" id="rtTabs" style="margin-bottom:0;"></div>
+      </div>
+
+      <!-- KPI -->
+      <div class="kpi-row" id="rtKpiRow" style="margin-bottom:14px;"></div>
+
+      <div class="card">
+        <div class="ctitle">
+          <span id="rtTableTitle">매장별 실시간 매출</span>
+          <input id="rtSearch" type="text" placeholder="매장명 검색..." autocomplete="off" oninput="window.renderRtTable()"
+            style="font-size:10px;background:#1a2f44;border:0.5px solid #1e3347;color:#aac4e0;padding:4px 8px;border-radius:5px;outline:none;width:140px;">
+        </div>
+        <div id="rtNoDateMsg" style="display:none;font-size:12px;color:#f0a04a;padding:20px 4px;text-align:center;"></div>
+        <div id="rtTableWrap" style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead>
+              <tr style="color:#6b8fa8;text-align:left;border-bottom:0.5px solid #1e3347;">
+                <th style="padding:6px 8px;width:36px;">순위</th>
+                <th style="padding:6px 8px;">매장명</th>
+                <th style="padding:6px 8px;">담당자</th>
+                <th style="padding:6px 8px;">지역</th>
+                <th style="padding:6px 8px;text-align:right;">순판매금액(오늘)</th>
+                <th style="padding:6px 8px;text-align:right;">주문횟수</th>
+                <th style="padding:6px 8px;text-align:center;">상태</th>
+              </tr>
+            </thead>
+            <tbody id="rtTableBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -3928,17 +3992,20 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
 
   window.switchPage = function(page){
     document.getElementById('salesPage').style.display = (page==='sales') ? '' : 'none';
+    document.getElementById('realtimePage').style.display = (page==='realtime') ? '' : 'none';
     document.getElementById('contractPage').style.display = (page==='contract') ? '' : 'none';
     document.getElementById('marketingPage').style.display = (page==='marketing') ? '' : 'none';
     document.getElementById('royaltyPage').style.display = (page==='royalty') ? '' : 'none';
     document.getElementById('pageTab-sales').classList.toggle('active', page==='sales');
+    document.getElementById('pageTab-realtime').classList.toggle('active', page==='realtime');
     document.getElementById('pageTab-contract').classList.toggle('active', page==='contract');
     document.getElementById('pageTab-marketing').classList.toggle('active', page==='marketing');
     document.getElementById('pageTab-royalty').classList.toggle('active', page==='royalty');
-    document.getElementById('brandTitle').textContent = (page==='sales') ? '복호두 매출 현황판' : (page==='contract') ? '복호두 재계약 안내' : (page==='marketing') ? '복호두 마케팅 참여현황' : '복호두 로열티 미입금 관리';
+    document.getElementById('brandTitle').textContent = (page==='sales') ? '복호두 매출 현황판' : (page==='realtime') ? '복호두 실시간 매출' : (page==='contract') ? '복호두 재계약 안내' : (page==='marketing') ? '복호두 마케팅 참여현황' : '복호두 로열티 미입금 관리';
     if(page==='contract'){ renderContractKpis(); renderContractTable(); }
     if(page==='marketing'){ renderMarketingKpis(); renderMarketingRegionChips(); renderMarketingTable(); }
     if(page==='royalty'){ loadRoyaltyUnpaid(); }
+    if(page==='realtime' && window.__RT_DATA){ window.renderRtTable(); }
   };
 
   window.setRcFilter = function(status){
@@ -9538,6 +9605,252 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 </body></html>`);
     doc.close();
   };
+})();
+</script>
+
+<!-- ===== 실시간매출 탭 로직 ===== -->
+<script>
+(function(){
+
+  // ── 오늘 날짜 (YYYY-MM-DD, 로컬 기준) ──
+  window.__rtTodayStr = function(){
+    const d = new Date();
+    const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  };
+
+  function excelCellDateToStr(v){
+    // cellDates:true 옵션으로 읽으면 Date 객체로 들어옴
+    if(v instanceof Date && !isNaN(v)){
+      const y=v.getFullYear(), m=String(v.getMonth()+1).padStart(2,'0'), d=String(v.getDate()).padStart(2,'0');
+      return `${y}-${m}-${d}`;
+    }
+    return null;
+  }
+
+  // 매출.xlsx 특유의 구조를 파싱:
+  // row0: 3칸마다(4번째 컬럼부터) 날짜, row1: 매장코드/매장명 + (판매금액/순판매금액/주문횟수) 반복, row2~: 매장별 데이터
+  function parseSalesSheet(aoa){
+    // 헤더 행 찾기: '매장코드'와 '매장명'이 있는 행
+    let headerRow = -1;
+    for(let r=0;r<Math.min(aoa.length,5);r++){
+      if(aoa[r] && aoa[r].some(c=>c==='매장코드') && aoa[r].some(c=>c==='매장명')){ headerRow=r; break; }
+    }
+    if(headerRow<0) throw new Error('헤더(매장코드/매장명)를 찾을 수 없습니다.');
+    const dateRow = headerRow>0 ? aoa[headerRow-1] : aoa[headerRow];
+
+    const codeCol = aoa[headerRow].indexOf('매장코드');
+    const nameCol = aoa[headerRow].indexOf('매장명');
+
+    // 날짜별 컬럼 그룹 찾기 (판매금액/순판매금액/주문횟수 3연속, 날짜는 판매금액 칸 위에 위치)
+    const dateGroups = []; // {dateStr, saleCol, netCol, cntCol}
+    for(let c=0;c<aoa[headerRow].length;c++){
+      if(aoa[headerRow][c]==='판매금액'){
+        const dstr = excelCellDateToStr(dateRow[c]);
+        if(dstr){
+          dateGroups.push({ dateStr: dstr, saleCol: c, netCol: c+1, cntCol: c+2 });
+        }
+      }
+    }
+    if(!dateGroups.length) throw new Error('날짜 컬럼을 찾을 수 없습니다.');
+
+    const stores = [];
+    for(let r=headerRow+1;r<aoa.length;r++){
+      const row = aoa[r];
+      if(!row) continue;
+      const name = row[nameCol];
+      if(!name || typeof name!=='string') continue; // '평균','합계' 등 요약행 스킵
+      const code = row[codeCol] || '';
+      const byDate = {};
+      dateGroups.forEach(g=>{
+        const net = row[g.netCol];
+        const sale = row[g.saleCol];
+        const cnt = row[g.cntCol];
+        byDate[g.dateStr] = {
+          net: (typeof net==='number') ? net : null,
+          sale: (typeof sale==='number') ? sale : null,
+          cnt: (typeof cnt==='number') ? cnt : null
+        };
+      });
+      stores.push({ code, name: String(name).trim(), byDate });
+    }
+
+    const dateList = dateGroups.map(g=>g.dateStr).sort();
+    return { stores, dateList };
+  }
+
+  // 매출 현황판(ALL)에서 매장명 -> 담당자/지역 매핑을 만든다 (동일 매장명 기준 매칭)
+  function buildMgrRegionMap(){
+    const map = {};
+    (window.ALL||[]).forEach(b=>{ map[b.name] = { manager: b.manager, region: b.region }; });
+    return map;
+  }
+
+  function loadRtFile(file){
+    if(!file) return;
+    const label = document.getElementById('rtFileLabel');
+    label.textContent = '파일 읽는 중...';
+    const reader = new FileReader();
+    reader.onload = function(e){
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, {type:'array', cellDates:true});
+        const sheetName = wb.SheetNames.includes('매출') ? '매출' : wb.SheetNames[0];
+        const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, raw:true});
+        const parsed = parseSalesSheet(aoa);
+        window.__RT_DATA = parsed;
+        window.__RT_MGRMAP = buildMgrRegionMap();
+        window.__rtCurrentFilter = 'all';
+        document.getElementById('rtDropzone').style.display = 'none';
+        document.getElementById('rtContent').style.display = '';
+        label.textContent = `📄 ${file.name} · ${parsed.stores.length}개 매장 · ${parsed.dateList[0]} ~ ${parsed.dateList[parsed.dateList.length-1]}`;
+
+        const dateInput = document.getElementById('rtDateInput');
+        dateInput.min = parsed.dateList[0];
+        dateInput.max = parsed.dateList[parsed.dateList.length-1];
+
+        renderRtTabs();
+        // 오늘 날짜가 데이터 범위 안에 있으면 오늘, 아니면 데이터의 마지막 날짜를 기본값으로
+        const today = window.__rtTodayStr();
+        const initDate = parsed.dateList.includes(today) ? today : parsed.dateList[parsed.dateList.length-1];
+        window.setRtDate(initDate);
+      } catch(err){
+        label.textContent = '';
+        alert('엑셀 파일을 읽는 중 문제가 발생했습니다: ' + err.message + '\n(양식이 기존 매출.xlsx와 다르면 틀을 조정해야 할 수 있어요.)');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  window.handleRtFileSelect = function(e){
+    const f = e.target.files && e.target.files[0];
+    if(f) loadRtFile(f);
+  };
+  window.handleRtDrop = function(e){
+    e.preventDefault();
+    e.currentTarget.style.background=''; e.currentTarget.style.borderColor='#2a5a8a';
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if(f) loadRtFile(f);
+  };
+
+  window.setRtDate = function(dateStr){
+    if(!window.__RT_DATA) return;
+    if(!dateStr) return;
+    window.__rtSelectedDate = dateStr;
+    document.getElementById('rtDateInput').value = dateStr;
+    renderRtTabs();
+    window.renderRtTable();
+  };
+
+  function renderRtTabs(){
+    const ORDER=['김태환 과장','임도형 과장','이중섭 대리','박영태 대리','강동우 사원','이현민 사원'];
+    const mgrmap = window.__RT_MGRMAP || {};
+    const existing = new Set(Object.values(mgrmap).map(v=>v.manager).filter(Boolean));
+    const sorted = ORDER.filter(m=>existing.has(m));
+    const others = [...existing].filter(m=>!ORDER.includes(m)).sort();
+    const mgrs = ['all', ...sorted, ...others];
+    window.__rtTabMgrs = mgrs;
+    const el = document.getElementById('rtTabs');
+    el.innerHTML = mgrs.map((m,i)=>{
+      const label = m==='all' ? '전체' : m;
+      return `<div class="tab" data-color="${label}" onclick="window.setRtFilter(window.__rtTabMgrs[${i}])">${label}</div>`;
+    }).join('');
+    updateRtTabActive();
+  }
+
+  function updateRtTabActive(){
+    const mgrs = window.__rtTabMgrs || [];
+    document.querySelectorAll('#rtTabs .tab').forEach((t,i)=>{
+      t.classList.toggle('active', mgrs[i]===window.__rtCurrentFilter);
+    });
+  }
+
+  window.setRtFilter = function(f){
+    window.__rtCurrentFilter = f;
+    updateRtTabActive();
+    window.renderRtTable();
+  };
+
+  function fmtWon(n){
+    if(n===null||n===undefined) return '-';
+    return Math.round(n).toLocaleString()+'원';
+  }
+
+  window.renderRtTable = function(){
+    if(!window.__RT_DATA) return;
+    const date = window.__rtSelectedDate;
+    const mgrmap = window.__RT_MGRMAP || {};
+    const filter = window.__rtCurrentFilter || 'all';
+    const search = (document.getElementById('rtSearch').value||'').trim();
+    const dateExists = window.__RT_DATA.dateList.includes(date);
+
+    const noMsg = document.getElementById('rtNoDateMsg');
+    const wrap = document.getElementById('rtTableWrap');
+    if(!dateExists){
+      noMsg.style.display='';
+      wrap.style.display='none';
+      noMsg.textContent = `선택하신 날짜(${date})의 데이터가 엑셀 파일에 없습니다. 파일에 있는 날짜(${window.__RT_DATA.dateList[0]} ~ ${window.__RT_DATA.dateList[window.__RT_DATA.dateList.length-1]}) 중에서 선택해 주세요.`;
+      renderRtKpis([]);
+      return;
+    }
+    noMsg.style.display='none';
+    wrap.style.display='';
+
+    let rows = window.__RT_DATA.stores.map(s=>{
+      const info = mgrmap[s.name] || {manager:'미배정', region:'-'};
+      const d = s.byDate[date] || {net:null, cnt:null};
+      return { name:s.name, code:s.code, manager:info.manager, region:info.region, net:d.net, cnt:d.cnt, closed: (d.net===null || d.net===0) };
+    });
+
+    if(filter!=='all') rows = rows.filter(r=>r.manager===filter);
+    if(search) rows = rows.filter(r=>r.name.includes(search));
+
+    // 영업 매장(매출 있는 곳) 매출 높은 순, 휴무 매장은 맨 아래
+    rows.sort((a,b)=>{
+      if(a.closed!==b.closed) return a.closed ? 1 : -1;
+      return (b.net||0)-(a.net||0);
+    });
+
+    renderRtKpis(rows);
+
+    const body = document.getElementById('rtTableBody');
+    body.innerHTML = rows.map((r,i)=>{
+      const badge = r.closed
+        ? `<span class="badge fl">휴무</span>`
+        : `<span class="badge ok">영업</span>`;
+      return `<tr style="border-bottom:0.5px solid #16232f;">
+        <td style="padding:6px 8px;color:#6b8fa8;">${i+1}</td>
+        <td style="padding:6px 8px;" class="store-name">${r.name}</td>
+        <td style="padding:6px 8px;color:#aac4e0;">${r.manager}</td>
+        <td style="padding:6px 8px;color:#aac4e0;">${r.region}</td>
+        <td style="padding:6px 8px;text-align:right;font-weight:600;color:${r.closed?'#6b8fa8':'#e0f0ff'};">${r.closed?'-':fmtWon(r.net)}</td>
+        <td style="padding:6px 8px;text-align:right;color:#aac4e0;">${(r.cnt!==null&&r.cnt!==undefined)?r.cnt.toLocaleString():'-'}</td>
+        <td style="padding:6px 8px;text-align:center;">${badge}</td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="7" style="padding:20px;text-align:center;color:#6b8fa8;">조건에 맞는 매장이 없습니다.</td></tr>`;
+
+    document.getElementById('rtTableTitle').textContent = `매장별 실시간 매출 (${date} 기준)`;
+  };
+
+  function renderRtKpis(rows){
+    const open = rows.filter(r=>!r.closed);
+    const closed = rows.filter(r=>r.closed);
+    const total = open.reduce((s,r)=>s+(r.net||0),0);
+    const avg = open.length ? Math.round(total/open.length) : 0;
+    const cards = [
+      {label:'조회일자', val: window.__rtSelectedDate || '-', color:'#e0f0ff'},
+      {label:'영업 매장', val: open.length+'개', color:'#3db87a'},
+      {label:'휴무 매장', val: closed.length+'개', color:'#e05555'},
+      {label:'오늘 총매출(순판매)', val: fmtWon(total), color:'#e0f0ff'},
+      {label:'매장 평균매출', val: fmtWon(avg), color:'#7eb8e8'},
+    ];
+    document.getElementById('rtKpiRow').innerHTML = cards.map(c=>`
+      <div class="kpi">
+        <div class="kl">${c.label}</div>
+        <div class="kv" style="color:${c.color};font-size:16px;">${c.val}</div>
+      </div>`).join('');
+  }
+
 })();
 </script>
 </body>
