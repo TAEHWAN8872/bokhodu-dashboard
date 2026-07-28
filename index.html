@@ -40,7 +40,7 @@ body.hide-names .store-name:hover{
 .mask-btn-on{background:rgba(251,146,60,0.15)!important;border-color:#fb923c!important;color:#fb923c!important;}
 
 /* 탭 */
-.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
 .tab{font-size:11px;padding:5px 12px;border-radius:6px;cursor:pointer;border:1px solid #1e3347;color:#6b8fa8;background:transparent;transition:all .2s;font-weight:500;}
 .tab:hover{border-color:#2a5a8a;color:#aac4e0;}
 .tab.active{color:#fff;font-weight:700;}
@@ -9932,12 +9932,18 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 
   function updateRtTabActive(){
     const mgrs = window.__rtTabMgrs || [];
+    const hasFilter = (window.__rtCurrentFilter||'all') !== 'all';
     document.querySelectorAll('#rtTabs .tab').forEach((t,i)=>{
-      t.classList.toggle('active', mgrs[i]===window.__rtCurrentFilter);
+      const isActive = mgrs[i]===window.__rtCurrentFilter;
+      t.classList.toggle('active', isActive);
+      t.classList.toggle('dimmed', hasFilter && !isActive && mgrs[i]!=='all');
     });
     const regions = window.__rtTabRegions || [];
+    const hasRegionFilter = (window.__rtCurrentRegionFilter||'all') !== 'all';
     document.querySelectorAll('#rtRegionTabs .tab').forEach((t,i)=>{
-      t.classList.toggle('active', regions[i]===window.__rtCurrentRegionFilter);
+      const isActive = regions[i]===window.__rtCurrentRegionFilter;
+      t.classList.toggle('active', isActive);
+      t.classList.toggle('dimmed', hasRegionFilter && !isActive && regions[i]!=='all');
     });
   }
 
