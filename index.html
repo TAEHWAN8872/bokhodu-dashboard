@@ -9895,6 +9895,12 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     '경남':'#0ea5e9','전북':'#d946ef','전남':'#10b981','강원':'#f59e0b'
   };
 
+  function rtHexToRgba(hex, alpha){
+    const h = hex.replace('#','');
+    const r = parseInt(h.substring(0,2),16), g = parseInt(h.substring(2,4),16), b = parseInt(h.substring(4,6),16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
   function renderRtTabs(){
     const ORDER=['김태환 과장','임도형 과장','이중섭 대리','박영태 대리','강동우 사원','이현민 사원'];
     const mgrmap = window.__RT_MGRMAP || {};
@@ -10008,9 +10014,14 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       const regColor = (regionFilter!=='all' && r.region===regionFilter) ? (RT_REGION_COLORS[r.region]||'#aac4e0') : '#aac4e0';
       const mgrWeight = (filter!=='all' && r.manager===filter) ? '700' : '400';
       const regWeight = (regionFilter!=='all' && r.region===regionFilter) ? '700' : '400';
-      return `<tr style="border-bottom:0.5px solid #16232f;">
+      // 담당자 탭을 클릭해 필터링된 상태면 담당자 색으로, 지역 탭이면 지역 색으로 행 전체를 강조
+      const hlColor = (filter!=='all') ? (RT_MGR_COLORS[filter]||null) : ((regionFilter!=='all') ? (RT_REGION_COLORS[regionFilter]||null) : null);
+      const rowStyle = hlColor
+        ? `border-bottom:0.5px solid #16232f;background:${rtHexToRgba(hlColor,0.12)};border-left:3px solid ${hlColor};`
+        : `border-bottom:0.5px solid #16232f;`;
+      return `<tr style="${rowStyle}">
         <td style="padding:6px 8px;color:#6b8fa8;text-align:center;white-space:nowrap;">${i+1}</td>
-        <td style="padding:6px 8px;text-align:center;" class="store-name">${r.name}</td>
+        <td style="padding:6px 8px;text-align:center;color:${hlColor||'#c8dff0'};font-weight:${hlColor?'700':'400'};" class="store-name">${r.name}</td>
         <td style="padding:6px 8px;text-align:center;color:${mgrColor};font-weight:${mgrWeight};">${r.manager}</td>
         <td style="padding:6px 8px;text-align:center;color:${regColor};font-weight:${regWeight};">${r.region}</td>
         <td style="padding:6px 8px;text-align:right;font-weight:600;color:${r.closed?'#6b8fa8':'#e0f0ff'};">${r.closed?'-':fmtWon(r.net)}</td>
@@ -10104,9 +10115,13 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       const regColor = (regionFilter!=='all' && r.region===regionFilter) ? (RT_REGION_COLORS[r.region]||'#aac4e0') : '#aac4e0';
       const mgrWeight = (filter!=='all' && r.manager===filter) ? '700' : '400';
       const regWeight = (regionFilter!=='all' && r.region===regionFilter) ? '700' : '400';
-      return `<tr style="border-bottom:0.5px solid #16232f;">
+      const hlColor = (filter!=='all') ? (RT_MGR_COLORS[filter]||null) : ((regionFilter!=='all') ? (RT_REGION_COLORS[regionFilter]||null) : null);
+      const rowStyle = hlColor
+        ? `border-bottom:0.5px solid #16232f;background:${rtHexToRgba(hlColor,0.12)};border-left:3px solid ${hlColor};`
+        : `border-bottom:0.5px solid #16232f;`;
+      return `<tr style="${rowStyle}">
         <td style="padding:6px 8px;color:#6b8fa8;text-align:center;white-space:nowrap;">${i+1}</td>
-        <td style="padding:6px 8px;text-align:center;" class="store-name">${r.name}</td>
+        <td style="padding:6px 8px;text-align:center;color:${hlColor||'#c8dff0'};font-weight:${hlColor?'700':'400'};" class="store-name">${r.name}</td>
         <td style="padding:6px 8px;text-align:center;color:${mgrColor};font-weight:${mgrWeight};">${r.manager}</td>
         <td style="padding:6px 8px;text-align:center;color:${regColor};font-weight:${regWeight};">${r.region}</td>
         <td style="padding:6px 8px;text-align:right;font-weight:600;color:${r.closed?'#6b8fa8':'#e0f0ff'};">${r.closed?'-':fmtWon(r.net)}</td>
