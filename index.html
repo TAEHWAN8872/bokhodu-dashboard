@@ -585,12 +585,27 @@ body.hide-names .store-name:hover{
 
     <div id="rtContent" style="display:none;">
 
+      <!-- 조회모드(일별/기간별) -->
+      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
+        <span style="font-size:10px;color:#6b8fa8;white-space:nowrap;">조회방식</span>
+        <div class="tabs" style="margin-bottom:0;">
+          <div class="tab active" data-color="전체" id="rtModeDayBtn" onclick="window.setRtMode('day')">일별</div>
+          <div class="tab" data-color="전체" id="rtModeRangeBtn" onclick="window.setRtMode('range')">기간별</div>
+        </div>
+      </div>
+
       <!-- 조회일자 + 담당자 필터 -->
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
-        <span style="font-size:11px;color:#6b8fa8;">조회일자</span>
-        <input type="date" id="rtDateInput" onchange="window.setRtDate(this.value)"
+        <span style="font-size:11px;color:#6b8fa8;" id="rtDateLabel">조회일자</span>
+        <input type="date" id="rtDateInput" onchange="window.onRtStartDateChange(this.value)"
           style="font-size:12px;background:#1a2f44;border:0.5px solid #2a5a8a;color:#e0f0ff;padding:6px 10px;border-radius:6px;outline:none;">
-        <button class="upload-btn" onclick="window.setRtDate(window.__rtTodayStr())" style="cursor:pointer;">오늘</button>
+        <span style="font-size:11px;color:#6b8fa8;display:none;" id="rtDateRangeSep">~</span>
+        <input type="date" id="rtDateInputEnd" style="display:none;font-size:12px;background:#1a2f44;border:0.5px solid #2a5a8a;color:#e0f0ff;padding:6px 10px;border-radius:6px;outline:none;"
+          onchange="window.onRtEndDateChange(this.value)">
+        <button class="upload-btn" id="rtTodayBtn" onclick="window.setRtDate(window.__rtTodayStr())" style="cursor:pointer;">오늘</button>
+        <button class="upload-btn" id="rtQuick7Btn" style="display:none;cursor:pointer;" onclick="window.setRtQuickRange(7)">최근 7일</button>
+        <button class="upload-btn" id="rtQuick30Btn" style="display:none;cursor:pointer;" onclick="window.setRtQuickRange(30)">최근 30일</button>
+        <button class="upload-btn" id="rtQuickAllBtn" style="display:none;cursor:pointer;" onclick="window.setRtQuickRange('all')">전체기간</button>
         <span style="font-size:11px;color:#6b8fa8;margin-left:8px;" id="rtFileLabel"></span>
         <button class="upload-btn" style="margin-left:auto;cursor:pointer;" onclick="document.getElementById('rtFileInput').click()">📤 다른 파일 업로드</button>
       </div>
@@ -618,14 +633,24 @@ body.hide-names .store-name:hover{
                 <th style="padding:6px 8px;">매장명</th>
                 <th style="padding:6px 8px;">담당자</th>
                 <th style="padding:6px 8px;">지역</th>
-                <th style="padding:6px 8px;text-align:right;">순판매금액(오늘)</th>
-                <th style="padding:6px 8px;text-align:right;">주문횟수</th>
+                <th style="padding:6px 8px;text-align:right;" id="rtColAmountLabel">순판매금액(오늘)</th>
+                <th style="padding:6px 8px;text-align:right;" id="rtColCntLabel">주문횟수</th>
                 <th style="padding:6px 8px;text-align:center;">상태</th>
               </tr>
             </thead>
             <tbody id="rtTableBody"></tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- 휴무 매장 클릭 시 목록 팝업 -->
+    <div class="kpi-modal-overlay" id="rtClosedModal" onclick="if(event.target===this) window.closeRtClosedModal();">
+      <div class="kpi-modal-box">
+        <button class="kpi-modal-close" onclick="window.closeRtClosedModal()">✕</button>
+        <div class="kpi-modal-title" id="rtClosedModalTitle">휴무 매장</div>
+        <div class="kpi-modal-sub" id="rtClosedModalSub">-</div>
+        <div class="kpi-modal-list" id="rtClosedModalList"></div>
       </div>
     </div>
   </div>
@@ -9616,6 +9641,11 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 <script>
 (function(){
 
+  // ── 조회 모드: 'day'(일별) | 'range'(기간별) ──
+  window.__rtMode = 'day';
+  window.__rtRangeStart = null;
+  window.__rtRangeEnd = null;
+
   // ── 오늘 날짜 (YYYY-MM-DD, 로컬 기준) ──
   window.__rtTodayStr = function(){
     const d = new Date();
@@ -9739,8 +9769,15 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         const dateInput = document.getElementById('rtDateInput');
         dateInput.min = parsed.dateList[0];
         dateInput.max = parsed.dateList[parsed.dateList.length-1];
+        const dateInputEnd = document.getElementById('rtDateInputEnd');
+        dateInputEnd.min = parsed.dateList[0];
+        dateInputEnd.max = parsed.dateList[parsed.dateList.length-1];
 
         renderRtTabs();
+        // 새 파일을 불러오면 일별 조회 모드로 초기화
+        window.__rtRangeStart = null;
+        window.__rtRangeEnd = null;
+        window.setRtMode('day');
         // 오늘 날짜가 데이터 범위 안에 있으면 오늘, 아니면 데이터의 마지막 날짜를 기본값으로
         const today = window.__rtTodayStr();
         const initDate = parsed.dateList.includes(today) ? today : parsed.dateList[parsed.dateList.length-1];
@@ -9770,6 +9807,72 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     window.__rtSelectedDate = dateStr;
     document.getElementById('rtDateInput').value = dateStr;
     renderRtTabs();
+    window.renderRtTable();
+  };
+
+  // 시작일(rtDateInput) 값이 바뀔 때: 일별 모드면 조회일자로, 기간별 모드면 시작일로 처리
+  window.onRtStartDateChange = function(v){
+    if(window.__rtMode === 'range'){
+      window.__rtRangeStart = v;
+      window.renderRtTable();
+    } else {
+      window.setRtDate(v);
+    }
+  };
+
+  // 종료일(rtDateInputEnd) 값이 바뀔 때
+  window.onRtEndDateChange = function(v){
+    window.__rtRangeEnd = v;
+    window.renderRtTable();
+  };
+
+  // 조회모드 전환: 일별 <-> 기간별
+  window.setRtMode = function(mode){
+    window.__rtMode = mode;
+    const isRange = mode === 'range';
+    document.getElementById('rtModeDayBtn').classList.toggle('active', !isRange);
+    document.getElementById('rtModeRangeBtn').classList.toggle('active', isRange);
+    document.getElementById('rtDateLabel').textContent = isRange ? '조회기간' : '조회일자';
+    document.getElementById('rtDateRangeSep').style.display = isRange ? '' : 'none';
+    document.getElementById('rtDateInputEnd').style.display = isRange ? '' : 'none';
+    document.getElementById('rtTodayBtn').style.display = isRange ? 'none' : '';
+    document.getElementById('rtQuick7Btn').style.display = isRange ? '' : 'none';
+    document.getElementById('rtQuick30Btn').style.display = isRange ? '' : 'none';
+    document.getElementById('rtQuickAllBtn').style.display = isRange ? '' : 'none';
+    document.getElementById('rtColAmountLabel').textContent = isRange ? '순판매금액(기간합계)' : '순판매금액(오늘)';
+    document.getElementById('rtColCntLabel').textContent = isRange ? '주문횟수(합계)' : '주문횟수';
+
+    if(isRange && window.__RT_DATA){
+      // 기간별 모드로 처음 전환 시 기본값: 현재 선택된 날짜 ~ 최근 7일
+      if(!window.__rtRangeStart || !window.__rtRangeEnd){
+        window.setRtQuickRange(7);
+        return; // setRtQuickRange가 렌더까지 처리함
+      }
+      document.getElementById('rtDateInput').value = window.__rtRangeStart;
+      document.getElementById('rtDateInputEnd').value = window.__rtRangeEnd;
+    } else if(!isRange){
+      document.getElementById('rtDateInput').value = window.__rtSelectedDate || '';
+    }
+    window.renderRtTable();
+  };
+
+  // 빠른 기간 선택: 최근 n일 또는 전체기간('all')
+  window.setRtQuickRange = function(n){
+    if(!window.__RT_DATA) return;
+    const dates = window.__RT_DATA.dateList;
+    let start, end;
+    if(n === 'all'){
+      start = dates[0];
+      end = dates[dates.length-1];
+    } else {
+      end = dates[dates.length-1];
+      const idx = Math.max(0, dates.length - n);
+      start = dates[idx];
+    }
+    window.__rtRangeStart = start;
+    window.__rtRangeEnd = end;
+    document.getElementById('rtDateInput').value = start;
+    document.getElementById('rtDateInputEnd').value = end;
     window.renderRtTable();
   };
 
@@ -9807,8 +9910,15 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     return Math.round(n).toLocaleString()+'원';
   }
 
+  // 조회모드에 따라 일별/기간별 렌더링으로 분기
   window.renderRtTable = function(){
     if(!window.__RT_DATA) return;
+    if(window.__rtMode === 'range') renderRtTableRange();
+    else renderRtTableDay();
+  };
+
+  // ── 일별 조회 ──
+  function renderRtTableDay(){
     const date = window.__rtSelectedDate;
     const mgrmap = window.__RT_MGRMAP || {};
     const filter = window.__rtCurrentFilter || 'all';
@@ -9821,7 +9931,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       noMsg.style.display='';
       wrap.style.display='none';
       noMsg.textContent = `선택하신 날짜(${date})의 데이터가 엑셀 파일에 없습니다. 파일에 있는 날짜(${window.__RT_DATA.dateList[0]} ~ ${window.__RT_DATA.dateList[window.__RT_DATA.dateList.length-1]}) 중에서 선택해 주세요.`;
-      renderRtKpis([]);
+      renderRtKpisDay([]);
       return;
     }
     noMsg.style.display='none';
@@ -9842,7 +9952,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       return (b.net||0)-(a.net||0);
     });
 
-    renderRtKpis(rows);
+    renderRtKpisDay(rows);
 
     const body = document.getElementById('rtTableBody');
     body.innerHTML = rows.map((r,i)=>{
@@ -9861,26 +9971,147 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     }).join('') || `<tr><td colspan="7" style="padding:20px;text-align:center;color:#6b8fa8;">조건에 맞는 매장이 없습니다.</td></tr>`;
 
     document.getElementById('rtTableTitle').textContent = `매장별 실시간 매출 (${date} 기준)`;
-  };
+  }
 
-  function renderRtKpis(rows){
+  function renderRtKpisDay(rows){
     const open = rows.filter(r=>!r.closed);
     const closed = rows.filter(r=>r.closed);
     const total = open.reduce((s,r)=>s+(r.net||0),0);
     const avg = open.length ? Math.round(total/open.length) : 0;
+    window.__rtClosedList = closed;
     const cards = [
       {label:'조회일자', val: window.__rtSelectedDate || '-', color:'#e0f0ff'},
       {label:'영업 매장', val: open.length+'개', color:'#3db87a'},
-      {label:'휴무 매장', val: closed.length+'개', color:'#e05555'},
+      {label:'휴무 매장', val: closed.length+'개', color:'#e05555', click:true},
       {label:'오늘 총매출(순판매)', val: fmtWon(total), color:'#e0f0ff'},
       {label:'매장 평균매출', val: fmtWon(avg), color:'#7eb8e8'},
     ];
-    document.getElementById('rtKpiRow').innerHTML = cards.map(c=>`
-      <div class="kpi">
+    renderRtKpiCards(cards);
+  }
+
+  // ── 기간별 조회 ──
+  function renderRtTableRange(){
+    const mgrmap = window.__RT_MGRMAP || {};
+    const filter = window.__rtCurrentFilter || 'all';
+    const search = (document.getElementById('rtSearch').value||'').trim();
+    const allDates = window.__RT_DATA.dateList;
+    let start = window.__rtRangeStart, end = window.__rtRangeEnd;
+
+    const noMsg = document.getElementById('rtNoDateMsg');
+    const wrap = document.getElementById('rtTableWrap');
+
+    if(!start || !end){
+      noMsg.style.display='';
+      wrap.style.display='none';
+      noMsg.textContent = '조회할 기간(시작일, 종료일)을 선택해 주세요.';
+      renderRtKpisRange([], start, end);
+      return;
+    }
+    if(start > end){ const t=start; start=end; end=t; } // 시작일/종료일이 뒤바뀐 경우 자동 교정
+
+    const rangeDates = allDates.filter(d=> d>=start && d<=end);
+    if(!rangeDates.length){
+      noMsg.style.display='';
+      wrap.style.display='none';
+      noMsg.textContent = `선택하신 기간(${start} ~ ${end})에 해당하는 데이터가 엑셀 파일에 없습니다. 파일에 있는 날짜(${allDates[0]} ~ ${allDates[allDates.length-1]}) 중에서 선택해 주세요.`;
+      renderRtKpisRange([], start, end);
+      return;
+    }
+    noMsg.style.display='none';
+    wrap.style.display='';
+
+    let rows = window.__RT_DATA.stores.map(s=>{
+      const info = mgrmap[rtNormalizeStoreName(s.name)] || {manager:'미배정', region:'-'};
+      let netSum=0, cntSum=0, openDays=0;
+      rangeDates.forEach(d=>{
+        const day = s.byDate[d] || {net:null, cnt:null};
+        if(day.net!==null && day.net!==0) openDays++;
+        if(day.net!==null) netSum += day.net;
+        if(day.cnt!==null) cntSum += day.cnt;
+      });
+      return { name:s.name, code:s.code, manager:info.manager, region:info.region, net:netSum, cnt:cntSum, openDays, totalDays: rangeDates.length, closed: openDays===0 };
+    });
+
+    if(filter!=='all') rows = rows.filter(r=>r.manager===filter);
+    if(search) rows = rows.filter(r=>r.name.includes(search));
+
+    // 영업일이 있는 매장을 매출 높은 순으로, 기간 내 전체휴무 매장은 맨 아래
+    rows.sort((a,b)=>{
+      if(a.closed!==b.closed) return a.closed ? 1 : -1;
+      return (b.net||0)-(a.net||0);
+    });
+
+    renderRtKpisRange(rows, start, end);
+
+    const body = document.getElementById('rtTableBody');
+    body.innerHTML = rows.map((r,i)=>{
+      const badge = r.closed
+        ? `<span class="badge fl">전체휴무</span>`
+        : `<span class="badge ok">영업 ${r.openDays}/${r.totalDays}일</span>`;
+      return `<tr style="border-bottom:0.5px solid #16232f;">
+        <td style="padding:6px 8px;color:#6b8fa8;">${i+1}</td>
+        <td style="padding:6px 8px;" class="store-name">${r.name}</td>
+        <td style="padding:6px 8px;color:#aac4e0;">${r.manager}</td>
+        <td style="padding:6px 8px;color:#aac4e0;">${r.region}</td>
+        <td style="padding:6px 8px;text-align:right;font-weight:600;color:${r.closed?'#6b8fa8':'#e0f0ff'};">${r.closed?'-':fmtWon(r.net)}</td>
+        <td style="padding:6px 8px;text-align:right;color:#aac4e0;">${r.cnt?r.cnt.toLocaleString():'-'}</td>
+        <td style="padding:6px 8px;text-align:center;">${badge}</td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="7" style="padding:20px;text-align:center;color:#6b8fa8;">조건에 맞는 매장이 없습니다.</td></tr>`;
+
+    document.getElementById('rtTableTitle').textContent = `매장별 기간 합계 매출 (${start} ~ ${end}, ${rangeDates.length}일)`;
+  }
+
+  function renderRtKpisRange(rows, start, end){
+    const open = rows.filter(r=>!r.closed);
+    const closed = rows.filter(r=>r.closed);
+    const total = open.reduce((s,r)=>s+(r.net||0),0);
+    const avg = open.length ? Math.round(total/open.length) : 0;
+    window.__rtClosedList = closed;
+    const periodLabel = (start && end) ? `${start} ~ ${end}` : '-';
+    const cards = [
+      {label:'조회기간', val: periodLabel, color:'#e0f0ff'},
+      {label:'영업 매장', val: open.length+'개', color:'#3db87a'},
+      {label:'전체휴무 매장', val: closed.length+'개', color:'#e05555', click:true},
+      {label:'기간 총매출(순판매)', val: fmtWon(total), color:'#e0f0ff'},
+      {label:'매장 평균매출', val: fmtWon(avg), color:'#7eb8e8'},
+    ];
+    renderRtKpiCards(cards);
+  }
+
+  // KPI 카드 공통 렌더러 (휴무 매장 카드는 클릭 가능하게)
+  function renderRtKpiCards(cards){
+    document.getElementById('rtKpiRow').innerHTML = cards.map(c=>{
+      const cls = c.click ? 'kpi kpi-click' : 'kpi';
+      const onclick = c.click ? ` onclick="window.openRtClosedModal()" title="클릭하면 휴무 매장 목록을 볼 수 있어요"` : '';
+      return `<div class="${cls}"${onclick}>
         <div class="kl">${c.label}</div>
         <div class="kv" style="color:${c.color};font-size:16px;">${c.val}</div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
+
+  // ── 휴무 매장 목록 팝업 ──
+  window.openRtClosedModal = function(){
+    const list = window.__rtClosedList || [];
+    const sub = window.__rtMode === 'range'
+      ? `${window.__rtRangeStart} ~ ${window.__rtRangeEnd} 기간 동안 매출이 한 번도 없었던 매장`
+      : `${window.__rtSelectedDate} 기준 휴무 매장`;
+    document.getElementById('rtClosedModalTitle').textContent = `휴무 매장 (${list.length}개)`;
+    document.getElementById('rtClosedModalSub').textContent = sub;
+    const listEl = document.getElementById('rtClosedModalList');
+    listEl.innerHTML = list.length
+      ? list.map(r=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 4px;border-bottom:0.5px solid #1e3347;font-size:12px;">
+          <div style="color:#e0f0ff;font-weight:600;" class="store-name">${r.name}</div>
+          <div style="color:#6b8fa8;white-space:nowrap;">${r.manager} · ${r.region}</div>
+        </div>`).join('')
+      : `<div style="padding:20px;text-align:center;color:#6b8fa8;font-size:12px;">휴무 매장이 없습니다.</div>`;
+    document.getElementById('rtClosedModal').classList.add('open');
+  };
+  window.closeRtClosedModal = function(){
+    document.getElementById('rtClosedModal').classList.remove('open');
+  };
 
 })();
 </script>
