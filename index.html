@@ -9698,7 +9698,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   // 매출 현황판(ALL)에서 매장명 -> 담당자/지역 매핑을 만든다 (정규화한 매장명 기준 매칭)
   function buildMgrRegionMap(){
     const map = {};
-    (window.ALL||[]).forEach(b=>{ map[rtNormalizeStoreName(b.name)] = { manager: b.manager, region: b.region }; });
+    (window.ALL || (typeof ALL !== 'undefined' ? ALL : [])).forEach(b=>{ map[rtNormalizeStoreName(b.name)] = { manager: b.manager, region: b.region }; });
     return map;
   }
 
