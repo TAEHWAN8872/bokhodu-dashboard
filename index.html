@@ -626,8 +626,19 @@ body.hide-names .store-name:hover{
       <div class="card">
         <div class="ctitle">
           <span id="rtTableTitle">매장별 실시간 매출</span>
-          <input id="rtSearch" type="text" placeholder="매장명 검색..." autocomplete="off" oninput="window.renderRtTable()"
-            style="font-size:10px;background:#1a2f44;border:0.5px solid #1e3347;color:#aac4e0;padding:4px 8px;border-radius:5px;outline:none;width:140px;">
+          <div style="display:flex;gap:6px;align-items:center;">
+            <select id="rtSortSelect" onchange="window.setRtSort(this.value)"
+              style="font-size:10px;background:#1a2f44;border:0.5px solid #1e3347;color:#aac4e0;padding:4px 6px;border-radius:5px;outline:none;cursor:pointer;">
+              <option value="default">기본순</option>
+              <option value="net_desc">매출 높은순</option>
+              <option value="net_asc">매출 낮은순</option>
+              <option value="open_desc">영업일 높은순</option>
+              <option value="open_asc">영업일 낮은순</option>
+              <option value="closed_desc">휴무 높은순</option>
+            </select>
+            <input id="rtSearch" type="text" placeholder="매장명 검색..." autocomplete="off" oninput="window.renderRtTable()"
+              style="font-size:10px;background:#1a2f44;border:0.5px solid #1e3347;color:#aac4e0;padding:4px 8px;border-radius:5px;outline:none;width:140px;">
+          </div>
         </div>
         <div id="rtNoDateMsg" style="display:none;font-size:12px;color:#f0a04a;padding:20px 4px;text-align:center;"></div>
         <div id="rtTableWrap" style="overflow-x:auto;">
@@ -638,9 +649,10 @@ body.hide-names .store-name:hover{
                 <th style="padding:6px 8px;text-align:center;">매장명</th>
                 <th style="padding:6px 8px;text-align:center;">담당자</th>
                 <th style="padding:6px 8px;text-align:center;">지역</th>
-                <th style="padding:6px 8px;text-align:right;" id="rtColAmountLabel">순판매금액(오늘)</th>
-                <th style="padding:6px 8px;text-align:right;" id="rtColCntLabel">주문횟수</th>
-                <th style="padding:6px 8px;text-align:center;">상태</th>
+                <th style="padding:6px 8px;text-align:center;" id="rtColAmountLabel">순판매금액(오늘)</th>
+                <th style="padding:6px 8px;text-align:center;" id="rtColCntLabel">주문횟수</th>
+                <th style="padding:6px 8px;text-align:center;">영업일</th>
+                <th style="padding:6px 8px;text-align:center;">휴무일</th>
               </tr>
             </thead>
             <tbody id="rtTableBody"></tbody>
@@ -9768,6 +9780,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         window.__RT_MGRMAP = buildMgrRegionMap();
         window.__rtCurrentFilter = 'all';
         window.__rtCurrentRegionFilter = 'all';
+        window.__rtSortOption = 'default';
         document.getElementById('rtDropzone').style.display = 'none';
         document.getElementById('rtContent').style.display = '';
         label.textContent = `📄 ${file.name} · ${parsed.stores.length}개 매장 · ${parsed.dateList[0]} ~ ${parsed.dateList[parsed.dateList.length-1]}`;
@@ -9964,6 +9977,23 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     return Math.round(n).toLocaleString()+'원';
   }
 
+  window.setRtSort = function(v){
+    window.__rtSortOption = v;
+    window.renderRtTable();
+  };
+
+  // 정렬 옵션에 따른 비교 함수 (기본: 영업 매장 매출 높은순, 휴무 매장은 맨 아래)
+  function rtSortComparator(a,b){
+    const opt = window.__rtSortOption || 'default';
+    if(opt==='net_desc') return (b.net||0)-(a.net||0);
+    if(opt==='net_asc') return (a.net||0)-(b.net||0);
+    if(opt==='open_desc') return (b.openDays||0)-(a.openDays||0);
+    if(opt==='open_asc') return (a.openDays||0)-(b.openDays||0);
+    if(opt==='closed_desc') return (b.closedDays||0)-(a.closedDays||0);
+    if(a.closed!==b.closed) return a.closed ? 1 : -1;
+    return (b.net||0)-(a.net||0);
+  }
+
   // 조회모드에 따라 일별/기간별 렌더링으로 분기
   window.renderRtTable = function(){
     if(!window.__RT_DATA) return;
@@ -9996,36 +10026,35 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     let rows = window.__RT_DATA.stores.map(s=>{
       const info = mgrmap[rtNormalizeStoreName(s.name)] || {manager:'미배정', region:'-'};
       const d = s.byDate[date] || {net:null, cnt:null};
-      return { name:s.name, code:s.code, manager:info.manager, region:info.region, net:d.net, cnt:d.cnt, closed: (d.net===null || d.net===0) };
+      const closed = (d.net===null || d.net===0);
+      return { name:s.name, code:s.code, manager:info.manager, region:info.region, net:d.net, cnt:d.cnt, closed, openDays: closed?0:1, closedDays: closed?1:0, totalDays:1 };
     });
 
     if(filter!=='all') rows = rows.filter(r=>r.manager===filter);
     if(regionFilter!=='all') rows = rows.filter(r=>r.region===regionFilter);
     if(search) rows = rows.filter(r=>r.name.includes(search));
 
-    // 영업 매장(매출 있는 곳) 매출 높은 순, 휴무 매장은 맨 아래
-    rows.sort((a,b)=>{
-      if(a.closed!==b.closed) return a.closed ? 1 : -1;
-      return (b.net||0)-(a.net||0);
-    });
+    rows.sort(rtSortComparator);
 
     renderRtKpisDay(rows);
 
     const body = document.getElementById('rtTableBody');
     body.innerHTML = rows.map((r,i)=>{
-      const badge = r.closed
+      const openTxt = r.closed
         ? `<span class="badge fl">휴무</span>`
         : `<span class="badge ok">영업</span>`;
+      const closedTxt = r.closedDays>0 ? `<span class="badge fl">${r.closedDays}일</span>` : '';
       return `<tr style="border-bottom:0.5px solid #16232f;">
         <td style="padding:6px 8px;color:#6b8fa8;text-align:center;white-space:nowrap;">${i+1}</td>
         <td style="padding:6px 8px;text-align:center;" class="store-name">${r.name}</td>
         <td style="padding:6px 8px;text-align:center;color:#aac4e0;">${r.manager}</td>
         <td style="padding:6px 8px;text-align:center;color:#aac4e0;">${r.region}</td>
-        <td style="padding:6px 8px;text-align:right;font-weight:600;color:${r.closed?'#6b8fa8':'#e0f0ff'};">${r.closed?'-':fmtWon(r.net)}</td>
-        <td style="padding:6px 8px;text-align:right;color:#aac4e0;">${(r.cnt!==null&&r.cnt!==undefined)?r.cnt.toLocaleString():'-'}</td>
-        <td style="padding:6px 8px;text-align:center;">${badge}</td>
+        <td style="padding:6px 8px;text-align:center;font-weight:600;color:${r.closed?'#6b8fa8':'#e0f0ff'};">${r.closed?'-':fmtWon(r.net)}</td>
+        <td style="padding:6px 8px;text-align:center;color:#aac4e0;">${(r.cnt!==null&&r.cnt!==undefined)?r.cnt.toLocaleString():'-'}</td>
+        <td style="padding:6px 8px;text-align:center;">${openTxt}</td>
+        <td style="padding:6px 8px;text-align:center;">${closedTxt}</td>
       </tr>`;
-    }).join('') || `<tr><td colspan="7" style="padding:20px;text-align:center;color:#6b8fa8;">조건에 맞는 매장이 없습니다.</td></tr>`;
+    }).join('') || `<tr><td colspan="8" style="padding:20px;text-align:center;color:#6b8fa8;">조건에 맞는 매장이 없습니다.</td></tr>`;
 
     document.getElementById('rtTableTitle').textContent = `매장별 실시간 매출 (${date} 기준)`;
   }
@@ -10088,38 +10117,35 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         if(day.net!==null) netSum += day.net;
         if(day.cnt!==null) cntSum += day.cnt;
       });
-      return { name:s.name, code:s.code, manager:info.manager, region:info.region, net:netSum, cnt:cntSum, openDays, totalDays: rangeDates.length, closed: openDays===0 };
+      const totalDays = rangeDates.length;
+      return { name:s.name, code:s.code, manager:info.manager, region:info.region, net:netSum, cnt:cntSum, openDays, closedDays: totalDays-openDays, totalDays, closed: openDays===0 };
     });
 
     if(filter!=='all') rows = rows.filter(r=>r.manager===filter);
     if(regionFilter!=='all') rows = rows.filter(r=>r.region===regionFilter);
     if(search) rows = rows.filter(r=>r.name.includes(search));
 
-    // 영업일이 있는 매장을 매출 높은 순으로, 기간 내 전체휴무 매장은 맨 아래
-    rows.sort((a,b)=>{
-      if(a.closed!==b.closed) return a.closed ? 1 : -1;
-      return (b.net||0)-(a.net||0);
-    });
+    rows.sort(rtSortComparator);
 
     renderRtKpisRange(rows, start, end);
 
     const body = document.getElementById('rtTableBody');
     body.innerHTML = rows.map((r,i)=>{
-      const closedDays = r.totalDays - r.openDays;
-      const badge = r.closed
+      const openTxt = r.closed
         ? `<span class="badge fl">전체휴무</span>`
-        : `<span class="badge ok">영업 <b style="color:#facc15;">${r.openDays}</b>/${r.totalDays}일</span>` +
-          (closedDays>0 ? ` <span class="badge fl" style="margin-left:4px;">휴무 ${closedDays}일</span>` : '');
+        : `<span class="badge ok"><b style="color:#facc15;">${r.openDays}</b>/${r.totalDays}일</span>`;
+      const closedTxt = r.closedDays>0 ? `<span class="badge fl">${r.closedDays}일</span>` : '';
       return `<tr style="border-bottom:0.5px solid #16232f;">
         <td style="padding:6px 8px;color:#6b8fa8;text-align:center;white-space:nowrap;">${i+1}</td>
         <td style="padding:6px 8px;text-align:center;" class="store-name">${r.name}</td>
         <td style="padding:6px 8px;text-align:center;color:#aac4e0;">${r.manager}</td>
         <td style="padding:6px 8px;text-align:center;color:#aac4e0;">${r.region}</td>
-        <td style="padding:6px 8px;text-align:right;font-weight:600;color:${r.closed?'#6b8fa8':'#e0f0ff'};">${r.closed?'-':fmtWon(r.net)}</td>
-        <td style="padding:6px 8px;text-align:right;color:#aac4e0;">${r.cnt?r.cnt.toLocaleString():'-'}</td>
-        <td style="padding:6px 8px;text-align:center;">${badge}</td>
+        <td style="padding:6px 8px;text-align:center;font-weight:600;color:${r.closed?'#6b8fa8':'#e0f0ff'};">${r.closed?'-':fmtWon(r.net)}</td>
+        <td style="padding:6px 8px;text-align:center;color:#aac4e0;">${r.cnt?r.cnt.toLocaleString():'-'}</td>
+        <td style="padding:6px 8px;text-align:center;">${openTxt}</td>
+        <td style="padding:6px 8px;text-align:center;">${closedTxt}</td>
       </tr>`;
-    }).join('') || `<tr><td colspan="7" style="padding:20px;text-align:center;color:#6b8fa8;">조건에 맞는 매장이 없습니다.</td></tr>`;
+    }).join('') || `<tr><td colspan="8" style="padding:20px;text-align:center;color:#6b8fa8;">조건에 맞는 매장이 없습니다.</td></tr>`;
 
     document.getElementById('rtTableTitle').textContent = `매장별 기간 합계 매출 (${start} ~ ${end}, ${rangeDates.length}일)`;
   }
