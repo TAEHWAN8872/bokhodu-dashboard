@@ -10615,10 +10615,15 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 
     const declineList = (typeof window.getDeclineBranches==='function') ? window.getDeclineBranches().list : [];
     const declines = declineList.filter(r=>r.manager===mgrLabel);
-    declines.slice(0,3).forEach(w=>{
-      msgs.push({ status:'warn', text: `${w.name} 매출이 작년 상반기 평균 대비 ${fmtPct(w.rate)} 하락했어요. 먼저 확인해보시는 게 좋겠어요.` });
+    // -10% 이상 하락한 매장은 개수 제한 없이 전부 노출하고, 매장별 마케팅 미실시 채널도 함께 지적
+    declines.forEach(w=>{
+      const gap = (typeof getMarketingGapsForStore==='function') ? getMarketingGapsForStore(w.name) : null;
+      const gapText = (gap && gap.missing.length)
+        ? ` 마케팅은 ${gap.missing.join(', ')}을(를) 전혀 진행하지 않았어요.`
+        : (gap ? ` 마케팅 채널(블로그체험단·네이버 플레이스 광고·메타광고·배너)은 모두 한 번 이상 진행했었어요.` : '');
+      msgs.push({ status:'warn', text: `${w.name} 매출이 작년 상반기 평균 대비 ${fmtPct(w.rate)} 하락했어요.${gapText}` });
     });
-    if(!issue && declines.length){ const w = declines[0]; issue = { type:'decline', store: w.name, rate: w.rate }; }
+    if(!issue && declines.length){ issue = { type:'decline', stores: declines }; }
 
     const contractData = window.CONTRACT_DATA || [];
     const today = new Date(); today.setHours(0,0,0,0);
@@ -10701,72 +10706,71 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     return { joined, total: keys.length };
   }
 
-  // 매출 하락 이슈: 항상 "가장 최근월"(현재 6월) 매출·마케팅·강수량 데이터만으로 자동 분석해 대본을 생성
-  async function buildDeclineDiscussionAsync(issue){
-    const latest = computeLatestMonthChange(issue.store);
-    const storeAll = findStoreAll(issue.store);
-    const region = storeAll ? storeAll.region : null;
-    const marketing = latest ? getMarketingForStore(issue.store, latest.monthLabel) : null;
+  // 4대 핵심 마케팅 채널(블로그체험단/네이버 플레이스 광고/메타광고/배너) 기준으로
+  // 해당 매장이 보유한 전체 기간(입력된 모든 월) 동안 한 번이라도 진행했는지 확인
+  const CORE_MARKETING_CHANNELS = [
+    { label:'블로그체험단', match:k=>k.includes('블로그체험단') },
+    { label:'네이버 플레이스 광고', match:k=>k.includes('네이버') },
+    { label:'메타광고', match:k=>k.includes('메타') },
+    { label:'배너', match:k=>k.includes('배너') }
+  ];
+  function getMarketingGapsForStore(storeName){
+    const raw = window.MARKETING_DATA || [];
+    const row = raw.find(s=>s[0]===storeName);
+    if(!row || !row[3]) return null;
+    const months = row[3];
+    const done = {};
+    CORE_MARKETING_CHANNELS.forEach(c=>{ done[c.label] = false; });
+    Object.keys(months).forEach(monthLabel=>{
+      const monthData = months[monthLabel] || {};
+      Object.keys(monthData).forEach(key=>{
+        if(monthData[key] !== true) return;
+        CORE_MARKETING_CHANNELS.forEach(c=>{ if(c.match(key)) done[c.label] = true; });
+      });
+    });
+    const missing = CORE_MARKETING_CHANNELS.map(c=>c.label).filter(l=>!done[l]);
+    return { missing, done };
+  }
 
-    let weatherCur = null, weatherPrev = null;
-    if(latest && region){
-      const monthNum = latest.monthIdx+1;
-      [weatherCur, weatherPrev] = await Promise.all([
-        fetchMonthlyRainfall(region, 2026, monthNum),
-        fetchMonthlyRainfall(region, 2025, monthNum)
-      ]);
+  // 매출 하락 이슈: 담당 매장 중 작년 상반기 평균 대비 -10% 이상 하락한 매장을 전부 분석 대상으로 삼아,
+  // 매장별로 하락폭과 마케팅(블로그체험단/네이버 플레이스 광고/메타광고/배너) 미실시 채널을 지적하고
+  // 일정을 잡아주는 대신 채널별로 실행 가능한 조언을 제시함
+  function channelAdvice(label){
+    switch(label){
+      case '블로그체험단': return '블로그체험단으로 지역 리뷰·후기를 늘리는 방법';
+      case '네이버 플레이스 광고': return '네이버 플레이스 광고로 검색 노출을 늘리는 방법';
+      case '메타광고': return '메타광고로 인근 상권 타겟 노출을 늘리는 방법';
+      case '배너': return '시즌 배너로 매장 앞 유동인구에 어필하는 방법';
+      default: return null;
     }
+  }
+
+  async function buildDeclineDiscussionAsync(issue){
+    const stores = issue.stores || (issue.store ? [issue] : []);
+    if(!stores.length) return null;
 
     const lines = [];
-    const monthLabel = latest ? latest.monthLabel : null;
-    let aiIntro = `${issue.store}, ${monthLabel || '최근월'} 매출 데이터를 확인해봤어요. `;
-    if(latest && latest.rate!=null){
-      aiIntro += `전년 동월 대비 ${fmtPct(latest.rate)} ${latest.rate<0?'하락':'증가'}했어요 (작년 ${fmt(latest.prev)} → 올해 ${fmt(latest.cur)}).`;
-    } else if(latest){
-      aiIntro += `이번 달 매출은 ${fmt(latest.cur)}인데, 작년 같은 달 비교 데이터가 없어서 증감률은 확인이 어려웠어요.`;
-    } else {
-      aiIntro += `작년 상반기 평균 대비 ${fmtPct(issue.rate)} 하락한 상태예요.`;
-    }
-    lines.push({who:'ai', text: aiIntro});
+    lines.push({ who:'ai', text: `담당 매장 중 작년 상반기 평균 대비 매출이 10% 이상 하락한 곳이 ${stores.length}곳 있어요. 매장별로 하나씩 짚어드릴게요.` });
 
-    let weatherLine = '';
-    const badWeather = !!(weatherCur && weatherPrev && (weatherCur.total-weatherPrev.total)>=20);
-    if(weatherCur && weatherPrev){
-      const diff = weatherCur.total - weatherPrev.total;
-      weatherLine = Math.abs(diff)>=20
-        ? `날씨 데이터를 보니 ${monthLabel} 강수량이 ${weatherCur.total}mm로 작년 같은 달(${weatherPrev.total}mm)보다 ${diff>0?diff+'mm 더 많았어요.':(-diff)+'mm 더 적었어요.'}`
-        : `${monthLabel} 강수량은 ${weatherCur.total}mm로 작년(${weatherPrev.total}mm)과 큰 차이는 없었어요.`;
-    }
+    const adviceSet = new Set();
+    stores.forEach(w=>{
+      const gap = (typeof getMarketingGapsForStore==='function') ? getMarketingGapsForStore(w.name) : null;
+      let text = `${w.name} — 작년 상반기 평균 대비 ${fmtPct(w.rate)} 하락했어요.`;
+      if(gap && gap.missing.length){
+        text += ` 마케팅은 ${gap.missing.join(', ')}을(를) 전혀 진행하지 않았어요.`;
+        gap.missing.forEach(m=>{ const a = channelAdvice(m); if(a) adviceSet.add(a); });
+      } else if(gap){
+        text += ` 마케팅 채널(블로그체험단·네이버 플레이스 광고·메타광고·배너)은 모두 한 번 이상 진행했었네요.`;
+      }
+      lines.push({ who:'ai', text });
+    });
 
-    let marketingLine = '';
-    const noMarketing = !!(marketing && marketing.joined.length===0);
-    if(marketing){
-      marketingLine = marketing.joined.length===0
-        ? `게다가 ${monthLabel}엔 진행 캠페인 ${marketing.total}개 중 참여한 게 하나도 없었어요.`
-        : marketing.joined.length<marketing.total
-          ? `${monthLabel} 캠페인은 ${marketing.total}개 중 ${marketing.joined.join(', ')}만 참여했어요.`
-          : `${monthLabel}엔 캠페인 ${marketing.total}개 모두 참여했더라고요.`;
-    }
+    const adviceText = adviceSet.size
+      ? `공통적으로 ${Array.from(adviceSet).join(', ')}을 검토해보시면 좋겠어요.`
+      : `마케팅은 이미 다 진행했던 매장들이라, 상권 자체나 경쟁 매장 변화를 먼저 살펴보시는 게 나을 것 같아요.`;
+    lines.push({ who:'ai', text: `${adviceText} 어떻게 생각하세요?` });
 
-    const combined = [weatherLine, marketingLine].filter(Boolean).join(' ');
-    const hasEvidence = badWeather || noMarketing;
-    lines.push({ who:'ai', text: combined ? combined+' 이 중 어떤 영향이 더 컸다고 보세요?' : `${monthLabel} 날씨나 마케팅 참여 데이터로는 뚜렷한 원인을 못 찾았어요. 혹시 확인해보신 게 있을까요?` });
-
-    // 담당자 대사는 실제로 확인된 데이터(날씨/마케팅)에 근거해서만 답하고,
-    // 근거 없는 추측(상권 변화, 경쟁 매장 등)은 절대 말하지 않도록 함
-    let mgrReply;
-    if(badWeather && noMarketing) mgrReply = `말씀대로 ${monthLabel}엔 비가 유독 많이 와서 방문 고객이 줄었고, 마케팅도 놓쳤던 게 겹친 것 같아요.`;
-    else if(badWeather) mgrReply = `네, ${monthLabel}에 비가 많이 와서 확실히 영향이 있었던 것 같아요.`;
-    else if(noMarketing) mgrReply = `날씨보다는 ${monthLabel}에 마케팅을 못 챙긴 영향이 큰 것 같아요.`;
-    else mgrReply = `지금 데이터로는 뚜렷한 원인이 확인되지 않네요. 확실한 근거 없이 말씀드리기보다, 매장에 직접 확인해보고 다시 말씀드릴게요.`;
-    lines.push({who:'mgr', text: mgrReply});
-
-    let aiFollow;
-    if(noMarketing) aiFollow = `그럼 다음 ${monthLabel} 캠페인은 놓치지 않도록 미리 일정 잡아드릴까요?`;
-    else if(badWeather) aiFollow = `날씨 영향이 크다면 우천 시 배달 프로모션을 강화해보는 게 어떨까요?`;
-    else aiFollow = `네, 확인되는 대로 알려주세요. 다음 주에 매출 다시 체크해볼게요.`;
-    lines.push({who:'ai', text: aiFollow});
-    lines.push({who:'mgr', text: hasEvidence ? `네, 그렇게 진행해볼게요. 다음 주까지 결과 공유드릴게요.` : `네, 확인해서 다음 주까지 말씀드릴게요.`});
+    lines.push({ who:'mgr', text: `네, 말씀하신 부분부터 매장별로 하나씩 챙겨볼게요. 상황 다시 확인해서 말씀드릴게요.` });
 
     return lines;
   }
@@ -10969,12 +10973,14 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 
     if(!c.isAI && c.issue){
       // 이슈가 있는 매니저를 클릭하면 AI 담당자에게 찾아가 원인을 함께 논의함
+      // issue.store(단일 매장, 로열티/계약)와 issue.stores(하락 매장 여러 곳)를 모두 안전하게 라벨링
+      const issueLabel = c.issue.store ? c.issue.store : (c.issue.stores ? `하락 매장 ${c.issue.stores.length}곳` : '매장');
       officeStopTalking();
       if(officeDiscussion) officeEndDiscussion();
       officeDiscussion = { managerId:id, script:null, idx:0, started:false, speakerId:null };
       officeLog = [];
       renderOfficeLog();
-      pushOfficeLog('ai', 'AI 담당자', '#38bdf8', `${c.shortName} 담당자님, ${c.issue.store} 매출·마케팅·날씨 데이터를 자동으로 분석하고 있어요. 잠시만요...`);
+      pushOfficeLog('ai', 'AI 담당자', '#38bdf8', `${c.shortName} 담당자님, ${issueLabel} 매출·마케팅 데이터를 자동으로 분석하고 있어요. 잠시만요...`);
       const spot = document.getElementById('officeAiSpot');
       if(spot) spot.textContent = '🔎 데이터 분석 중...';
 
@@ -10985,16 +10991,16 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       c.ty = (aiChar? aiChar.y : AI_DESK.y) + 48;
       renderOfficeChars();
 
-      // 담당자가 걸어가는 동안 백그라운드에서 실제 매출/마케팅/날씨 데이터를 분석해 대본 생성
+      // 담당자가 걸어가는 동안 백그라운드에서 실제 매출/마케팅 데이터를 분석해 대본 생성
       buildDiscussionScriptAsync(c, c.issue).then(script=>{
         if(!officeDiscussion || officeDiscussion.managerId!==id) return; // 그 사이 취소/전환된 경우 무시
-        officeDiscussion.script = script || [{who:'ai', text:`${c.issue.store} 관련 특이사항을 다시 확인했는데 뚜렷한 원인은 못 찾았어요. 함께 살펴봐 주시겠어요?`}];
+        officeDiscussion.script = script || [{who:'ai', text:`${issueLabel} 관련 특이사항을 다시 확인했는데 뚜렷한 원인은 못 찾았어요. 함께 살펴봐 주시겠어요?`}];
         const spot2 = document.getElementById('officeAiSpot');
         if(spot2) spot2.textContent = 'AI 상담 데스크';
         if(officeDiscussion.started && !officeTypeTimer){ startDiscussionTyping(); }
       }).catch(()=>{
         if(!officeDiscussion || officeDiscussion.managerId!==id) return;
-        officeDiscussion.script = [{who:'ai', text:`${c.issue.store} 데이터를 분석하는 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.`}];
+        officeDiscussion.script = [{who:'ai', text:`${issueLabel} 데이터를 분석하는 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.`}];
         const spot2 = document.getElementById('officeAiSpot');
         if(spot2) spot2.textContent = 'AI 상담 데스크';
         if(officeDiscussion.started && !officeTypeTimer){ startDiscussionTyping(); }
