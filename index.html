@@ -10528,8 +10528,36 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   const AI_IDLE_LINES = [
     '안녕하세요! 저는 매출 데이터를 분석하는 AI 담당자예요.',
     '이슈가 있는 담당자를 클릭하면 저를 찾아와서 원인을 함께 이야기해요.',
-    '날씨, 비수기, 물류 등 다양한 원인을 함께 짚어드릴게요!'
+    '매출·마케팅 참여·실제 날씨 데이터까지 자동으로 확인해서 말씀드릴게요!'
   ];
+
+  // 지역별 대표 좌표 (기상 데이터 조회용, 시/군청 인근 대략치)
+  const REGION_COORDS = {
+    '서울':{lat:37.5665,lon:126.9780}, '경기':{lat:37.4138,lon:127.5183}, '인천':{lat:37.4563,lon:126.7052},
+    '부산':{lat:35.1796,lon:129.0756}, '대구':{lat:35.8714,lon:128.6014}, '광주':{lat:35.1595,lon:126.8526},
+    '대전':{lat:36.3504,lon:127.3845}, '울산':{lat:35.5384,lon:129.3114}, '세종':{lat:36.4801,lon:127.2890},
+    '충북':{lat:36.6357,lon:127.4917}, '충남':{lat:36.5184,lon:126.8000}, '경북':{lat:36.4919,lon:128.8889},
+    '경남':{lat:35.4606,lon:128.2132}, '전북':{lat:35.7175,lon:127.1530}, '전남':{lat:34.8161,lon:126.4629},
+    '강원':{lat:37.8228,lon:128.1555}
+  };
+  const officeWeatherCache = {};
+  // Open-Meteo 과거 기상 API로 특정 지역·연·월의 강수량 합계(mm)를 조회 (API 키 불필요, 실패 시 null)
+  function fetchMonthlyRainfall(region, year, month){
+    const key = region+'-'+year+'-'+month;
+    if(officeWeatherCache[key]) return officeWeatherCache[key];
+    const coord = REGION_COORDS[region];
+    if(!coord){ officeWeatherCache[key] = Promise.resolve(null); return officeWeatherCache[key]; }
+    const mm = String(month).padStart(2,'0');
+    const lastDay = new Date(year, month, 0).getDate();
+    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${coord.lat}&longitude=${coord.lon}&start_date=${year}-${mm}-01&end_date=${year}-${mm}-${String(lastDay).padStart(2,'0')}&daily=precipitation_sum&timezone=Asia%2FSeoul`;
+    officeWeatherCache[key] = fetch(url).then(r=>r.json()).then(d=>{
+      const arr = (d && d.daily && d.daily.precipitation_sum) || [];
+      if(!arr.length) return null;
+      const total = arr.reduce((s,v)=>s+(v||0),0);
+      return { total: Math.round(total) };
+    }).catch(()=>null);
+    return officeWeatherCache[key];
+  }
 
   function rand(min,max){ return Math.random()*(max-min)+min; }
   function fmtPct(v){ return (v>0?'+':'') + v.toFixed(1) + '%'; }
@@ -10628,8 +10656,104 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     return { status: worst, texts: msgs.map(m=>m.text), issue };
   }
 
-  // 이슈가 있는 담당자가 AI 담당자를 찾아가 원인을 논의하는 대화 스크립트 생성
-  function buildDiscussionScript(mgrChar, issue){
+  // 매장명으로 26년 매출 원본 데이터(months 배열 포함) 조회
+  function findStoreAll(name){
+    const all = window.ALL || (typeof ALL!=='undefined'?ALL:[]);
+    return all.find(b=>b.name===name);
+  }
+
+  // 담당 매장의 1~6월 중 전년 동월 대비 하락폭이 가장 큰 달을 찾음 (날씨 대조에 사용할 "그 달")
+  function computeWorstMonth(storeName){
+    const cur = findStoreAll(storeName);
+    const all25 = (typeof ALL25!=='undefined') ? ALL25 : (window.ALL25||{});
+    const prevArr = all25[storeName];
+    if(!cur || !cur.months || !prevArr) return null;
+    let worst = null;
+    for(let i=0;i<6;i++){
+      const cv = cur.months[i], pv = prevArr[i];
+      if(cv>0 && pv>0){
+        const rate = (cv-pv)/pv*100;
+        if(!worst || rate<worst.rate) worst = { monthIdx:i, monthLabel: MONTHS[i], cur:cv, prev:pv, rate };
+      }
+    }
+    return worst;
+  }
+
+  // 특정 매장의 특정 월 마케팅 캠페인 참여 현황 조회
+  function getMarketingForStore(storeName, monthLabel){
+    const raw = window.MARKETING_DATA || [];
+    const row = raw.find(s=>s[0]===storeName);
+    if(!row || !row[3]) return null;
+    const monthData = row[3][monthLabel];
+    if(!monthData) return null;
+    const keys = Object.keys(monthData);
+    const joined = keys.filter(k=>monthData[k]===true);
+    return { joined, total: keys.length };
+  }
+
+  // 매출 하락 이슈: 실제 매출/마케팅/날씨 데이터를 자동으로 분석해 AI-담당자 토론 대본을 생성
+  async function buildDeclineDiscussionAsync(issue){
+    const worst = computeWorstMonth(issue.store);
+    const storeAll = findStoreAll(issue.store);
+    const region = storeAll ? storeAll.region : null;
+    const marketing = worst ? getMarketingForStore(issue.store, worst.monthLabel) : null;
+
+    let weatherCur = null, weatherPrev = null;
+    if(worst && region){
+      const monthNum = worst.monthIdx+1;
+      [weatherCur, weatherPrev] = await Promise.all([
+        fetchMonthlyRainfall(region, 2026, monthNum),
+        fetchMonthlyRainfall(region, 2025, monthNum)
+      ]);
+    }
+
+    const lines = [];
+    let aiIntro = `${issue.store} 매출을 자세히 분석해봤어요. `;
+    aiIntro += worst
+      ? `특히 ${worst.monthLabel}에 전년 동월 대비 ${fmtPct(worst.rate)} 하락한 게 가장 커요 (작년 ${fmt(worst.prev)} → 올해 ${fmt(worst.cur)}).`
+      : `작년 상반기 평균 대비 ${fmtPct(issue.rate)} 하락했어요.`;
+    lines.push({who:'ai', text: aiIntro});
+
+    let weatherLine = '';
+    const badWeather = !!(weatherCur && weatherPrev && (weatherCur.total-weatherPrev.total)>=20);
+    if(weatherCur && weatherPrev){
+      const diff = weatherCur.total - weatherPrev.total;
+      weatherLine = Math.abs(diff)>=20
+        ? `날씨 데이터를 보니 ${worst.monthLabel} 강수량이 ${weatherCur.total}mm로 작년 같은 달(${weatherPrev.total}mm)보다 ${diff>0?diff+'mm 더 많았어요.':(-diff)+'mm 더 적었어요.'}`
+        : `${worst.monthLabel} 강수량은 ${weatherCur.total}mm로 작년(${weatherPrev.total}mm)과 큰 차이는 없었어요.`;
+    }
+
+    let marketingLine = '';
+    const noMarketing = !!(marketing && marketing.joined.length===0);
+    if(marketing){
+      marketingLine = marketing.joined.length===0
+        ? `게다가 ${worst.monthLabel}엔 진행 캠페인 ${marketing.total}개 중 참여한 게 하나도 없었어요.`
+        : marketing.joined.length<marketing.total
+          ? `${worst.monthLabel} 캠페인은 ${marketing.total}개 중 ${marketing.joined.join(', ')}만 참여했어요.`
+          : `${worst.monthLabel}엔 캠페인 ${marketing.total}개 모두 참여했더라고요.`;
+    }
+
+    const combined = [weatherLine, marketingLine].filter(Boolean).join(' ');
+    lines.push({ who:'ai', text: combined ? combined+' 이 중 어떤 영향이 더 컸다고 보세요?' : '날씨나 마케팅 참여 데이터로는 뚜렷한 원인을 못 찾았어요. 혹시 다른 요인이 있었을까요?' });
+
+    let mgrReply;
+    if(badWeather && noMarketing) mgrReply = `말씀대로 ${worst.monthLabel}엔 비가 유독 많이 와서 방문 고객이 줄었고, 마케팅도 놓쳤던 게 겹친 것 같아요.`;
+    else if(badWeather) mgrReply = `네, 그 달에 비가 많이 와서 확실히 영향이 있었던 것 같아요.`;
+    else if(noMarketing) mgrReply = `날씨보다는 그 달에 마케팅을 못 챙긴 영향이 큰 것 같아요.`;
+    else mgrReply = `제가 다시 확인해보니 인근 경쟁 매장 오픈이나 주변 상권 변화가 있었던 것 같아요.`;
+    lines.push({who:'mgr', text: mgrReply});
+
+    let aiFollow;
+    if(noMarketing) aiFollow = `그럼 다음 ${worst?worst.monthLabel:''} 캠페인은 놓치지 않도록 미리 일정 잡아드릴까요?`;
+    else if(badWeather) aiFollow = `날씨 영향이 크다면 우천 시 배달 프로모션을 강화해보는 게 어떨까요?`;
+    else aiFollow = `주변 상권 변화라면 경쟁 매장 현황을 한번 조사해볼까요?`;
+    lines.push({who:'ai', text: aiFollow});
+    lines.push({who:'mgr', text: `네, 그렇게 진행해볼게요. 다음 주까지 결과 공유드릴게요.`});
+
+    return lines;
+  }
+
+  async function buildDiscussionScriptAsync(mgrChar, issue){
     if(!issue) return null;
     if(issue.type==='royalty'){
       return [
@@ -10640,13 +10764,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       ];
     }
     if(issue.type==='decline'){
-      return [
-        {who:'ai', text:`${issue.store} 매출이 작년 상반기 평균 대비 ${fmtPct(issue.rate)} 하락했어요. 원인이 뭘까요? 날씨 영향일까요, 비수기 때문일까요, 아니면 물류나 재고 문제가 있었을까요?`},
-        {who:'mgr', text:`이번엔 장마가 길어져서 방문 고객이 줄었고, 여름 비수기까지 겹친 것 같아요. 물류 쪽은 특별한 이슈는 없었어요.`},
-        {who:'ai', text:`날씨·비수기 영향이 크다는 거네요. 방문을 늘릴 프로모션을 검토해볼까요?`},
-        {who:'mgr', text:`네, 배달 프로모션이랑 SNS 홍보를 강화해볼게요.`},
-        {who:'ai', text:`좋아요, 다음 주에 진행 상황을 다시 공유해주세요.`}
-      ];
+      // 매출·마케팅 참여·실제 강수량 데이터를 자동으로 분석해서 대본을 만듦
+      return await buildDeclineDiscussionAsync(issue);
     }
     if(issue.type==='contract'){
       return [
@@ -10834,19 +10953,35 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       // 이슈가 있는 매니저를 클릭하면 AI 담당자에게 찾아가 원인을 함께 논의함
       officeStopTalking();
       if(officeDiscussion) officeEndDiscussion();
-      const script = buildDiscussionScript(c, c.issue);
-      if(script){
-        officeDiscussion = { managerId:id, script, idx:0, started:false, speakerId:null };
-        officeLog = [];
-        renderOfficeLog();
-        c.headingToAI = true;
-        c.waitUntil = 0;
-        const aiChar = officeChars.find(x=>x.isAI);
-        c.tx = (aiChar? aiChar.x : AI_DESK.x) + rand(-36,36);
-        c.ty = (aiChar? aiChar.y : AI_DESK.y) + 48;
-        renderOfficeChars();
-        return;
-      }
+      officeDiscussion = { managerId:id, script:null, idx:0, started:false, speakerId:null };
+      officeLog = [];
+      renderOfficeLog();
+      pushOfficeLog('ai', 'AI 담당자', '#38bdf8', `${c.shortName} 담당자님, ${c.issue.store} 매출·마케팅·날씨 데이터를 자동으로 분석하고 있어요. 잠시만요...`);
+      const spot = document.getElementById('officeAiSpot');
+      if(spot) spot.textContent = '🔎 데이터 분석 중...';
+
+      c.headingToAI = true;
+      c.waitUntil = 0;
+      const aiChar = officeChars.find(x=>x.isAI);
+      c.tx = (aiChar? aiChar.x : AI_DESK.x) + rand(-36,36);
+      c.ty = (aiChar? aiChar.y : AI_DESK.y) + 48;
+      renderOfficeChars();
+
+      // 담당자가 걸어가는 동안 백그라운드에서 실제 매출/마케팅/날씨 데이터를 분석해 대본 생성
+      buildDiscussionScriptAsync(c, c.issue).then(script=>{
+        if(!officeDiscussion || officeDiscussion.managerId!==id) return; // 그 사이 취소/전환된 경우 무시
+        officeDiscussion.script = script || [{who:'ai', text:`${c.issue.store} 관련 특이사항을 다시 확인했는데 뚜렷한 원인은 못 찾았어요. 함께 살펴봐 주시겠어요?`}];
+        const spot2 = document.getElementById('officeAiSpot');
+        if(spot2) spot2.textContent = 'AI 상담 데스크';
+        if(officeDiscussion.started && !officeTypeTimer){ startDiscussionTyping(); }
+      }).catch(()=>{
+        if(!officeDiscussion || officeDiscussion.managerId!==id) return;
+        officeDiscussion.script = [{who:'ai', text:`${c.issue.store} 데이터를 분석하는 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.`}];
+        const spot2 = document.getElementById('officeAiSpot');
+        if(spot2) spot2.textContent = 'AI 상담 데스크';
+        if(officeDiscussion.started && !officeTypeTimer){ startDiscussionTyping(); }
+      });
+      return;
     }
 
     // 기본: 특이사항 없는 매니저이거나 AI 담당자 본인을 클릭한 경우 - 혼자 말하기
@@ -10880,6 +11015,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       mgr.ty = rand(PAD+40, OFFICE_H-PAD);
     }
     officeDiscussion = null;
+    const spot = document.getElementById('officeAiSpot');
+    if(spot) spot.textContent = 'AI 상담 데스크';
     renderOfficeChars();
   }
 
@@ -10990,7 +11127,15 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
             const aiChar = officeChars.find(x=>x.isAI);
             if(aiChar){ c.dir = (aiChar.x>=c.x)?1:-1; aiChar.dir = (c.x>=aiChar.x)?1:-1; }
             officeDiscussion.started = true;
-            startDiscussionTyping();
+            if(officeDiscussion.script){
+              startDiscussionTyping();
+            } else {
+              // 아직 데이터 분석(날씨 API 등)이 끝나지 않은 경우: AI가 분석 중임을 말풍선으로 표시
+              officeDiscussion.speakerId = 'ai';
+              renderOfficeChars();
+              const bubble = document.getElementById('officeBubble-ai');
+              if(bubble) bubble.innerHTML = '🔎 매출·마케팅·날씨 데이터를 분석하고 있어요<span style="opacity:.5;">…</span>';
+            }
             return;
           }
           c.x += (dx/dist)*rushSpeed; c.y += (dy/dist)*rushSpeed;
