@@ -10732,9 +10732,54 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     return { missing, done };
   }
 
+  // ── 매장 하락 심층 분석용 헬퍼들 ──
+
+  // 물류(공급가) 매입률 = 물류 공급가 합계 / 매출 합계 × 100. LOG_BUCKETS 기준(32~36%가 정상 범위)으로 판정
+  function computeLogisticsRatio(storeName, monthsArr){
+    const LOGISTICS = window.LOGISTICS || {};
+    const logArr = LOGISTICS[storeName];
+    if(!logArr) return null;
+    let sumS=0, sumL=0;
+    (monthsArr||[]).forEach((sv,i)=>{ const lv=logArr[i]||0; if(sv>0 && lv>0){ sumS+=sv; sumL+=lv; } });
+    if(sumS<=0 || sumL<=0) return null;
+    const ratio = sumL/sumS*100;
+    const bk = (typeof LOG_BUCKETS!=='undefined') ? LOG_BUCKETS.find(b=>ratio>=b.min && ratio<b.max) : null;
+    return { ratio, guide: bk ? bk.guide : null, normal: bk ? bk.guide==='정상 범위' : null };
+  }
+
+  // 같은 지역 매장들의 월평균 매출(전 기간) — 하락 매장이 지역 평균 대비 어느 수준인지 비교용
+  function computeRegionAvgSales(region){
+    const all = window.ALL || (typeof ALL!=='undefined'?ALL:[]);
+    const stores = all.filter(b=>b.region===region);
+    if(!stores.length) return null;
+    let total=0, count=0;
+    stores.forEach(b=>{
+      const vals = (b.months||[]).filter(v=>v>0);
+      if(vals.length){ total += vals.reduce((s,v)=>s+v,0)/vals.length; count++; }
+    });
+    return count ? total/count : null;
+  }
+
+  // 전체 매장(지역 무관) 월평균 매출 — 지역 평균과 별개로 전사 기준으로도 비교하기 위함
+  function computeOverallAvgSales(){
+    const all = window.ALL || (typeof ALL!=='undefined'?ALL:[]);
+    if(!all.length) return null;
+    let total=0, count=0;
+    all.forEach(b=>{
+      const vals = (b.months||[]).filter(v=>v>0);
+      if(vals.length){ total += vals.reduce((s,v)=>s+v,0)/vals.length; count++; }
+    });
+    return count ? total/count : null;
+  }
+
+  // 로열티 미입금 목록(window.__ROYALTY_CACHE)에 해당 매장이 있는지 확인
+  function isRoyaltyUnpaid(storeName){
+    return (window.__ROYALTY_CACHE || []).some(it => it.store === storeName);
+  }
+
   // 매출 하락 이슈: 담당 매장 중 작년 상반기 평균 대비 -10% 이상 하락한 매장을 전부 분석 대상으로 삼아,
-  // 매장별로 하락폭과 마케팅(블로그체험단/네이버 플레이스 광고/메타광고/배너) 미실시 채널을 지적하고
-  // 일정을 잡아주는 대신 채널별로 실행 가능한 조언을 제시함
+  // 각 매장을 하나씩 꼬치꼬치 짚어감 — 매출 하락폭, 물류 매입률, 마케팅 채널 미실시,
+  // 지역 평균 대비 수준, 로열티 입금 여부까지 확인하고, 일정을 잡아주는 대신 채널별 실행 조언을 제시함
   function channelAdvice(label){
     switch(label){
       case '블로그체험단': return '블로그체험단으로 지역 리뷰·후기를 늘리는 방법';
@@ -10750,27 +10795,66 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     if(!stores.length) return null;
 
     const lines = [];
-    lines.push({ who:'ai', text: `담당 매장 중 작년 상반기 평균 대비 매출이 10% 이상 하락한 곳이 ${stores.length}곳 있어요. 매장별로 하나씩 짚어드릴게요.` });
+    lines.push({ who:'ai', text: `작년 상반기 평균 대비 매출이 10% 이상 하락한 매장이 ${stores.length}곳 있어요. 한 곳씩 매출·물류·마케팅·지역 평균·전체 매장 평균·로열티까지 차례로 짚어볼게요.` });
 
     const adviceSet = new Set();
-    stores.forEach(w=>{
+    stores.forEach((w, idx)=>{
+      const storeAll = findStoreAll(w.name);
+      const monthsArr = storeAll ? storeAll.months : null;
+
+      // 1) 매출 하락폭
+      lines.push({ who:'ai', text: `${idx+1}) ${w.name} — 작년 상반기 평균 대비 ${fmtPct(w.rate)} 하락했어요 (작년 평균 ${fmt(w.avg25)} → 올해 평균 ${fmt(w.avg26)}).` });
+
+      // 2) 물류 매입률 확인
+      const logi = monthsArr ? computeLogisticsRatio(w.name, monthsArr) : null;
+      if(logi){
+        lines.push({ who:'ai', text: logi.normal
+          ? `물류 매입률은 ${logi.ratio.toFixed(1)}%로 정상 범위예요. 물류 쪽 문제는 아닌 것 같아요.`
+          : `물류 매입률이 ${logi.ratio.toFixed(1)}%로 정상 범위(32~36%)를 벗어나 있어요 — "${logi.guide}"가 필요해 보여요.` });
+      } else {
+        lines.push({ who:'ai', text: `물류 데이터가 없어서 매입률은 확인이 어려웠어요.` });
+      }
+
+      // 3) 마케팅 채널 미실시 확인
       const gap = (typeof getMarketingGapsForStore==='function') ? getMarketingGapsForStore(w.name) : null;
-      let text = `${w.name} — 작년 상반기 평균 대비 ${fmtPct(w.rate)} 하락했어요.`;
       if(gap && gap.missing.length){
-        text += ` 마케팅은 ${gap.missing.join(', ')}을(를) 전혀 진행하지 않았어요.`;
+        lines.push({ who:'ai', text: `마케팅은 ${gap.missing.join(', ')}을(를) 전혀 진행하지 않았어요.` });
         gap.missing.forEach(m=>{ const a = channelAdvice(m); if(a) adviceSet.add(a); });
       } else if(gap){
-        text += ` 마케팅 채널(블로그체험단·네이버 플레이스 광고·메타광고·배너)은 모두 한 번 이상 진행했었네요.`;
+        lines.push({ who:'ai', text: `마케팅 채널(블로그체험단·네이버 플레이스 광고·메타광고·배너)은 모두 한 번 이상 진행했었네요.` });
       }
-      lines.push({ who:'ai', text });
+
+      // 4) 지역 평균 대비 매출 수준
+      const regionAvg = w.region ? computeRegionAvgSales(w.region) : null;
+      if(regionAvg && w.avg26){
+        const diffPct = (w.avg26 - regionAvg) / regionAvg * 100;
+        lines.push({ who:'ai', text: diffPct < 0
+          ? `${w.region} 지역 평균 월매출(${fmt(regionAvg)})과 비교하면 이 매장은 ${fmtPct(diffPct)} 낮아요.`
+          : `${w.region} 지역 평균 월매출(${fmt(regionAvg)})보다는 ${fmtPct(diffPct)} 높은 편이라, 하락은 있어도 지역 내에서 유독 부진한 매장은 아니에요.` });
+      }
+
+      // 4-1) 전체 매장 평균 대비 매출 수준 (지역 평균과 별개로 전사 기준으로도 확인)
+      const overallAvg = computeOverallAvgSales();
+      if(overallAvg && w.avg26){
+        const diffPctAll = (w.avg26 - overallAvg) / overallAvg * 100;
+        lines.push({ who:'ai', text: diffPctAll < 0
+          ? `전체 매장 평균 월매출(${fmt(overallAvg)})과 비교해도 ${fmtPct(diffPctAll)} 낮은 편이에요.`
+          : `다만 전체 매장 평균 월매출(${fmt(overallAvg)})보다는 ${fmtPct(diffPctAll)} 높아서, 전사 기준으로는 하위권은 아니에요.` });
+      }
+
+      // 5) 로열티 입금 여부
+      lines.push({ who:'ai', text: isRoyaltyUnpaid(w.name)
+        ? `로열티도 아직 미입금 상태예요. 이 부분은 먼저 확인 부탁드려요.`
+        : `로열티는 정상적으로 입금됐어요.` });
     });
 
+    // 종합 조언 (일정 잡기 X, 채널별 실행 조언)
     const adviceText = adviceSet.size
       ? `공통적으로 ${Array.from(adviceSet).join(', ')}을 검토해보시면 좋겠어요.`
       : `마케팅은 이미 다 진행했던 매장들이라, 상권 자체나 경쟁 매장 변화를 먼저 살펴보시는 게 나을 것 같아요.`;
-    lines.push({ who:'ai', text: `${adviceText} 어떻게 생각하세요?` });
+    lines.push({ who:'ai', text: `${adviceText} 담당자님이 보시기엔 어떤 매장부터 먼저 챙기는 게 나을까요?` });
 
-    lines.push({ who:'mgr', text: `네, 말씀하신 부분부터 매장별로 하나씩 챙겨볼게요. 상황 다시 확인해서 말씀드릴게요.` });
+    lines.push({ who:'mgr', text: `네, 짚어주신 부분부터 매장별로 하나씩 확인해서 다시 말씀드릴게요.` });
 
     return lines;
   }
