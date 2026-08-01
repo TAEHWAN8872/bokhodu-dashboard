@@ -120,6 +120,7 @@ body.hide-names .store-name:hover{
 .office-bubble:after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid #ffffff;}
 .office-chip-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
 .office-chip{display:flex;align-items:center;gap:6px;font-size:11px;color:#c8dff0;background:#111e2e;border:0.5px solid #1e3347;border-radius:20px;padding:5px 11px;cursor:pointer;}
+.office-ai-spot{position:absolute;transform:translate(-50%,0);font-size:9px;font-weight:700;color:#0ea5e9;background:rgba(56,189,248,0.1);border:1px dashed rgba(14,165,233,0.4);border-radius:8px;padding:2px 8px;white-space:nowrap;pointer-events:none;}
 @keyframes officeWalkBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}
 @keyframes officeIdleBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
 @keyframes officeLegL{0%,100%{transform:rotate(22deg)}50%{transform:rotate(-22deg)}}
@@ -10509,9 +10510,16 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     {id:"ljs", label:"이중섭 대리", shortName:"이중섭", color:"#facc15", animal:"cat"},
     {id:"pyt", label:"박영태 대리", shortName:"박영태", color:"#3b82f6", animal:"rabbit"},
     {id:"kdw", label:"강동우 사원", shortName:"강동우", color:"#a855f7", animal:"dog"},
-    {id:"lhm", label:"이현민 사원", shortName:"이현민", color:"#f472b6", animal:"deer"}
+    {id:"lhm", label:"이현민 사원", shortName:"이현민", color:"#f472b6", animal:"deer"},
+    {id:"ai", label:"AI 담당자", shortName:"AI", color:"#38bdf8", isAI:true}
   ];
-  const STATUS_COLOR = { good:'#16a34a', warn:'#d97706', bad:'#dc2626' };
+  const STATUS_COLOR = { good:'#16a34a', warn:'#d97706', bad:'#dc2626', ai:'#38bdf8' };
+  const AI_DESK = { x: OFFICE_W-95, y: 150 };
+  const AI_IDLE_LINES = [
+    '안녕하세요! 저는 매출 데이터를 분석하는 AI 담당자예요.',
+    '이슈가 있는 담당자를 클릭하면 저를 찾아와서 원인을 함께 이야기해요.',
+    '날씨, 비수기, 물류 등 다양한 원인을 함께 짚어드릴게요!'
+  ];
 
   function rand(min,max){ return Math.random()*(max-min)+min; }
   function fmtPct(v){ return (v>0?'+':'') + v.toFixed(1) + '%'; }
@@ -10519,8 +10527,11 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   let officeChars = null;
   let officeStyleMode = 'human';
   let officeTalkingId = null;
+  let officeDiscussion = null; // { managerId, script, idx, started, speakerId }
   let officeTickTimer = null;
   let officeTypeTimer = null;
+  let officeMsgTimer = null;
+  let officeMsgIndex = 0;
   let officeInited = false;
 
   function storeCountOf(mgrLabel){
@@ -10528,24 +10539,47 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     return all.filter(b=>b.manager===mgrLabel).length;
   }
 
-  // 담당자별 브리핑 우선순위: ① 로열티 미입금 ② 매출 급락(전년 상반기 대비 10%↑ 하락) ③ 재계약 임박(6개월 이내) ④ 정상
-  function computeManagerBriefing(mgrLabel){
+  // 담당자 매장들의 최근 매출 합계 / 전월 대비 증감 / 최고 매출 매장을 계산
+  function managerSalesSummary(mgrLabel){
+    const all = window.ALL || (typeof ALL!=='undefined'?ALL:[]);
+    const stores = all.filter(b=>b.manager===mgrLabel);
+    if(!stores.length) return null;
+    let curTotal=0, prevTotal=0, havePrev=true, top=null;
+    stores.forEach(s=>{
+      const vals = (s.months||[]).filter(v=>v>0);
+      const cur = vals.length ? vals[vals.length-1] : 0;
+      const prev = vals.length>1 ? vals[vals.length-2] : null;
+      curTotal += cur;
+      if(prev==null) havePrev=false; else prevTotal += prev;
+      if(cur>0 && (!top || cur>top.val)) top = { name:s.name, val:cur };
+    });
+    const rate = (havePrev && prevTotal>0) ? ((curTotal-prevTotal)/prevTotal*100) : null;
+    return { curTotal, rate, top, storeCount: stores.length };
+  }
+
+  // 담당자별 브리핑: 로열티 미입금 / 매출 급락 / 재계약 임박 등 이슈 + 매출 요약을
+  // 여러 개의 멘트 배열로 만들어, 캐릭터가 순서대로 계속 말할 수 있게 함.
+  // 가장 우선순위 높은 이슈는 issue로 함께 반환해 AI 담당자와의 토론에 사용함.
+  function computeManagerBriefings(mgrLabel){
     const storeCount = storeCountOf(mgrLabel);
     const getMgr = (typeof window.mkStoreManager==='function') ? window.mkStoreManager : function(){ return null; };
+    const msgs = [];
+    let issue = null;
 
     const royalty = (window.__ROYALTY_CACHE || []).filter(it => getMgr(it.store) === mgrLabel);
     if(royalty.length){
       const first = royalty[0];
       const extra = royalty.length>1 ? ` 등 ${royalty.length}곳` : '';
-      return { status:'bad', text: `${first.store}${extra} 로열티가 미입금 상태예요. 확인 부탁드려요.` };
+      msgs.push({ status:'bad', text: `${first.store}${extra} 로열티가 미입금 상태예요. 확인 부탁드려요.` });
+      if(!issue) issue = { type:'royalty', store: first.store, count: royalty.length };
     }
 
     const declineList = (typeof window.getDeclineBranches==='function') ? window.getDeclineBranches().list : [];
     const declines = declineList.filter(r=>r.manager===mgrLabel);
-    if(declines.length){
-      const w = declines[0];
-      return { status:'warn', text: `${w.name} 매출이 작년 상반기 평균 대비 ${fmtPct(w.rate)} 하락했어요. 먼저 확인해보시는 게 좋겠어요.` };
-    }
+    declines.slice(0,3).forEach(w=>{
+      msgs.push({ status:'warn', text: `${w.name} 매출이 작년 상반기 평균 대비 ${fmtPct(w.rate)} 하락했어요. 먼저 확인해보시는 게 좋겠어요.` });
+    });
+    if(!issue && declines.length){ const w = declines[0]; issue = { type:'decline', store: w.name, rate: w.rate }; }
 
     const contractData = window.CONTRACT_DATA || [];
     const today = new Date(); today.setHours(0,0,0,0);
@@ -10558,23 +10592,91 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       })
       .filter(x=>x.days>=0 && x.days<=180)
       .sort((a,b)=>a.days-b.days);
-    if(contracts.length){
-      const w = contracts[0];
-      return { status:'warn', text: `${w.name} 계약 종료까지 ${w.days}일 남았어요. 재계약 안내가 필요해요.` };
+    contracts.slice(0,2).forEach(w=>{
+      msgs.push({ status:'warn', text: `${w.name} 계약 종료까지 ${w.days}일 남았어요. 재계약 안내가 필요해요.` });
+    });
+    if(!issue && contracts.length){ const w = contracts[0]; issue = { type:'contract', store: w.name, days: w.days }; }
+
+    const sales = managerSalesSummary(mgrLabel);
+    if(sales){
+      let salesText = `담당 매장 ${sales.storeCount}곳 최근 월 매출 합계는 ${fmt(sales.curTotal)}이에요.`;
+      if(sales.rate!=null) salesText += ` 전월 대비 ${fmtPct(sales.rate)} ${sales.rate>=0?'증가':'감소'}했어요.`;
+      msgs.push({ status:'good', text: salesText });
+      if(sales.top){
+        msgs.push({ status:'good', text: `이번 달은 ${sales.top.name}이 ${fmt(sales.top.val)}로 가장 매출이 높았어요.` });
+      }
     }
 
-    return { status:'good', text: `담당 매장 ${storeCount}곳 모두 특이사항 없어요. 안정적으로 운영되고 있습니다.` };
+    if(!msgs.length){
+      msgs.push({ status:'good', text: `담당 매장 ${storeCount}곳 모두 특이사항 없어요. 안정적으로 운영되고 있습니다.` });
+    } else {
+      msgs.push({ status:'good', text: `그 외 담당 매장 ${storeCount}곳은 특이사항 없이 안정적으로 운영되고 있어요.` });
+    }
+
+    const worst = msgs.some(m=>m.status==='bad') ? 'bad' : (msgs.some(m=>m.status==='warn') ? 'warn' : 'good');
+    return { status: worst, texts: msgs.map(m=>m.text), issue };
+  }
+
+  // 이슈가 있는 담당자가 AI 담당자를 찾아가 원인을 논의하는 대화 스크립트 생성
+  function buildDiscussionScript(mgrChar, issue){
+    if(!issue) return null;
+    if(issue.type==='royalty'){
+      return [
+        {who:'ai', text:`${issue.store} 로열티가 아직 입금되지 않았어요. 매장에 자금 문제가 있을까요, 아니면 단순 누락일까요?`},
+        {who:'mgr', text:`확인해보니 자금 문제라기보다는 담당자 실수로 이체가 누락됐을 가능성이 커 보여요.`},
+        {who:'ai', text:`그렇다면 빠르게 안내 문자를 보내는 게 좋겠어요. 혹시 반복되는 매장인가요?`},
+        {who:'mgr', text:`아니요, 이번이 처음이에요. 바로 연락드릴게요.`}
+      ];
+    }
+    if(issue.type==='decline'){
+      return [
+        {who:'ai', text:`${issue.store} 매출이 작년 상반기 평균 대비 ${fmtPct(issue.rate)} 하락했어요. 원인이 뭘까요? 날씨 영향일까요, 비수기 때문일까요, 아니면 물류나 재고 문제가 있었을까요?`},
+        {who:'mgr', text:`이번엔 장마가 길어져서 방문 고객이 줄었고, 여름 비수기까지 겹친 것 같아요. 물류 쪽은 특별한 이슈는 없었어요.`},
+        {who:'ai', text:`날씨·비수기 영향이 크다는 거네요. 방문을 늘릴 프로모션을 검토해볼까요?`},
+        {who:'mgr', text:`네, 배달 프로모션이랑 SNS 홍보를 강화해볼게요.`},
+        {who:'ai', text:`좋아요, 다음 주에 진행 상황을 다시 공유해주세요.`}
+      ];
+    }
+    if(issue.type==='contract'){
+      return [
+        {who:'ai', text:`${issue.store} 계약 종료까지 ${issue.days}일 남았어요. 재계약 협상은 어떻게 진행하면 좋을까요?`},
+        {who:'mgr', text:`매장 사장님과 통화해봤는데 조건 조정을 원하시더라고요.`},
+        {who:'ai', text:`경쟁사 조건을 비교해서 제안서를 준비해드릴까요?`},
+        {who:'mgr', text:`네, 이번 주 안에 자료 부탁드려요.`}
+      ];
+    }
+    return null;
   }
 
   function initOfficeChars(){
+    const stage = document.getElementById('officeStage');
+    if(stage && !document.getElementById('officeAiSpot')){
+      const spot = document.createElement('div');
+      spot.id = 'officeAiSpot';
+      spot.className = 'office-ai-spot';
+      spot.style.left = AI_DESK.x+'px';
+      spot.style.top = (AI_DESK.y+34)+'px';
+      spot.textContent = 'AI 상담 데스크';
+      stage.appendChild(spot);
+    }
     officeChars = OFFICE_MANAGER_DEFS.map((m,i)=>{
-      const briefing = computeManagerBriefing(m.label);
+      if(m.isAI){
+        return Object.assign({}, m, {
+          hair: '#334155',
+          status: 'ai', headlines: AI_IDLE_LINES, headline: AI_IDLE_LINES[0],
+          x: AI_DESK.x, y: AI_DESK.y, tx: AI_DESK.x, ty: AI_DESK.y,
+          dir: -1, phase: 'idle', waitUntil: Infinity, issue: null
+        });
+      }
+      const briefing = computeManagerBriefings(m.label);
       return Object.assign({}, m, {
         hair: HAIR_COLORS[i % HAIR_COLORS.length],
-        status: briefing.status, headline: briefing.text,
+        status: briefing.status, headlines: briefing.texts, headline: briefing.texts[0],
+        issue: briefing.issue,
         x: rand(PAD, OFFICE_W-PAD), y: rand(PAD+40, OFFICE_H-PAD),
         tx: rand(PAD, OFFICE_W-PAD), ty: rand(PAD+40, OFFICE_H-PAD),
         dir: 1, phase: 'walking', waitUntil: 0
+
       });
     });
   }
@@ -10582,8 +10684,9 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   window.refreshOfficeBriefings = function(){
     if(!officeChars) return;
     officeChars.forEach(c=>{
-      const b = computeManagerBriefing(c.label);
-      c.status = b.status; c.headline = b.text;
+      if(c.isAI) return;
+      const b = computeManagerBriefings(c.label);
+      c.status = b.status; c.headlines = b.texts; c.headline = b.texts[0]; c.issue = b.issue;
     });
     renderOfficeChips();
   };
@@ -10616,7 +10719,14 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     const legAnimR = isWalking ? 'officeLegR .32s linear infinite' : 'none';
     const armAnimL = isWalking ? 'officeArmL .32s linear infinite' : (isTalking ? 'officeWave 1.5s ease-in-out infinite' : 'none');
     const armAnimR = isWalking ? 'officeArmR .32s linear infinite' : 'none';
-    const headPart = isAC ? `
+    const headPart = c.isAI ? `
+        <rect x="33" y="2" width="4" height="6" fill="#64748b"/>
+        <circle cx="35" cy="3" r="3" fill="${isTalking?'#7dd3fc':'#38bdf8'}"/>
+        <rect x="20" y="8" width="30" height="24" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.4"/>
+        <circle cx="29" cy="20" r="3.2" fill="${isTalking?'#7dd3fc':'#38bdf8'}"/>
+        <circle cx="41" cy="20" r="3.2" fill="${isTalking?'#7dd3fc':'#38bdf8'}"/>
+        <rect x="29" y="26" width="12" height="${isTalking?3.2:2}" rx="1.4" fill="#7dd3fc"/>
+      ` : isAC ? `
         ${earsSVG(c.animal, fur)}
         <circle cx="35" cy="20" r="14" fill="${fur.base}"/>
         ${faceSVG(c.animal, fur, isTalking)}
@@ -10629,8 +10739,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         <circle cx="40" cy="20" r="1.6" fill="#1e293b"/>
         <ellipse cx="35" cy="26" rx="4.5" ry="${isTalking?3.2:1.1}" fill="#c2664a"/>
       `;
-    const handFill = isAC ? fur.light : '#f0b98d';
-    const neckFill = isAC ? fur.base : '#f0b98d';
+    const handFill = c.isAI ? '#94a3b8' : (isAC ? fur.light : '#f0b98d');
+    const neckFill = c.isAI ? '#1e293b' : (isAC ? fur.base : '#f0b98d');
     return `<svg viewBox="0 0 70 110" width="38" height="60" style="display:block;">
       <g style="transform-origin:30px 78px;animation:${legAnim}"><rect x="26" y="76" width="8" height="28" rx="3.5" fill="#334155"/></g>
       <g style="transform-origin:40px 78px;animation:${legAnimR}"><rect x="36" y="76" width="8" height="28" rx="3.5" fill="#475569"/></g>
@@ -10644,6 +10754,12 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       ${headPart}
       <circle cx="49" cy="7" r="5.5" fill="${STATUS_COLOR[c.status]}" stroke="#ffffff" stroke-width="2"/>
     </svg>`;
+  }
+
+  function officeIsSpeaking(id){
+    if(officeTalkingId===id) return true;
+    if(officeDiscussion && officeDiscussion.started && officeDiscussion.speakerId===id) return true;
+    return false;
   }
 
   function renderOfficeChars(){
@@ -10661,7 +10777,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       }
       el.style.left = c.x+'px';
       el.style.top = c.y+'px';
-      const talking = officeTalkingId===c.id;
+      const talking = officeIsSpeaking(c.id);
       el.style.zIndex = talking ? 10 : 2;
 
       // phase/talking/스타일이 바뀔 때만 모양을 다시 그림.
@@ -10675,7 +10791,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
           <div class="office-char-figure ${c.phase}" style="transform:scaleX(${c.dir});">${personSVG(c)}</div>
           <div class="office-char-name ${talking?'talking':''}">${c.shortName}</div>
         `;
-        if(talking){ startOfficeTyping(c); }
+        if(talking && officeTalkingId===c.id){ startOfficeTyping(c); }
       } else {
         // 모양은 그대로 두고 좌우 방향(scaleX)만 갱신 (애니메이션 유지)
         const figure = el.querySelector('.office-char-figure');
@@ -10685,24 +10801,114 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   }
 
   function officeHandleClick(id){
-    if(officeTalkingId===id) return;
+    const c = (officeChars||[]).find(x=>x.id===id);
+    if(!c) return;
+
+    // 이미 혼자 말하고 있는 캐릭터를 다시 클릭 → 종료
+    if(officeTalkingId===id){ officeStopTalking(); return; }
+
+    // 이미 AI와 토론 중인 매니저를 다시 클릭 → 토론 종료
+    if(officeDiscussion && officeDiscussion.managerId===id){ officeEndDiscussion(); return; }
+
+    if(!c.isAI && c.issue){
+      // 이슈가 있는 매니저를 클릭하면 AI 담당자에게 찾아가 원인을 함께 논의함
+      officeStopTalking();
+      if(officeDiscussion) officeEndDiscussion();
+      const script = buildDiscussionScript(c, c.issue);
+      if(script){
+        officeDiscussion = { managerId:id, script, idx:0, started:false, speakerId:null };
+        c.headingToAI = true;
+        c.waitUntil = 0;
+        const aiChar = officeChars.find(x=>x.isAI);
+        c.tx = (aiChar? aiChar.x : AI_DESK.x) + rand(-36,36);
+        c.ty = (aiChar? aiChar.y : AI_DESK.y) + 48;
+        renderOfficeChars();
+        return;
+      }
+    }
+
+    // 기본: 특이사항 없는 매니저이거나 AI 담당자 본인을 클릭한 경우 - 혼자 말하기
+    if(officeDiscussion) officeEndDiscussion();
+    if(officeTypeTimer) clearInterval(officeTypeTimer);
+    if(officeMsgTimer) clearTimeout(officeMsgTimer);
     officeTalkingId = id;
+    officeMsgIndex = 0;
     renderOfficeChars();
   }
   window.officeHandleClickPublic = officeHandleClick;
 
+  function officeStopTalking(){
+    if(officeTypeTimer) clearInterval(officeTypeTimer);
+    if(officeMsgTimer) clearTimeout(officeMsgTimer);
+    officeTypeTimer = null; officeMsgTimer = null;
+    officeTalkingId = null; officeMsgIndex = 0;
+    renderOfficeChars();
+  }
+
+  function officeEndDiscussion(){
+    if(!officeDiscussion) return;
+    if(officeTypeTimer) clearInterval(officeTypeTimer);
+    if(officeMsgTimer) clearTimeout(officeMsgTimer);
+    officeTypeTimer = null; officeMsgTimer = null;
+    const mgr = (officeChars||[]).find(x=>x.id===officeDiscussion.managerId);
+    if(mgr){
+      mgr.headingToAI = false;
+      mgr.waitUntil = 0;
+      mgr.tx = rand(PAD, OFFICE_W-PAD);
+      mgr.ty = rand(PAD+40, OFFICE_H-PAD);
+    }
+    officeDiscussion = null;
+    renderOfficeChars();
+  }
+
+  // 말풍선이 한 마디로 끝나지 않고, 담당 매장의 여러 데이터(이슈/매출 요약 등)를
+  // 순서대로 계속 타이핑해서 보여줌. 사용자가 캐릭터를 다시 클릭할 때까지 반복됨.
   function startOfficeTyping(c){
     const bubble = document.getElementById('officeBubble-'+c.id);
     if(!bubble) return;
+    if(officeTalkingId !== c.id) return; // 이미 대화가 종료된 경우 중단
     if(officeTypeTimer) clearInterval(officeTypeTimer);
-    const text = c.headline || '';
+    if(officeMsgTimer) clearTimeout(officeMsgTimer);
+    const messages = (c.headlines && c.headlines.length) ? c.headlines : [c.headline || ''];
+    const text = messages[officeMsgIndex % messages.length] || '';
     let idx = 0;
     officeTypeTimer = setInterval(()=>{
       idx++;
       bubble.innerHTML = text.slice(0, idx) + (idx<text.length ? '<span style="opacity:.5;">▍</span>' : '');
       if(idx>=text.length){
         clearInterval(officeTypeTimer);
-        setTimeout(()=>{ officeTalkingId=null; renderOfficeChars(); }, 1400);
+        officeMsgTimer = setTimeout(()=>{
+          if(officeTalkingId !== c.id) return; // 그 사이 다른 캐릭터로 전환/종료된 경우 중단
+          officeMsgIndex = (officeMsgIndex+1) % messages.length;
+          startOfficeTyping(c);
+        }, 2400);
+      }
+    }, 26);
+  }
+
+  // AI 담당자와 이슈 매니저가 번갈아 말하는 토론 진행. 대본을 끝까지 마치면
+  // 처음부터 다시 반복하며, 매니저를 다시 클릭하면 종료됨.
+  function startDiscussionTyping(){
+    if(!officeDiscussion) return;
+    const line = officeDiscussion.script[officeDiscussion.idx % officeDiscussion.script.length];
+    officeDiscussion.speakerId = line.who==='ai' ? 'ai' : officeDiscussion.managerId;
+    renderOfficeChars();
+    const bubble = document.getElementById('officeBubble-'+officeDiscussion.speakerId);
+    if(!bubble) return;
+    if(officeTypeTimer) clearInterval(officeTypeTimer);
+    if(officeMsgTimer) clearTimeout(officeMsgTimer);
+    const text = line.text;
+    let idx = 0;
+    officeTypeTimer = setInterval(()=>{
+      idx++;
+      bubble.innerHTML = text.slice(0, idx) + (idx<text.length ? '<span style="opacity:.5;">▍</span>' : '');
+      if(idx>=text.length){
+        clearInterval(officeTypeTimer);
+        officeMsgTimer = setTimeout(()=>{
+          if(!officeDiscussion) return; // 그 사이 종료된 경우 중단
+          officeDiscussion.idx++;
+          startDiscussionTyping();
+        }, 2200);
       }
     }, 26);
   }
@@ -10712,6 +10918,32 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     const now = Date.now();
     const speed = 1.15;
     officeChars.forEach(c=>{
+      if(c.isAI){
+        // AI 담당자는 데스크에 고정. 토론 중이거나 혼자 말하는 중일 때만 talking으로 표시
+        c.phase = (officeTalkingId===c.id || (officeDiscussion && officeDiscussion.started)) ? 'talking' : 'idle';
+        return;
+      }
+
+      if(officeDiscussion && officeDiscussion.managerId===c.id){
+        if(c.headingToAI){
+          const dx = c.tx-c.x, dy = c.ty-c.y, dist = Math.hypot(dx,dy);
+          if(dist<4){
+            c.headingToAI = false;
+            c.phase = 'talking';
+            const aiChar = officeChars.find(x=>x.isAI);
+            if(aiChar){ c.dir = (aiChar.x>=c.x)?1:-1; aiChar.dir = (c.x>=aiChar.x)?1:-1; }
+            officeDiscussion.started = true;
+            startDiscussionTyping();
+            return;
+          }
+          c.x += (dx/dist)*speed; c.y += (dy/dist)*speed;
+          c.dir = dx>=0?1:-1; c.phase = 'walking';
+          return;
+        }
+        c.phase = 'talking';
+        return;
+      }
+
       if(c.id===officeTalkingId){ c.phase='talking'; return; }
       if(c.waitUntil && now < c.waitUntil){ c.phase='idle'; return; }
       if(c.waitUntil && now >= c.waitUntil){
