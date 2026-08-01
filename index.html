@@ -10663,20 +10663,30 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   }
 
   // 담당 매장의 1~6월 중 전년 동월 대비 하락폭이 가장 큰 달을 찾음 (날씨 대조에 사용할 "그 달")
-  function computeWorstMonth(storeName){
+  // 전체 매장 데이터 중 실제로 매출이 입력된 가장 최근 달의 인덱스(0=1월 ... 5=6월)를 찾음
+  function getLatestMonthIdx(){
+    const all = window.ALL || (typeof ALL!=='undefined'?ALL:[]);
+    let maxIdx = -1;
+    all.forEach(b=>{
+      (b.months||[]).forEach((v,i)=>{ if(v>0 && i>maxIdx) maxIdx = i; });
+    });
+    return maxIdx;
+  }
+
+  // 담당 매장의 "가장 최근월(현재 데이터 기준 6월)" 매출을 전년 동월과 비교
+  // 과거 여러 달 중 원인을 찾는 게 아니라, 항상 최신 데이터 기준으로만 분석함
+  function computeLatestMonthChange(storeName){
+    const idx = getLatestMonthIdx();
+    if(idx<0) return null;
     const cur = findStoreAll(storeName);
+    if(!cur || !cur.months) return null;
+    const cv = cur.months[idx];
+    if(!(cv>0)) return null; // 최근월 데이터 자체가 없으면 분석 불가
     const all25 = (typeof ALL25!=='undefined') ? ALL25 : (window.ALL25||{});
     const prevArr = all25[storeName];
-    if(!cur || !cur.months || !prevArr) return null;
-    let worst = null;
-    for(let i=0;i<6;i++){
-      const cv = cur.months[i], pv = prevArr[i];
-      if(cv>0 && pv>0){
-        const rate = (cv-pv)/pv*100;
-        if(!worst || rate<worst.rate) worst = { monthIdx:i, monthLabel: MONTHS[i], cur:cv, prev:pv, rate };
-      }
-    }
-    return worst;
+    const pv = (prevArr && prevArr[idx]>0) ? prevArr[idx] : null;
+    const rate = pv!=null ? (cv-pv)/pv*100 : null;
+    return { monthIdx:idx, monthLabel: MONTHS[idx], cur:cv, prev:pv, rate };
   }
 
   // 특정 매장의 특정 월 마케팅 캠페인 참여 현황 조회
@@ -10691,16 +10701,16 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     return { joined, total: keys.length };
   }
 
-  // 매출 하락 이슈: 실제 매출/마케팅/날씨 데이터를 자동으로 분석해 AI-담당자 토론 대본을 생성
+  // 매출 하락 이슈: 항상 "가장 최근월"(현재 6월) 매출·마케팅·강수량 데이터만으로 자동 분석해 대본을 생성
   async function buildDeclineDiscussionAsync(issue){
-    const worst = computeWorstMonth(issue.store);
+    const latest = computeLatestMonthChange(issue.store);
     const storeAll = findStoreAll(issue.store);
     const region = storeAll ? storeAll.region : null;
-    const marketing = worst ? getMarketingForStore(issue.store, worst.monthLabel) : null;
+    const marketing = latest ? getMarketingForStore(issue.store, latest.monthLabel) : null;
 
     let weatherCur = null, weatherPrev = null;
-    if(worst && region){
-      const monthNum = worst.monthIdx+1;
+    if(latest && region){
+      const monthNum = latest.monthIdx+1;
       [weatherCur, weatherPrev] = await Promise.all([
         fetchMonthlyRainfall(region, 2026, monthNum),
         fetchMonthlyRainfall(region, 2025, monthNum)
@@ -10708,10 +10718,15 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     }
 
     const lines = [];
-    let aiIntro = `${issue.store} 매출을 자세히 분석해봤어요. `;
-    aiIntro += worst
-      ? `특히 ${worst.monthLabel}에 전년 동월 대비 ${fmtPct(worst.rate)} 하락한 게 가장 커요 (작년 ${fmt(worst.prev)} → 올해 ${fmt(worst.cur)}).`
-      : `작년 상반기 평균 대비 ${fmtPct(issue.rate)} 하락했어요.`;
+    const monthLabel = latest ? latest.monthLabel : null;
+    let aiIntro = `${issue.store}, ${monthLabel || '최근월'} 매출 데이터를 확인해봤어요. `;
+    if(latest && latest.rate!=null){
+      aiIntro += `전년 동월 대비 ${fmtPct(latest.rate)} ${latest.rate<0?'하락':'증가'}했어요 (작년 ${fmt(latest.prev)} → 올해 ${fmt(latest.cur)}).`;
+    } else if(latest){
+      aiIntro += `이번 달 매출은 ${fmt(latest.cur)}인데, 작년 같은 달 비교 데이터가 없어서 증감률은 확인이 어려웠어요.`;
+    } else {
+      aiIntro += `작년 상반기 평균 대비 ${fmtPct(issue.rate)} 하락한 상태예요.`;
+    }
     lines.push({who:'ai', text: aiIntro});
 
     let weatherLine = '';
@@ -10719,36 +10734,39 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     if(weatherCur && weatherPrev){
       const diff = weatherCur.total - weatherPrev.total;
       weatherLine = Math.abs(diff)>=20
-        ? `날씨 데이터를 보니 ${worst.monthLabel} 강수량이 ${weatherCur.total}mm로 작년 같은 달(${weatherPrev.total}mm)보다 ${diff>0?diff+'mm 더 많았어요.':(-diff)+'mm 더 적었어요.'}`
-        : `${worst.monthLabel} 강수량은 ${weatherCur.total}mm로 작년(${weatherPrev.total}mm)과 큰 차이는 없었어요.`;
+        ? `날씨 데이터를 보니 ${monthLabel} 강수량이 ${weatherCur.total}mm로 작년 같은 달(${weatherPrev.total}mm)보다 ${diff>0?diff+'mm 더 많았어요.':(-diff)+'mm 더 적었어요.'}`
+        : `${monthLabel} 강수량은 ${weatherCur.total}mm로 작년(${weatherPrev.total}mm)과 큰 차이는 없었어요.`;
     }
 
     let marketingLine = '';
     const noMarketing = !!(marketing && marketing.joined.length===0);
     if(marketing){
       marketingLine = marketing.joined.length===0
-        ? `게다가 ${worst.monthLabel}엔 진행 캠페인 ${marketing.total}개 중 참여한 게 하나도 없었어요.`
+        ? `게다가 ${monthLabel}엔 진행 캠페인 ${marketing.total}개 중 참여한 게 하나도 없었어요.`
         : marketing.joined.length<marketing.total
-          ? `${worst.monthLabel} 캠페인은 ${marketing.total}개 중 ${marketing.joined.join(', ')}만 참여했어요.`
-          : `${worst.monthLabel}엔 캠페인 ${marketing.total}개 모두 참여했더라고요.`;
+          ? `${monthLabel} 캠페인은 ${marketing.total}개 중 ${marketing.joined.join(', ')}만 참여했어요.`
+          : `${monthLabel}엔 캠페인 ${marketing.total}개 모두 참여했더라고요.`;
     }
 
     const combined = [weatherLine, marketingLine].filter(Boolean).join(' ');
-    lines.push({ who:'ai', text: combined ? combined+' 이 중 어떤 영향이 더 컸다고 보세요?' : '날씨나 마케팅 참여 데이터로는 뚜렷한 원인을 못 찾았어요. 혹시 다른 요인이 있었을까요?' });
+    const hasEvidence = badWeather || noMarketing;
+    lines.push({ who:'ai', text: combined ? combined+' 이 중 어떤 영향이 더 컸다고 보세요?' : `${monthLabel} 날씨나 마케팅 참여 데이터로는 뚜렷한 원인을 못 찾았어요. 혹시 확인해보신 게 있을까요?` });
 
+    // 담당자 대사는 실제로 확인된 데이터(날씨/마케팅)에 근거해서만 답하고,
+    // 근거 없는 추측(상권 변화, 경쟁 매장 등)은 절대 말하지 않도록 함
     let mgrReply;
-    if(badWeather && noMarketing) mgrReply = `말씀대로 ${worst.monthLabel}엔 비가 유독 많이 와서 방문 고객이 줄었고, 마케팅도 놓쳤던 게 겹친 것 같아요.`;
-    else if(badWeather) mgrReply = `네, 그 달에 비가 많이 와서 확실히 영향이 있었던 것 같아요.`;
-    else if(noMarketing) mgrReply = `날씨보다는 그 달에 마케팅을 못 챙긴 영향이 큰 것 같아요.`;
-    else mgrReply = `제가 다시 확인해보니 인근 경쟁 매장 오픈이나 주변 상권 변화가 있었던 것 같아요.`;
+    if(badWeather && noMarketing) mgrReply = `말씀대로 ${monthLabel}엔 비가 유독 많이 와서 방문 고객이 줄었고, 마케팅도 놓쳤던 게 겹친 것 같아요.`;
+    else if(badWeather) mgrReply = `네, ${monthLabel}에 비가 많이 와서 확실히 영향이 있었던 것 같아요.`;
+    else if(noMarketing) mgrReply = `날씨보다는 ${monthLabel}에 마케팅을 못 챙긴 영향이 큰 것 같아요.`;
+    else mgrReply = `지금 데이터로는 뚜렷한 원인이 확인되지 않네요. 확실한 근거 없이 말씀드리기보다, 매장에 직접 확인해보고 다시 말씀드릴게요.`;
     lines.push({who:'mgr', text: mgrReply});
 
     let aiFollow;
-    if(noMarketing) aiFollow = `그럼 다음 ${worst?worst.monthLabel:''} 캠페인은 놓치지 않도록 미리 일정 잡아드릴까요?`;
+    if(noMarketing) aiFollow = `그럼 다음 ${monthLabel} 캠페인은 놓치지 않도록 미리 일정 잡아드릴까요?`;
     else if(badWeather) aiFollow = `날씨 영향이 크다면 우천 시 배달 프로모션을 강화해보는 게 어떨까요?`;
-    else aiFollow = `주변 상권 변화라면 경쟁 매장 현황을 한번 조사해볼까요?`;
+    else aiFollow = `네, 확인되는 대로 알려주세요. 다음 주에 매출 다시 체크해볼게요.`;
     lines.push({who:'ai', text: aiFollow});
-    lines.push({who:'mgr', text: `네, 그렇게 진행해볼게요. 다음 주까지 결과 공유드릴게요.`});
+    lines.push({who:'mgr', text: hasEvidence ? `네, 그렇게 진행해볼게요. 다음 주까지 결과 공유드릴게요.` : `네, 확인해서 다음 주까지 말씀드릴게요.`});
 
     return lines;
   }
