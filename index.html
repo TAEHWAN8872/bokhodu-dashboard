@@ -92,6 +92,42 @@ body.hide-names .store-name:hover{
 .tab[data-region="강원"].active{background:rgba(245,158,11,0.2);border-color:#f59e0b;color:#f59e0b;}
 .tab[data-region="강원"]:hover{border-color:#f59e0b;color:#f59e0b;}
 
+/* AI 오피스 */
+.office-style-toggle{display:flex;gap:4px;background:#0d1e30;border:0.5px solid #1e3347;border-radius:20px;padding:3px;}
+.office-style-btn{border:none;cursor:pointer;font-size:11px;font-weight:700;padding:5px 12px;border-radius:16px;background:transparent;color:#6b8fa8;transition:all .15s ease;}
+.office-style-btn.active{background:#1a3a5c;color:#7eb8e8;}
+.office-stage{position:relative;width:100%;max-width:680px;height:400px;margin:0 auto;background:linear-gradient(180deg,#fbf7f0 0%,#f3ead9 100%);border:1px solid #e2d9c8;border-radius:16px;overflow:hidden;}
+.office-header-band{position:absolute;top:0;left:0;width:100%;height:100px;background:#eef2f7;border-bottom:3px solid #d9e2ec;}
+.office-window{position:absolute;width:90px;height:64px;border-radius:6px;overflow:hidden;border:5px solid #ffffff;box-shadow:0 2px 6px rgba(0,0,0,.08);background:linear-gradient(180deg,#bfe3fb 0%,#e6f4fd 100%);}
+.office-window-cloud1{position:absolute;left:10px;top:14px;width:22px;height:9px;background:#ffffff;border-radius:8px;opacity:.85;}
+.office-window-cloud2{position:absolute;left:40px;top:26px;width:28px;height:10px;background:#ffffff;border-radius:8px;opacity:.85;}
+.office-window-cross-h{position:absolute;left:0;top:50%;width:100%;height:2px;background:#ffffff;}
+.office-window-cross-v{position:absolute;top:0;left:50%;width:2px;height:100%;background:#ffffff;}
+.office-rug{position:absolute;left:50%;top:56%;transform:translate(-50%,-50%);width:150px;height:60px;border-radius:30px;background:#e4c9a3;border:2px solid #d3b083;opacity:.8;}
+.office-floor-line{position:absolute;left:0;width:100%;height:1px;background:rgba(180,140,90,0.12);}
+.office-desk{position:absolute;width:62px;height:40px;}
+.office-desk-top{position:absolute;bottom:0;width:100%;height:26px;background:#c98a53;border-radius:5px;box-shadow:0 3px 4px rgba(0,0,0,.12);}
+.office-desk-mon{position:absolute;bottom:22px;left:16px;width:30px;height:18px;background:#334155;border-radius:3px 3px 1px 1px;}
+.office-desk-screen{position:absolute;bottom:25px;left:19px;width:24px;height:12px;background:#7dd3fc;}
+.office-plant{position:absolute;}
+.office-char{position:absolute;transform:translate(-50%,-50%);cursor:pointer;}
+.office-char-figure{width:38px;height:60px;filter:drop-shadow(0 3px 3px rgba(0,0,0,.2));}
+.office-char-figure.walking{animation:officeWalkBob .32s ease-in-out infinite;}
+.office-char-figure.idle,.office-char-figure.talking{animation:officeIdleBob 2s ease-in-out infinite;}
+.office-char-name{text-align:center;font-size:9.5px;margin-top:2px;color:#64748b;font-weight:600;white-space:nowrap;text-shadow:0 1px 2px rgba(255,255,255,.8);}
+.office-char-name.talking{color:#1e293b;font-weight:700;}
+.office-bubble{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:8px;width:210px;background:#ffffff;border:1px solid #dbe4ee;border-radius:10px;padding:8px 10px;font-size:11.5px;line-height:1.5;color:#334155;box-shadow:0 6px 18px rgba(30,41,59,.18);z-index:20;}
+.office-bubble:after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid #ffffff;}
+.office-chip-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
+.office-chip{display:flex;align-items:center;gap:6px;font-size:11px;color:#c8dff0;background:#111e2e;border:0.5px solid #1e3347;border-radius:20px;padding:5px 11px;cursor:pointer;}
+@keyframes officeWalkBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}
+@keyframes officeIdleBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes officeLegL{0%,100%{transform:rotate(22deg)}50%{transform:rotate(-22deg)}}
+@keyframes officeLegR{0%,100%{transform:rotate(-22deg)}50%{transform:rotate(22deg)}}
+@keyframes officeArmL{0%,100%{transform:rotate(-24deg)}50%{transform:rotate(24deg)}}
+@keyframes officeArmR{0%,100%{transform:rotate(24deg)}50%{transform:rotate(-24deg)}}
+@keyframes officeWave{0%,100%{transform:rotate(0deg)}25%{transform:rotate(-26deg)}50%{transform:rotate(0deg)}75%{transform:rotate(-16deg)}}
+
 /* KPI */
 .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px;}
 @media (min-width:1100px){
@@ -427,6 +463,7 @@ body.hide-names .store-name:hover{
     <div class="page-tab" id="pageTab-contract" onclick="switchPage('contract')">📋 재계약 안내<span class="pt-badge" id="rcUrgentBadge" style="display:none;"></span></div>
     <div class="page-tab" id="pageTab-marketing" onclick="switchPage('marketing')">📣 마케팅 참여현황</div>
     <div class="page-tab" id="pageTab-royalty" onclick="switchPage('royalty')">💰 로열티 미입금<span class="pt-badge" id="royaltyBadge" style="display:none;"></span></div>
+    <div class="page-tab" id="pageTab-office" onclick="switchPage('office')">🏢 AI 오피스</div>
     <div class="page-tab" id="pageTab-keyword" onclick="window.open('https://taehwan8872.github.io/bokhodu-keyword-tracker/', '_blank')" style="display:inline-flex;align-items:center;gap:4px;line-height:1;"><span style="display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:15px;height:15px;background:#03C75A;color:#fff;font-weight:800;font-size:10px;border-radius:3px;">N</span><span>키워드검색량</span></div>
     <div class="page-tab" id="pageTab-aichat" onclick="openAiChatWindow()" style="display:inline-flex;align-items:center;gap:4px;line-height:1;"><span>🤖</span><span>AI 챗봇</span></div>
   </div>
@@ -565,6 +602,40 @@ body.hide-names .store-name:hover{
           <tbody id="royaltyTableBody"></tbody>
         </table>
       </div>
+    </div>
+  </div>
+
+  <!-- AI 오피스 페이지 -->
+  <div id="officePage" style="display:none;">
+    <div class="card" style="padding:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+        <div style="font-size:11px;color:#6b8fa8;">캐릭터를 누르면 멈춰서 실제 매출·재계약·로열티 데이터 기반 브리핑을 말해요</div>
+        <div class="office-style-toggle">
+          <button id="officeStyleBtn-human" class="office-style-btn active" onclick="setOfficeStyle('human')">사람</button>
+          <button id="officeStyleBtn-ac" class="office-style-btn" onclick="setOfficeStyle('ac')">동물의숲풍</button>
+        </div>
+      </div>
+      <div id="officeStage" class="office-stage">
+        <div class="office-header-band"></div>
+        <div class="office-window" style="top:16px;left:40px;"><div class="office-window-cloud1"></div><div class="office-window-cloud2"></div><div class="office-window-cross-h"></div><div class="office-window-cross-v"></div></div>
+        <div class="office-window" style="top:16px;left:300px;"><div class="office-window-cloud1"></div><div class="office-window-cloud2"></div><div class="office-window-cross-h"></div><div class="office-window-cross-v"></div></div>
+        <div class="office-window" style="top:16px;right:40px;"><div class="office-window-cloud1"></div><div class="office-window-cloud2"></div><div class="office-window-cross-h"></div><div class="office-window-cross-v"></div></div>
+        <div class="office-floor-line" style="top:100px;"></div>
+        <div class="office-floor-line" style="top:150px;"></div>
+        <div class="office-floor-line" style="top:200px;"></div>
+        <div class="office-floor-line" style="top:250px;"></div>
+        <div class="office-floor-line" style="top:300px;"></div>
+        <div class="office-floor-line" style="top:350px;"></div>
+        <div class="office-desk" style="left:26px;top:110px;"><div class="office-desk-top"></div><div class="office-desk-mon"></div><div class="office-desk-screen"></div></div>
+        <div class="office-desk" style="right:26px;top:110px;"><div class="office-desk-top"></div><div class="office-desk-mon"></div><div class="office-desk-screen"></div></div>
+        <div class="office-desk" style="left:26px;bottom:20px;"><div class="office-desk-top"></div><div class="office-desk-mon"></div><div class="office-desk-screen"></div></div>
+        <div class="office-desk" style="right:26px;bottom:20px;"><div class="office-desk-top"></div><div class="office-desk-mon"></div><div class="office-desk-screen"></div></div>
+        <div class="office-rug"></div>
+        <div class="office-plant" style="left:4px;top:350px;"><svg width="30" height="40" viewBox="0 0 30 40"><path d="M15 24 C6 20 6 8 15 4 C24 8 24 20 15 24" fill="#4ade80"/><path d="M15 22 C8 24 22 24 15 22" fill="#22c55e"/><rect x="9" y="24" width="12" height="12" rx="2" fill="#b45309"/></svg></div>
+        <div class="office-plant" style="right:4px;top:96px;"><svg width="30" height="40" viewBox="0 0 30 40"><path d="M15 24 C6 20 6 8 15 4 C24 8 24 20 15 24" fill="#4ade80"/><path d="M15 22 C8 24 22 24 15 22" fill="#22c55e"/><rect x="9" y="24" width="12" height="12" rx="2" fill="#b45309"/></svg></div>
+        <!-- 캐릭터는 JS로 렌더링됩니다 -->
+      </div>
+      <div id="officeChipRow" class="office-chip-row"></div>
     </div>
   </div>
 
@@ -3655,6 +3726,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     const key = normalizeStoreNameForManagerMatch(name);
     return window.__mkManagerMap.hasOwnProperty(key) ? window.__mkManagerMap[key] : null;
   }
+  window.mkStoreManager = mkStoreManager;
   function mkPopulateManagerSel(){
     const sel = document.getElementById('mkManagerSel');
     if(!sel || sel.__populated) return;
@@ -4052,16 +4124,19 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     document.getElementById('contractPage').style.display = (page==='contract') ? '' : 'none';
     document.getElementById('marketingPage').style.display = (page==='marketing') ? '' : 'none';
     document.getElementById('royaltyPage').style.display = (page==='royalty') ? '' : 'none';
+    document.getElementById('officePage').style.display = (page==='office') ? '' : 'none';
     document.getElementById('pageTab-sales').classList.toggle('active', page==='sales');
     document.getElementById('pageTab-realtime').classList.toggle('active', page==='realtime');
     document.getElementById('pageTab-contract').classList.toggle('active', page==='contract');
     document.getElementById('pageTab-marketing').classList.toggle('active', page==='marketing');
     document.getElementById('pageTab-royalty').classList.toggle('active', page==='royalty');
-    document.getElementById('brandTitle').textContent = (page==='sales') ? '복호두 매출 현황판' : (page==='realtime') ? '복호두 실시간 매출' : (page==='contract') ? '복호두 재계약 안내' : (page==='marketing') ? '복호두 마케팅 참여현황' : '복호두 로열티 미입금 관리';
+    document.getElementById('pageTab-office').classList.toggle('active', page==='office');
+    document.getElementById('brandTitle').textContent = (page==='sales') ? '복호두 매출 현황판' : (page==='realtime') ? '복호두 실시간 매출' : (page==='contract') ? '복호두 재계약 안내' : (page==='marketing') ? '복호두 마케팅 참여현황' : (page==='royalty') ? '복호두 로열티 미입금 관리' : '복호두 담당자 AI 오피스';
     if(page==='contract'){ renderContractKpis(); renderContractTable(); }
     if(page==='marketing'){ renderMarketingKpis(); renderMarketingRegionChips(); renderMarketingTable(); }
     if(page==='royalty'){ loadRoyaltyUnpaid(); }
     if(page==='realtime' && window.__RT_DATA){ window.renderRtTable(); }
+    if(page==='office'){ window.initOfficePage && window.initOfficePage(); }
   };
 
   window.setRcFilter = function(status){
@@ -4181,6 +4256,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     list.sort((a,b)=>a.rate-b.rate); // 하락폭이 큰 매장이 위로
     return {list};
   }
+  window.getDeclineBranches = getDeclineBranches;
 
   function checkDeclineAlert(){
     const {list} = getDeclineBranches();
@@ -4325,6 +4401,8 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       const res = await fetch(ROYALTY_API_URL + '?action=list');
       const data = await res.json();
       ROYALTY_CACHE = Array.isArray(data) ? data : (data.items||[]);
+      window.__ROYALTY_CACHE = ROYALTY_CACHE;
+      if(typeof window.refreshOfficeBriefings==='function') window.refreshOfficeBriefings();
       loadingEl.style.display = 'none';
       window.renderRoyaltyPage();
     }catch(e){
@@ -4385,6 +4463,8 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       const data = await res.json();
       const list = Array.isArray(data) ? data : (data.items||[]);
       ROYALTY_CACHE = list;
+      window.__ROYALTY_CACHE = list;
+      if(typeof window.refreshOfficeBriefings==='function') window.refreshOfficeBriefings();
       renderRoyaltyBadge(list.length);
       if(list.length===0) return;
       document.getElementById('royaltyAlertSub').textContent = `로열티 미입금 매장이 ${list.length}곳 있습니다. (입금 확인 시 목록에서 제거해주세요)`;
@@ -10406,6 +10486,282 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     document.getElementById('rtClosedModal').classList.remove('open');
   };
 
+})();
+</script>
+
+<!-- AI 오피스: 실제 매출/재계약/로열티 데이터를 기반으로 담당자 캐릭터가 브리핑하는 페이지 -->
+<script>
+(function(){
+  const OFFICE_W = 680, OFFICE_H = 400, PAD = 55;
+  const HAIR_COLORS = ["#3f2e1e","#2b2b2b","#4a3826","#1f1f1f","#5a4530","#332222"];
+  const ANIMAL_FUR = {
+    fox:{base:"#f0a458",light:"#fff5e6"},
+    bear:{base:"#a9764f",light:"#f2d9b8"},
+    cat:{base:"#d9d2c7",light:"#ffffff"},
+    rabbit:{base:"#f6e9df",light:"#ffffff"},
+    dog:{base:"#e0b878",light:"#fffaf0"},
+    deer:{base:"#c99a6b",light:"#f5e6cf"}
+  };
+  // label은 ALL 데이터의 b.manager 값과 정확히 일치해야 매출/재계약/로열티 매칭이 됩니다.
+  const OFFICE_MANAGER_DEFS = [
+    {id:"kth", label:"김태환 과장", shortName:"김태환", color:"#22c55e", animal:"fox"},
+    {id:"ldh", label:"임도형 과장", shortName:"임도형", color:"#ef4444", animal:"bear"},
+    {id:"ljs", label:"이중섭 대리", shortName:"이중섭", color:"#facc15", animal:"cat"},
+    {id:"pyt", label:"박영태 대리", shortName:"박영태", color:"#3b82f6", animal:"rabbit"},
+    {id:"kdw", label:"강동우 사원", shortName:"강동우", color:"#a855f7", animal:"dog"},
+    {id:"lhm", label:"이현민 사원", shortName:"이현민", color:"#f472b6", animal:"deer"}
+  ];
+  const STATUS_COLOR = { good:'#16a34a', warn:'#d97706', bad:'#dc2626' };
+
+  function rand(min,max){ return Math.random()*(max-min)+min; }
+  function fmtPct(v){ return (v>0?'+':'') + v.toFixed(1) + '%'; }
+
+  let officeChars = null;
+  let officeStyleMode = 'human';
+  let officeTalkingId = null;
+  let officeTickTimer = null;
+  let officeTypeTimer = null;
+  let officeInited = false;
+
+  function storeCountOf(mgrLabel){
+    const all = window.ALL || (typeof ALL!=='undefined'?ALL:[]);
+    return all.filter(b=>b.manager===mgrLabel).length;
+  }
+
+  // 담당자별 브리핑 우선순위: ① 로열티 미입금 ② 매출 급락(전년 상반기 대비 10%↑ 하락) ③ 재계약 임박(6개월 이내) ④ 정상
+  function computeManagerBriefing(mgrLabel){
+    const storeCount = storeCountOf(mgrLabel);
+    const getMgr = (typeof window.mkStoreManager==='function') ? window.mkStoreManager : function(){ return null; };
+
+    const royalty = (window.__ROYALTY_CACHE || []).filter(it => getMgr(it.store) === mgrLabel);
+    if(royalty.length){
+      const first = royalty[0];
+      const extra = royalty.length>1 ? ` 등 ${royalty.length}곳` : '';
+      return { status:'bad', text: `${first.store}${extra} 로열티가 미입금 상태예요. 확인 부탁드려요.` };
+    }
+
+    const declineList = (typeof window.getDeclineBranches==='function') ? window.getDeclineBranches().list : [];
+    const declines = declineList.filter(r=>r.manager===mgrLabel);
+    if(declines.length){
+      const w = declines[0];
+      return { status:'warn', text: `${w.name} 매출이 작년 상반기 평균 대비 ${fmtPct(w.rate)} 하락했어요. 먼저 확인해보시는 게 좋겠어요.` };
+    }
+
+    const contractData = window.CONTRACT_DATA || [];
+    const today = new Date(); today.setHours(0,0,0,0);
+    const contracts = contractData
+      .filter(r => r[5] && getMgr(r[1]) === mgrLabel)
+      .map(r=>{
+        const end = new Date(r[5]+'T00:00:00');
+        const days = Math.round((end-today)/86400000);
+        return { name:r[1], days };
+      })
+      .filter(x=>x.days>=0 && x.days<=180)
+      .sort((a,b)=>a.days-b.days);
+    if(contracts.length){
+      const w = contracts[0];
+      return { status:'warn', text: `${w.name} 계약 종료까지 ${w.days}일 남았어요. 재계약 안내가 필요해요.` };
+    }
+
+    return { status:'good', text: `담당 매장 ${storeCount}곳 모두 특이사항 없어요. 안정적으로 운영되고 있습니다.` };
+  }
+
+  function initOfficeChars(){
+    officeChars = OFFICE_MANAGER_DEFS.map((m,i)=>{
+      const briefing = computeManagerBriefing(m.label);
+      return Object.assign({}, m, {
+        hair: HAIR_COLORS[i % HAIR_COLORS.length],
+        status: briefing.status, headline: briefing.text,
+        x: rand(PAD, OFFICE_W-PAD), y: rand(PAD+40, OFFICE_H-PAD),
+        tx: rand(PAD, OFFICE_W-PAD), ty: rand(PAD+40, OFFICE_H-PAD),
+        dir: 1, phase: 'walking', waitUntil: 0
+      });
+    });
+  }
+
+  window.refreshOfficeBriefings = function(){
+    if(!officeChars) return;
+    officeChars.forEach(c=>{
+      const b = computeManagerBriefing(c.label);
+      c.status = b.status; c.headline = b.text;
+    });
+    renderOfficeChips();
+  };
+
+  function earsSVG(type, fur){
+    switch(type){
+      case 'fox': return `<path d="M20 10 L14 -4 L28 6 Z" fill="${fur.base}"/><path d="M50 10 L56 -4 L42 6 Z" fill="${fur.base}"/><path d="M21 8 L18 -1 L27 6 Z" fill="${fur.light}"/><path d="M49 8 L52 -1 L43 6 Z" fill="${fur.light}"/>`;
+      case 'cat': return `<path d="M19 9 L13 -6 L29 5 Z" fill="${fur.base}"/><path d="M51 9 L57 -6 L41 5 Z" fill="${fur.base}"/><path d="M20 7 L17 -1 L27 5 Z" fill="#f4b8c6"/><path d="M50 7 L53 -1 L43 5 Z" fill="#f4b8c6"/>`;
+      case 'bear': return `<circle cx="18" cy="4" r="8" fill="${fur.base}"/><circle cx="52" cy="4" r="8" fill="${fur.base}"/><circle cx="18" cy="4" r="4" fill="${fur.light}"/><circle cx="52" cy="4" r="4" fill="${fur.light}"/>`;
+      case 'dog': return `<path d="M17 6 Q6 14 12 30 Q22 26 22 12 Z" fill="${fur.base}"/><path d="M53 6 Q64 14 58 30 Q48 26 48 12 Z" fill="${fur.base}"/>`;
+      case 'rabbit': return `<path d="M22 6 Q18 -22 27 -22 Q31 -2 30 8 Z" fill="${fur.base}"/><path d="M48 6 Q52 -22 43 -22 Q39 -2 40 8 Z" fill="${fur.base}"/><path d="M23 3 Q21 -16 27 -17 Q29 -2 29 5 Z" fill="#f9c9d6"/><path d="M47 3 Q49 -16 43 -17 Q41 -2 41 5 Z" fill="#f9c9d6"/>`;
+      case 'deer': return `<path d="M22 2 Q14 -10 8 -8 M14 -6 Q10 -12 5 -12" stroke="#8a6a45" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M48 2 Q56 -10 62 -8 M56 -6 Q60 -12 65 -12" stroke="#8a6a45" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M19 8 L13 -2 L27 5 Z" fill="${fur.base}"/><path d="M51 8 L57 -2 L43 5 Z" fill="${fur.base}"/>`;
+      default: return '';
+    }
+  }
+  function faceSVG(type, fur, isTalking){
+    const muzzle = type==='cat'
+      ? `<ellipse cx="35" cy="24" rx="6" ry="4" fill="${fur.light}"/>`
+      : `<ellipse cx="35" cy="25" rx="7.5" ry="5.5" fill="${fur.light}"/>`;
+    const whiskers = type==='cat' ? `<path d="M27 25 L18 23 M27 27 L18 28" stroke="#c7bfb2" stroke-width="0.8"/><path d="M43 25 L52 23 M43 27 L52 28" stroke="#c7bfb2" stroke-width="0.8"/>` : '';
+    return `${muzzle}<circle cx="30" cy="19" r="1.6" fill="#1e293b"/><circle cx="40" cy="19" r="1.6" fill="#1e293b"/><ellipse cx="35" cy="26" rx="${type==='cat'?1.4:2.2}" ry="${isTalking?2.6:1.1}" fill="#7a4a3a"/>${whiskers}`;
+  }
+
+  function personSVG(c){
+    const isWalking = c.phase==='walking';
+    const isTalking = c.phase==='talking';
+    const fur = ANIMAL_FUR[c.animal] || ANIMAL_FUR.fox;
+    const isAC = officeStyleMode==='ac';
+    const legAnim = isWalking ? 'officeLegL .32s linear infinite' : 'none';
+    const legAnimR = isWalking ? 'officeLegR .32s linear infinite' : 'none';
+    const armAnimL = isWalking ? 'officeArmL .32s linear infinite' : (isTalking ? 'officeWave 1.5s ease-in-out infinite' : 'none');
+    const armAnimR = isWalking ? 'officeArmR .32s linear infinite' : 'none';
+    const headPart = isAC ? `
+        ${earsSVG(c.animal, fur)}
+        <circle cx="35" cy="20" r="14" fill="${fur.base}"/>
+        ${faceSVG(c.animal, fur, isTalking)}
+        <circle cx="24" cy="24" r="2.2" fill="#f7b6b6" opacity="0.7"/>
+        <circle cx="46" cy="24" r="2.2" fill="#f7b6b6" opacity="0.7"/>
+      ` : `
+        <circle cx="35" cy="20" r="14" fill="#f0b98d"/>
+        <path d="M21 18 Q21 4 35 4 Q49 4 49 18 Q49 10 35 10 Q21 10 21 18Z" fill="${c.hair}"/>
+        <circle cx="30" cy="20" r="1.6" fill="#1e293b"/>
+        <circle cx="40" cy="20" r="1.6" fill="#1e293b"/>
+        <ellipse cx="35" cy="26" rx="4.5" ry="${isTalking?3.2:1.1}" fill="#c2664a"/>
+      `;
+    const handFill = isAC ? fur.light : '#f0b98d';
+    const neckFill = isAC ? fur.base : '#f0b98d';
+    return `<svg viewBox="0 0 70 110" width="38" height="60" style="display:block;">
+      <g style="transform-origin:30px 78px;animation:${legAnim}"><rect x="26" y="76" width="8" height="28" rx="3.5" fill="#334155"/></g>
+      <g style="transform-origin:40px 78px;animation:${legAnimR}"><rect x="36" y="76" width="8" height="28" rx="3.5" fill="#475569"/></g>
+      <ellipse cx="30" cy="105" rx="6" ry="3" fill="#1e293b"/>
+      <ellipse cx="40" cy="105" rx="6" ry="3" fill="#1e293b"/>
+      <g style="transform-origin:20px 48px;animation:${armAnimL}"><rect x="14" y="45" width="8" height="26" rx="4" fill="${c.color}"/><circle cx="18" cy="72" r="4.2" fill="${handFill}"/></g>
+      <g style="transform-origin:50px 48px;animation:${armAnimR}"><rect x="48" y="45" width="8" height="26" rx="4" fill="${c.color}"/><circle cx="52" cy="72" r="4.2" fill="${handFill}"/></g>
+      <path d="M22 40 Q35 32 48 40 L50 78 Q35 84 20 78 Z" fill="${c.color}"/>
+      <path d="M31 40 L35 47 L39 40 Z" fill="#ffffff" opacity="0.85"/>
+      <rect x="30" y="27" width="10" height="10" fill="${neckFill}"/>
+      ${headPart}
+      <circle cx="49" cy="7" r="5.5" fill="${STATUS_COLOR[c.status]}" stroke="#ffffff" stroke-width="2"/>
+    </svg>`;
+  }
+
+  function renderOfficeChars(){
+    const stage = document.getElementById('officeStage');
+    if(!stage || !officeChars) return;
+    officeChars.forEach(c=>{
+      let el = document.getElementById('officeChar-'+c.id);
+      const isNew = !el;
+      if(isNew){
+        el = document.createElement('div');
+        el.id = 'officeChar-'+c.id;
+        el.className = 'office-char';
+        el.addEventListener('click', function(){ officeHandleClick(c.id); });
+        stage.appendChild(el);
+      }
+      el.style.left = c.x+'px';
+      el.style.top = c.y+'px';
+      const talking = officeTalkingId===c.id;
+      el.style.zIndex = talking ? 10 : 2;
+
+      // phase/talking/스타일이 바뀔 때만 모양을 다시 그림.
+      // (매 tick마다 innerHTML을 통째로 재생성하면 팔다리 CSS 애니메이션이
+      //  계속 0%로 리셋되어 거의 멈춘 것처럼 보이는 문제가 있었음)
+      const renderKey = c.phase+'|'+talking+'|'+officeStyleMode;
+      if(isNew || el.dataset.renderKey !== renderKey){
+        el.dataset.renderKey = renderKey;
+        el.innerHTML = `
+          ${talking ? `<div class="office-bubble" id="officeBubble-${c.id}"></div>` : ''}
+          <div class="office-char-figure ${c.phase}" style="transform:scaleX(${c.dir});">${personSVG(c)}</div>
+          <div class="office-char-name ${talking?'talking':''}">${c.shortName}</div>
+        `;
+        if(talking){ startOfficeTyping(c); }
+      } else {
+        // 모양은 그대로 두고 좌우 방향(scaleX)만 갱신 (애니메이션 유지)
+        const figure = el.querySelector('.office-char-figure');
+        if(figure) figure.style.transform = 'scaleX('+c.dir+')';
+      }
+    });
+  }
+
+  function officeHandleClick(id){
+    if(officeTalkingId===id) return;
+    officeTalkingId = id;
+    renderOfficeChars();
+  }
+  window.officeHandleClickPublic = officeHandleClick;
+
+  function startOfficeTyping(c){
+    const bubble = document.getElementById('officeBubble-'+c.id);
+    if(!bubble) return;
+    if(officeTypeTimer) clearInterval(officeTypeTimer);
+    const text = c.headline || '';
+    let idx = 0;
+    officeTypeTimer = setInterval(()=>{
+      idx++;
+      bubble.innerHTML = text.slice(0, idx) + (idx<text.length ? '<span style="opacity:.5;">▍</span>' : '');
+      if(idx>=text.length){
+        clearInterval(officeTypeTimer);
+        setTimeout(()=>{ officeTalkingId=null; renderOfficeChars(); }, 1400);
+      }
+    }, 26);
+  }
+
+  function officeTick(){
+    if(!officeChars) return;
+    const now = Date.now();
+    const speed = 1.15;
+    officeChars.forEach(c=>{
+      if(c.id===officeTalkingId){ c.phase='talking'; return; }
+      if(c.waitUntil && now < c.waitUntil){ c.phase='idle'; return; }
+      if(c.waitUntil && now >= c.waitUntil){
+        c.waitUntil = 0;
+        c.tx = rand(PAD, OFFICE_W-PAD);
+        c.ty = rand(PAD+40, OFFICE_H-PAD);
+        return;
+      }
+      const dx = c.tx-c.x, dy = c.ty-c.y;
+      const dist = Math.hypot(dx,dy);
+      if(dist<4){ c.phase='idle'; c.waitUntil = now+rand(1600,4200); return; }
+      c.x += (dx/dist)*speed; c.y += (dy/dist)*speed;
+      c.dir = dx>=0?1:-1; c.phase='walking';
+    });
+    renderOfficeChars();
+  }
+
+  function renderOfficeChips(){
+    const row = document.getElementById('officeChipRow');
+    if(!row || !officeChars) return;
+    row.innerHTML = officeChars.map(c=>`
+      <div class="office-chip" onclick="officeHandleClickPublic('${c.id}')">
+        <span style="width:8px;height:8px;border-radius:50%;background:${c.color};display:inline-block;"></span>
+        ${c.shortName}
+        <span style="width:6px;height:6px;border-radius:50%;background:${STATUS_COLOR[c.status]};display:inline-block;"></span>
+      </div>
+    `).join('');
+  }
+
+  window.setOfficeStyle = function(mode){
+    officeStyleMode = mode;
+    const humanBtn = document.getElementById('officeStyleBtn-human');
+    const acBtn = document.getElementById('officeStyleBtn-ac');
+    if(humanBtn) humanBtn.classList.toggle('active', mode==='human');
+    if(acBtn) acBtn.classList.toggle('active', mode==='ac');
+    renderOfficeChars();
+  };
+
+  window.initOfficePage = function(){
+    if(!officeInited){
+      officeInited = true;
+      initOfficeChars();
+      renderOfficeChars();
+      renderOfficeChips();
+      officeTickTimer = setInterval(officeTick, 40);
+    } else {
+      // 페이지 재방문 시: 캐릭터 위치/애니메이션은 유지하고 브리핑 내용만 최신 데이터로 갱신
+      window.refreshOfficeBriefings();
+    }
+  };
 })();
 </script>
 </body>
