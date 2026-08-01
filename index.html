@@ -96,7 +96,7 @@ body.hide-names .store-name:hover{
 .office-style-toggle{display:flex;gap:4px;background:#0d1e30;border:0.5px solid #1e3347;border-radius:20px;padding:3px;}
 .office-style-btn{border:none;cursor:pointer;font-size:11px;font-weight:700;padding:5px 12px;border-radius:16px;background:transparent;color:#6b8fa8;transition:all .15s ease;}
 .office-style-btn.active{background:#1a3a5c;color:#7eb8e8;}
-.office-stage{position:relative;width:100%;max-width:680px;height:400px;margin:0 auto;background:linear-gradient(180deg,#fbf7f0 0%,#f3ead9 100%);border:1px solid #e2d9c8;border-radius:16px;overflow:hidden;}
+.office-stage{position:relative;width:100%;max-width:920px;height:500px;margin:0 auto;background:linear-gradient(180deg,#fbf7f0 0%,#f3ead9 100%);border:1px solid #e2d9c8;border-radius:16px;overflow:hidden;}
 .office-header-band{position:absolute;top:0;left:0;width:100%;height:100px;background:#eef2f7;border-bottom:3px solid #d9e2ec;}
 .office-window{position:absolute;width:90px;height:64px;border-radius:6px;overflow:hidden;border:5px solid #ffffff;box-shadow:0 2px 6px rgba(0,0,0,.08);background:linear-gradient(180deg,#bfe3fb 0%,#e6f4fd 100%);}
 .office-window-cloud1{position:absolute;left:10px;top:14px;width:22px;height:9px;background:#ffffff;border-radius:8px;opacity:.85;}
@@ -121,6 +121,14 @@ body.hide-names .store-name:hover{
 .office-chip-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
 .office-chip{display:flex;align-items:center;gap:6px;font-size:11px;color:#c8dff0;background:#111e2e;border:0.5px solid #1e3347;border-radius:20px;padding:5px 11px;cursor:pointer;}
 .office-ai-spot{position:absolute;transform:translate(-50%,0);font-size:9px;font-weight:700;color:#0ea5e9;background:rgba(56,189,248,0.1);border:1px dashed rgba(14,165,233,0.4);border-radius:8px;padding:2px 8px;white-space:nowrap;pointer-events:none;}
+.office-log-title{font-size:11px;color:#6b8fa8;margin:14px 0 6px;font-weight:600;}
+.office-log{max-height:220px;overflow-y:auto;background:#0d1e30;border:0.5px solid #1e3347;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:10px;}
+.office-log-empty{font-size:11.5px;color:#4a6070;text-align:center;padding:26px 0;}
+.office-log-row{display:flex;gap:8px;align-items:flex-start;}
+.office-log-avatar{flex:0 0 auto;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;color:#0a1628;}
+.office-log-body{flex:1;min-width:0;}
+.office-log-name{font-size:10.5px;font-weight:700;margin-bottom:2px;}
+.office-log-text{font-size:12px;color:#c8dff0;line-height:1.5;word-break:break-word;}
 @keyframes officeWalkBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}
 @keyframes officeIdleBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
 @keyframes officeLegL{0%,100%{transform:rotate(22deg)}50%{transform:rotate(-22deg)}}
@@ -619,7 +627,7 @@ body.hide-names .store-name:hover{
       <div id="officeStage" class="office-stage">
         <div class="office-header-band"></div>
         <div class="office-window" style="top:16px;left:40px;"><div class="office-window-cloud1"></div><div class="office-window-cloud2"></div><div class="office-window-cross-h"></div><div class="office-window-cross-v"></div></div>
-        <div class="office-window" style="top:16px;left:300px;"><div class="office-window-cloud1"></div><div class="office-window-cloud2"></div><div class="office-window-cross-h"></div><div class="office-window-cross-v"></div></div>
+        <div class="office-window" style="top:16px;left:415px;"><div class="office-window-cloud1"></div><div class="office-window-cloud2"></div><div class="office-window-cross-h"></div><div class="office-window-cross-v"></div></div>
         <div class="office-window" style="top:16px;right:40px;"><div class="office-window-cloud1"></div><div class="office-window-cloud2"></div><div class="office-window-cross-h"></div><div class="office-window-cross-v"></div></div>
         <div class="office-floor-line" style="top:100px;"></div>
         <div class="office-floor-line" style="top:150px;"></div>
@@ -637,6 +645,8 @@ body.hide-names .store-name:hover{
         <!-- 캐릭터는 JS로 렌더링됩니다 -->
       </div>
       <div id="officeChipRow" class="office-chip-row"></div>
+      <div class="office-log-title">💬 AI-담당자 대화 기록</div>
+      <div id="officeLog" class="office-log"></div>
     </div>
   </div>
 
@@ -10493,7 +10503,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 <!-- AI 오피스: 실제 매출/재계약/로열티 데이터를 기반으로 담당자 캐릭터가 브리핑하는 페이지 -->
 <script>
 (function(){
-  const OFFICE_W = 680, OFFICE_H = 400, PAD = 55;
+  const OFFICE_W = 920, OFFICE_H = 500, PAD = 55;
   const HAIR_COLORS = ["#3f2e1e","#2b2b2b","#4a3826","#1f1f1f","#5a4530","#332222"];
   const ANIMAL_FUR = {
     fox:{base:"#f0a458",light:"#fff5e6"},
@@ -10514,7 +10524,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     {id:"ai", label:"AI 담당자", shortName:"AI", color:"#38bdf8", isAI:true}
   ];
   const STATUS_COLOR = { good:'#16a34a', warn:'#d97706', bad:'#dc2626', ai:'#38bdf8' };
-  const AI_DESK = { x: OFFICE_W-95, y: 150 };
+  const AI_DESK = { x: OFFICE_W/2, y: 150 };
   const AI_IDLE_LINES = [
     '안녕하세요! 저는 매출 데이터를 분석하는 AI 담당자예요.',
     '이슈가 있는 담당자를 클릭하면 저를 찾아와서 원인을 함께 이야기해요.',
@@ -10533,6 +10543,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   let officeMsgTimer = null;
   let officeMsgIndex = 0;
   let officeInited = false;
+  let officeLog = []; // AI-담당자 대화 기록 (아래 로그 패널에 표시)
 
   function storeCountOf(mgrLabel){
     const all = window.ALL || (typeof ALL!=='undefined'?ALL:[]);
@@ -10650,6 +10661,15 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 
   function initOfficeChars(){
     const stage = document.getElementById('officeStage');
+    if(stage && !document.getElementById('officeAiDesk')){
+      const desk = document.createElement('div');
+      desk.id = 'officeAiDesk';
+      desk.className = 'office-desk';
+      desk.style.left = (AI_DESK.x-31)+'px';
+      desk.style.top = (AI_DESK.y-46)+'px';
+      desk.innerHTML = '<div class="office-desk-top"></div><div class="office-desk-mon"></div><div class="office-desk-screen"></div>';
+      stage.appendChild(desk);
+    }
     if(stage && !document.getElementById('officeAiSpot')){
       const spot = document.createElement('div');
       spot.id = 'officeAiSpot';
@@ -10817,6 +10837,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       const script = buildDiscussionScript(c, c.issue);
       if(script){
         officeDiscussion = { managerId:id, script, idx:0, started:false, speakerId:null };
+        officeLog = [];
+        renderOfficeLog();
         c.headingToAI = true;
         c.waitUntil = 0;
         const aiChar = officeChars.find(x=>x.isAI);
@@ -10886,12 +10908,46 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     }, 26);
   }
 
+  // 대화 기록 패널을 officeLog 배열 내용으로 다시 그림
+  function renderOfficeLog(){
+    const el = document.getElementById('officeLog');
+    if(!el) return;
+    if(!officeLog.length){
+      el.innerHTML = '<div class="office-log-empty">이슈가 있는 담당자를 클릭하면<br>AI 담당자와의 대화 내용이 여기에 기록돼요.</div>';
+      return;
+    }
+    el.innerHTML = officeLog.map(m=>`
+      <div class="office-log-row">
+        <div class="office-log-avatar" style="background:${m.color};">${m.speakerId==='ai' ? 'AI' : (m.speakerName||'').slice(0,1)}</div>
+        <div class="office-log-body">
+          <div class="office-log-name" style="color:${m.color};">${m.speakerName}</div>
+          <div class="office-log-text">${m.text}</div>
+        </div>
+      </div>
+    `).join('');
+    el.scrollTop = el.scrollHeight;
+  }
+
+  // 대화 한 마디를 기록에 추가 (최대 200개까지 보관)
+  function pushOfficeLog(speakerId, speakerName, color, text){
+    officeLog.push({ speakerId, speakerName, color, text });
+    if(officeLog.length>200) officeLog.shift();
+    renderOfficeLog();
+  }
+
   // AI 담당자와 이슈 매니저가 번갈아 말하는 토론 진행. 대본을 끝까지 마치면
   // 처음부터 다시 반복하며, 매니저를 다시 클릭하면 종료됨.
   function startDiscussionTyping(){
     if(!officeDiscussion) return;
     const line = officeDiscussion.script[officeDiscussion.idx % officeDiscussion.script.length];
     officeDiscussion.speakerId = line.who==='ai' ? 'ai' : officeDiscussion.managerId;
+    // 대본을 처음 순회할 때만 대화 기록에 남김 (반복 재생 시 중복 기록 방지)
+    if(officeDiscussion.idx < officeDiscussion.script.length){
+      const mgrChar = officeChars.find(x=>x.id===officeDiscussion.managerId);
+      const speakerName = line.who==='ai' ? 'AI 담당자' : (mgrChar ? mgrChar.shortName : '담당자');
+      const speakerColor = line.who==='ai' ? '#38bdf8' : (mgrChar ? mgrChar.color : '#7eb8e8');
+      pushOfficeLog(officeDiscussion.speakerId, speakerName, speakerColor, line.text);
+    }
     renderOfficeChars();
     const bubble = document.getElementById('officeBubble-'+officeDiscussion.speakerId);
     if(!bubble) return;
@@ -10917,6 +10973,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     if(!officeChars) return;
     const now = Date.now();
     const speed = 1.15;
+    const rushSpeed = 6.5; // 이슈가 있어 AI 담당자를 찾아갈 때는 훨씬 빠르게 이동
     officeChars.forEach(c=>{
       if(c.isAI){
         // AI 담당자는 데스크에 고정. 토론 중이거나 혼자 말하는 중일 때만 talking으로 표시
@@ -10936,7 +10993,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
             startDiscussionTyping();
             return;
           }
-          c.x += (dx/dist)*speed; c.y += (dy/dist)*speed;
+          c.x += (dx/dist)*rushSpeed; c.y += (dy/dist)*rushSpeed;
           c.dir = dx>=0?1:-1; c.phase = 'walking';
           return;
         }
@@ -10988,6 +11045,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       initOfficeChars();
       renderOfficeChars();
       renderOfficeChips();
+      renderOfficeLog();
       officeTickTimer = setInterval(officeTick, 40);
     } else {
       // 페이지 재방문 시: 캐릭터 위치/애니메이션은 유지하고 브리핑 내용만 최신 데이터로 갱신
