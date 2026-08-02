@@ -2571,8 +2571,8 @@ function openBranchModal(b){
 
     let salesLine = `${monthLabel} 매출 ${curVFmt}`;
     const rateParts = [];
-    if (momR !== null) rateParts.push(`MoM ${momR >= 0 ? '▲' : '▼'}${Math.abs(momR).toFixed(1)}%`);
-    if (yoyR !== null) rateParts.push(`YoY ${yoyR >= 0 ? '▲' : '▼'}${Math.abs(yoyR).toFixed(1)}%`);
+    if (momR !== null) rateParts.push(`전월대비 ${momR >= 0 ? '▲' : '▼'}${Math.abs(momR).toFixed(1)}%`);
+    if (yoyR !== null) rateParts.push(`전년대비 ${yoyR >= 0 ? '▲' : '▼'}${Math.abs(yoyR).toFixed(1)}%`);
     if (rateParts.length) salesLine += ` (${rateParts.join(' · ')})`;
 
     // 재계약 정보 (종료일 포함, 상세)
@@ -2619,9 +2619,12 @@ function openBranchModal(b){
       ? chunks.map((c, i) => `${c}\n(${i + 1}/${chunks.length})`)
       : chunks;
 
-    window.currentShareData = { chunks: taggedChunks, idx: 0 };
+    window.currentShareData = { chunks: taggedChunks, idx: 0, storeName: b.name };
     const btn = document.getElementById('kakaoShareBtn');
-    if (btn) btn.textContent = taggedChunks.length > 1 ? `💬 카톡공유 (1/${taggedChunks.length})` : '💬 카톡공유';
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = taggedChunks.length > 1 ? `💬 카톡공유 (1/${taggedChunks.length})` : '💬 카톡공유';
+    }
 
     insightEl.innerHTML = `
 <div style="border-top:0.5px solid #1a2f44;padding-top:12px;background:linear-gradient(135deg,#0d1e30,#111e2e);border:0.5px solid #2a5a8a;border-radius:10px;padding:12px 14px;">
@@ -2806,12 +2809,13 @@ function __sendKakaoChunk(){
   if(!d || !d.chunks || d.idx >= d.chunks.length) return false;
 
   const text = d.chunks[d.idx];
+  const deepUrl = 'https://taehwan8872.github.io/bokhodu-dashboard/?store=' + encodeURIComponent(d.storeName || '');
   Kakao.Share.sendDefault({
     objectType: 'text',
     text: text,
     link: {
-      mobileWebUrl: 'https://taehwan8872.github.io/bokhodu-dashboard/',
-      webUrl: 'https://taehwan8872.github.io/bokhodu-dashboard/'
+      mobileWebUrl: deepUrl,
+      webUrl: deepUrl
     },
     buttonTitle: '대시보드 보기'
   });
@@ -2823,7 +2827,27 @@ function __sendKakaoChunk(){
     if (btn) btn.textContent = d.chunks.length > 1 ? `💬 카톡공유 (1/${d.chunks.length})` : '💬 카톡공유';
     return false;
   } else {
-    if (btn) btn.textContent = `💬 카톡공유 (${d.idx + 1}/${d.chunks.length})`;
+    // 공유창에서 친구를 검색해서 실제로 보낼 시간을 벌어주는 쿨다운 (버튼 잠깐 비활성화)
+    const COOLDOWN_SEC = 10;
+    if (btn) {
+      btn.disabled = true;
+      btn.style.opacity = '0.55';
+      btn.style.cursor = 'not-allowed';
+      let remain = COOLDOWN_SEC;
+      btn.textContent = `⏳ ${remain}초 후 다음(${d.idx + 1}/${d.chunks.length})`;
+      const cd = setInterval(() => {
+        remain--;
+        if (remain <= 0) {
+          clearInterval(cd);
+          btn.disabled = false;
+          btn.style.opacity = '';
+          btn.style.cursor = 'pointer';
+          btn.textContent = `💬 카톡공유 (${d.idx + 1}/${d.chunks.length})`;
+        } else {
+          btn.textContent = `⏳ ${remain}초 후 다음(${d.idx + 1}/${d.chunks.length})`;
+        }
+      }, 1000);
+    }
     return true;
   }
 }
@@ -3617,6 +3641,32 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   document.getElementById('lastUpdate').textContent='26년(1~6월) + 25년 연간 데이터 · '+ALL.length+'개 매장 · '+LAST_EDITED+' 수정';
 })();
 
+// ===== 카카오톡 공유 딥링크: ?store=매장명 파라미터로 들어오면 해당 매장 상세 자동 오픈 =====
+(function(){
+  const params = new URLSearchParams(window.location.search);
+  const storeParam = params.get('store');
+  if(!storeParam) return;
+  const norm = (s) => !s ? '' : String(s).replace(/^\(폐점\)/,'').replace(/복호두\s*/g,'').replace(/\s+/g,'').trim();
+  const target = norm(storeParam);
+  const tryOpen = () => {
+    const list = (typeof ALL !== 'undefined' && ALL && ALL.length) ? ALL : (window.ALL || []);
+    if(!list || !list.length) return false;
+    const match = list.find(b => norm(b.name) === target);
+    if(match && typeof openBranchModal === 'function'){
+      openBranchModal(match);
+      return true;
+    }
+    return false;
+  };
+  // ALL 데이터가 비동기로 채워질 수 있어 약간의 지연을 두고 재시도
+  if(!tryOpen()){
+    let tries = 0;
+    const iv = setInterval(() => {
+      tries++;
+      if(tryOpen() || tries > 20) clearInterval(iv);
+    }, 250);
+  }
+})();
 // ===== 재계약현황판 =====
 (function(){
   // [번호, 점포명, 담당자, 연락처, 계약회차(누적), 현재계약종료일, 6개월전안내예정일, 3개월전안내예정일, 안내문발송여부]
