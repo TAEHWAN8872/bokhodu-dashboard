@@ -93,7 +93,7 @@ body.hide-names .store-name:hover{
 .tab[data-region="강원"]:hover{border-color:#f59e0b;color:#f59e0b;}
 
 /* AI 오피스 */
-.office-stage{position:relative;width:100%;max-width:920px;height:500px;margin:0 auto;background:linear-gradient(180deg,#fbf7f0 0%,#f3ead9 100%);border:1px solid #e2d9c8;border-radius:16px;overflow:hidden;}
+.office-stage{position:relative;width:100%;max-width:1100px;height:580px;margin:0 auto;background:linear-gradient(180deg,#fbf7f0 0%,#f3ead9 100%);border:1px solid #e2d9c8;border-radius:16px;overflow:hidden;}
 .office-header-band{position:absolute;top:0;left:0;width:100%;height:100px;background:#eef2f7;border-bottom:3px solid #d9e2ec;}
 .office-window{position:absolute;width:90px;height:64px;border-radius:6px;overflow:hidden;border:5px solid #ffffff;box-shadow:0 2px 6px rgba(0,0,0,.08);background:linear-gradient(180deg,#bfe3fb 0%,#e6f4fd 100%);}
 .office-window-cloud1{position:absolute;left:10px;top:14px;width:22px;height:9px;background:#ffffff;border-radius:8px;opacity:.85;}
@@ -113,6 +113,7 @@ body.hide-names .store-name:hover{
 .office-table-label.royalty{color:#991b1b;}
 .office-table-label.marketing{color:#6d28d9;}
 .office-table-label.logistics{color:#166534;}
+.office-table-label.contract{color:#9a3412;}
 .office-table-label.meeting{color:#1e293b;}
 .office-chair{position:absolute;transform:translate(-50%,-50%);width:26px;height:28px;pointer-events:none;z-index:1;}
 .office-chair-back{position:absolute;top:0;left:4px;width:18px;height:14px;background:#9a6b3f;border:1px solid #7c552f;border-radius:4px 4px 2px 2px;}
@@ -638,7 +639,7 @@ body.hide-names .store-name:hover{
       <div id="officeStage" class="office-stage">
         <div class="office-header-band"></div>
         <div class="office-window" style="top:16px;left:40px;"><div class="office-window-cloud1"></div><div class="office-window-cloud2"></div><div class="office-window-cross-h"></div><div class="office-window-cross-v"></div></div>
-        <div class="office-window" style="top:16px;left:415px;"><div class="office-window-cloud1"></div><div class="office-window-cloud2"></div><div class="office-window-cross-h"></div><div class="office-window-cross-v"></div></div>
+        <div class="office-window" style="top:16px;left:505px;"><div class="office-window-cloud1"></div><div class="office-window-cloud2"></div><div class="office-window-cross-h"></div><div class="office-window-cross-v"></div></div>
         <div class="office-window" style="top:16px;right:40px;"><div class="office-window-cloud1"></div><div class="office-window-cloud2"></div><div class="office-window-cross-h"></div><div class="office-window-cross-v"></div></div>
         <div class="office-floor-line" style="top:100px;"></div>
         <div class="office-floor-line" style="top:150px;"></div>
@@ -646,10 +647,10 @@ body.hide-names .store-name:hover{
         <div class="office-floor-line" style="top:250px;"></div>
         <div class="office-floor-line" style="top:300px;"></div>
         <div class="office-floor-line" style="top:350px;"></div>
-        <div class="office-desk" style="left:26px;top:110px;"><div class="office-desk-top"></div><div class="office-desk-mon"></div><div class="office-desk-screen"></div></div>
-        <div class="office-desk" style="right:26px;top:110px;"><div class="office-desk-top"></div><div class="office-desk-mon"></div><div class="office-desk-screen"></div></div>
-        <div class="office-desk" style="left:26px;bottom:20px;"><div class="office-desk-top"></div><div class="office-desk-mon"></div><div class="office-desk-screen"></div></div>
-        <div class="office-desk" style="right:26px;bottom:20px;"><div class="office-desk-top"></div><div class="office-desk-mon"></div><div class="office-desk-screen"></div></div>
+        <div class="office-floor-line" style="top:400px;"></div>
+        <div class="office-floor-line" style="top:450px;"></div>
+        <div class="office-floor-line" style="top:500px;"></div>
+        <div class="office-floor-line" style="top:550px;"></div>
         <div class="office-rug"></div>
         <div class="office-plant" style="left:4px;top:350px;"><svg width="30" height="40" viewBox="0 0 30 40"><path d="M15 24 C6 20 6 8 15 4 C24 8 24 20 15 24" fill="#4ade80"/><path d="M15 22 C8 24 22 24 15 22" fill="#22c55e"/><rect x="9" y="24" width="12" height="12" rx="2" fill="#b45309"/></svg></div>
         <div class="office-plant" style="right:4px;top:96px;"><svg width="30" height="40" viewBox="0 0 30 40"><path d="M15 24 C6 20 6 8 15 4 C24 8 24 20 15 24" fill="#4ade80"/><path d="M15 22 C8 24 22 24 15 22" fill="#22c55e"/><rect x="9" y="24" width="12" height="12" rx="2" fill="#b45309"/></svg></div>
@@ -10514,7 +10515,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 <!-- AI 오피스: 실제 매출/재계약/로열티 데이터를 기반으로 담당자 캐릭터가 브리핑하는 페이지 -->
 <script>
 (function(){
-  const OFFICE_W = 920, OFFICE_H = 500, PAD = 55;
+  const OFFICE_W = 1100, OFFICE_H = 580, PAD = 55;
   const HAIR_COLORS = ["#3f2e1e","#2b2b2b","#4a3826","#1f1f1f","#5a4530","#332222"];
   // label은 ALL 데이터의 b.manager 값과 정확히 일치해야 매출/재계약/로열티 매칭이 됩니다.
   const OFFICE_MANAGER_DEFS = [
@@ -10532,11 +10533,12 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   // 담당자들이 평소 모여 있는 회의 테이블 + 주제별로 찾아가 앉아서 이야기하는 4개의 테이블.
   // w/h는 테이블 사각형의 실제 크기이고, seats는 테이블 가장자리에서 충분히 떨어진(의자/이름표와 겹치지 않는) 좌석 좌표.
   const OFFICE_TABLES = {
-    meeting:   { key:'meeting',   label:'회의 테이블',   icon:'🗂️', x:460, y:345, w:240, h:100, seats:[[-90,-70],[0,-70],[90,-70],[-90,70],[0,70],[90,70]] },
-    sales:     { key:'sales',     label:'매출 테이블',   icon:'💰', x:165, y:240, w:150, h:80,  seats:[[-45,-56],[45,-56],[0,60]] },
-    royalty:   { key:'royalty',   label:'로열티 테이블', icon:'🧾', x:755, y:240, w:150, h:80,  seats:[[-45,-56],[45,-56],[0,60]] },
-    marketing: { key:'marketing', label:'마케팅 테이블', icon:'📣', x:165, y:400, w:150, h:80,  seats:[[-45,-56],[45,-56],[0,60]] },
-    logistics: { key:'logistics', label:'물류 테이블',   icon:'🚚', x:755, y:400, w:150, h:80,  seats:[[-45,-56],[45,-56],[0,60]] }
+    meeting:   { key:'meeting',   label:'회의',   icon:'🗂️', x:550, y:330, w:240, h:100, seats:[[-90,-70],[0,-70],[90,-70],[-90,70],[0,70],[90,70]] },
+    sales:     { key:'sales',     label:'매출',   icon:'💰', x:190, y:195, w:150, h:80,  seats:[[-45,-56],[45,-56]] },
+    royalty:   { key:'royalty',   label:'로열티', icon:'🧾', x:910, y:195, w:150, h:80,  seats:[[-45,-56],[45,-56]] },
+    marketing: { key:'marketing', label:'마케팅', icon:'📣', x:190, y:460, w:150, h:80,  seats:[[-45,-56],[45,-56]] },
+    logistics: { key:'logistics', label:'물류',   icon:'🚚', x:910, y:460, w:150, h:80,  seats:[[-45,-56],[45,-56]] },
+    contract:  { key:'contract',  label:'재계약', icon:'📑', x:550, y:510, w:150, h:70,  seats:[[-45,-56],[45,-56]] }
   };
 
   // 담당자(매니저) 캐릭터가 특정 테이블에서 앉을 자리를 계산 (인덱스 기반, 항상 같은 자리)
@@ -10638,7 +10640,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 
   // 담당자별 브리핑: 로열티 미입금 / 매출 급락 / 재계약 임박 / 마케팅 미실시 / 물류 이상 등
   // "매장 단위" 문제를 여러 개의 멘트로 만들고, 각 멘트에 어느 테이블(주제)에서 이야기할지
-  // topic('sales'|'royalty'|'marketing'|'logistics'|'meeting')을 함께 표시함.
+  // topic('sales'|'royalty'|'marketing'|'logistics'|'contract'|'meeting')을 함께 표시함.
   // 캐릭터는 이 topic을 보고 해당 테이블로 걸어가 앉아서 이야기함.
   function computeManagerBriefings(mgrLabel){
     const storeCount = storeCountOf(mgrLabel);
@@ -10667,7 +10669,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       problems.push({ type:'decline', store: w.name, data: w, topic:'sales' });
     });
 
-    // 3) 회의 테이블 — 재계약 임박 (일반 업무 안건으로 분류)
+    // 3) 재계약 테이블 — 재계약 임박
     const contractData = window.CONTRACT_DATA || [];
     const today = new Date(); today.setHours(0,0,0,0);
     const contracts = contractData
@@ -10680,8 +10682,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       .filter(x=>x.days>=0 && x.days<=180)
       .sort((a,b)=>a.days-b.days);
     contracts.slice(0,2).forEach(w=>{
-      msgs.push({ status:'warn', text: `${w.name} 계약 종료까지 ${w.days}일 남았어요. 재계약 안내가 필요해요.`, store: w.name, topic:'meeting' });
-      problems.push({ type:'contract', store: w.name, days: w.days, topic:'meeting' });
+      msgs.push({ status:'warn', text: `${w.name} 계약 종료까지 ${w.days}일 남았어요. 재계약 안내가 필요해요.`, store: w.name, topic:'contract' });
+      problems.push({ type:'contract', store: w.name, days: w.days, topic:'contract' });
     });
 
     // 4) 마케팅 테이블 — 담당 매장 전체 기준 채널 미실시 현황
@@ -11299,7 +11301,12 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   function officeIsSpeaking(id){
     if(officeTalkingId===id) return true;
     if(officeDiscussion && officeDiscussion.started && officeDiscussion.speakerId===id) return true;
-    if(officeAmbientId===id) return true;
+    if(officeAmbientId===id){
+      // 테이블로 걸어가는 중(headingToTable)에는 말풍선을 띄우지 않고, 도착해서 자리에 앉은 뒤에만 이야기함
+      const c = (officeChars||[]).find(x=>x.id===id);
+      if(c && c.headingToTable) return false;
+      return true;
+    }
     return false;
   }
 
@@ -11387,7 +11394,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         c.problemIdx = (c.problemIdx + 1) % c.problems.length;
         target = c.problems[c.problemIdx];
       }
-      const issueLabel = target.store || ({sales:'매출', royalty:'로열티', marketing:'마케팅', logistics:'물류', meeting:'담당 매장'}[target.topic] || '담당 매장');
+      const issueLabel = target.store || ({sales:'매출', royalty:'로열티', marketing:'마케팅', logistics:'물류', contract:'재계약', meeting:'담당 매장'}[target.topic] || '담당 매장');
       const topic = target.topic || 'meeting';
       const tableInfo = OFFICE_TABLES[topic] || OFFICE_TABLES.meeting;
 
