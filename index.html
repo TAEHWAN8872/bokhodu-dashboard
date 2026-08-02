@@ -10705,7 +10705,37 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       problems.push({ type:'decline', store: w.name, data: w, topic:'sales' });
     });
 
-    // 3) 재계약 테이블 — 재계약 임박
+    // 3) 마케팅 테이블 — 채널 미실시 매장을 "외 N곳"으로 뭉치지 않고 매장별로 하나씩 말함
+    const missingByStore = [];
+    managerStores.forEach(s=>{
+      const gap = (typeof getMarketingGapsForStore==='function') ? getMarketingGapsForStore(s.name) : null;
+      if(gap && gap.missing.length) missingByStore.push({ name:s.name, missing:gap.missing });
+    });
+    if(missingByStore.length){
+      missingByStore.forEach(x=>{
+        msgs.push({ status:'warn', text: `${x.name} 마케팅 채널 중 ${x.missing.join('·')}을(를) 전혀 진행하지 않았어요.`, store: x.name, topic:'marketing' });
+        problems.push({ type:'marketing', store: x.name, missing: x.missing, topic:'marketing' });
+      });
+    } else if(managerStores.length){
+      msgs.push({ status:'good', text: `담당 매장 마케팅 채널(블로그체험단·네이버 플레이스 광고·메타광고·배너)은 모두 한 번 이상 진행했어요.`, topic:'marketing' });
+    }
+
+    // 4) 물류 테이블 — 매입률 이상 매장도 "외 N곳"으로 뭉치지 않고 매장별로 하나씩 말함
+    const abnormalLogi = [];
+    managerStores.forEach(s=>{
+      const logi = (typeof computeLogisticsRatio==='function') ? computeLogisticsRatio(s.name, s.months) : null;
+      if(logi && !logi.normal) abnormalLogi.push({ name:s.name, ratio:logi.ratio, guide:logi.guide });
+    });
+    if(abnormalLogi.length){
+      abnormalLogi.forEach(x=>{
+        msgs.push({ status:'warn', text: `${x.name} 물류 매입률이 ${x.ratio.toFixed(1)}%로 정상 범위(32~36%)를 벗어났어요.`, store: x.name, topic:'logistics' });
+        problems.push({ type:'logistics', store: x.name, ratio: x.ratio, guide: x.guide, topic:'logistics' });
+      });
+    } else if(managerStores.length){
+      msgs.push({ status:'good', text: `담당 매장 물류 매입률은 모두 정상 범위(32~36%)예요.`, topic:'logistics' });
+    }
+
+    // 5) 재계약 테이블 — 재계약 임박
     // "재계약 안내가 필요한지"는 남은 일수만으로 판단하지 않고, 실제 안내문 발송 여부(완/미발송)를 확인해서 판단함.
     // 이미 안내문을 보냈다면 "필요해요"라고 말하지 않고, 발송을 이미 했다는 사실만 알려줌.
     const contractData = window.CONTRACT_DATA || [];
@@ -10728,37 +10758,6 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         problems.push({ type:'contract', store: w.name, days: w.days, topic:'contract' });
       }
     });
-
-
-    // 4) 마케팅 테이블 — 채널 미실시 매장을 "외 N곳"으로 뭉치지 않고 매장별로 하나씩 말함
-    const missingByStore = [];
-    managerStores.forEach(s=>{
-      const gap = (typeof getMarketingGapsForStore==='function') ? getMarketingGapsForStore(s.name) : null;
-      if(gap && gap.missing.length) missingByStore.push({ name:s.name, missing:gap.missing });
-    });
-    if(missingByStore.length){
-      missingByStore.forEach(x=>{
-        msgs.push({ status:'warn', text: `${x.name} 마케팅 채널 중 ${x.missing.join('·')}을(를) 전혀 진행하지 않았어요.`, store: x.name, topic:'marketing' });
-        problems.push({ type:'marketing', store: x.name, missing: x.missing, topic:'marketing' });
-      });
-    } else if(managerStores.length){
-      msgs.push({ status:'good', text: `담당 매장 마케팅 채널(블로그체험단·네이버 플레이스 광고·메타광고·배너)은 모두 한 번 이상 진행했어요.`, topic:'marketing' });
-    }
-
-    // 5) 물류 테이블 — 매입률 이상 매장도 "외 N곳"으로 뭉치지 않고 매장별로 하나씩 말함
-    const abnormalLogi = [];
-    managerStores.forEach(s=>{
-      const logi = (typeof computeLogisticsRatio==='function') ? computeLogisticsRatio(s.name, s.months) : null;
-      if(logi && !logi.normal) abnormalLogi.push({ name:s.name, ratio:logi.ratio, guide:logi.guide });
-    });
-    if(abnormalLogi.length){
-      abnormalLogi.forEach(x=>{
-        msgs.push({ status:'warn', text: `${x.name} 물류 매입률이 ${x.ratio.toFixed(1)}%로 정상 범위(32~36%)를 벗어났어요.`, store: x.name, topic:'logistics' });
-        problems.push({ type:'logistics', store: x.name, ratio: x.ratio, guide: x.guide, topic:'logistics' });
-      });
-    } else if(managerStores.length){
-      msgs.push({ status:'good', text: `담당 매장 물류 매입률은 모두 정상 범위(32~36%)예요.`, topic:'logistics' });
-    }
 
     // 6) 매출 테이블 — 전체 요약(좋은 소식)
     const sales = managerSalesSummary(mgrLabel);
