@@ -2619,7 +2619,6 @@ function openBranchModal(b){
       ? chunks.map((c, i) => `${c}\n(${i + 1}/${chunks.length})`)
       : chunks;
 
-    if (typeof __kakaoAutoTimer !== 'undefined' && __kakaoAutoTimer) { clearInterval(__kakaoAutoTimer); __kakaoAutoTimer = null; }
     window.currentShareData = { chunks: taggedChunks, idx: 0 };
     const btn = document.getElementById('kakaoShareBtn');
     if (btn) btn.textContent = taggedChunks.length > 1 ? `💬 카톡공유 (1/${taggedChunks.length})` : '💬 카톡공유';
@@ -2802,8 +2801,6 @@ function closeModal(){
   if(modalChartInst){modalChartInst.destroy();modalChartInst=null;}
 }
 
-let __kakaoAutoTimer = null;
-
 function __sendKakaoChunk(){
   const d = window.currentShareData;
   if(!d || !d.chunks || d.idx >= d.chunks.length) return false;
@@ -2822,12 +2819,11 @@ function __sendKakaoChunk(){
   d.idx++;
   const btn = document.getElementById('kakaoShareBtn');
   if (d.idx >= d.chunks.length) {
-    if (__kakaoAutoTimer) { clearInterval(__kakaoAutoTimer); __kakaoAutoTimer = null; }
     d.idx = 0; // 마지막까지 보냈으면 처음으로 리셋
     if (btn) btn.textContent = d.chunks.length > 1 ? `💬 카톡공유 (1/${d.chunks.length})` : '💬 카톡공유';
     return false;
   } else {
-    if (btn) btn.textContent = `💬 카톡공유 (${d.idx + 1}/${d.chunks.length}) 자동전송중...`;
+    if (btn) btn.textContent = `💬 카톡공유 (${d.idx + 1}/${d.chunks.length})`;
     return true;
   }
 }
@@ -2836,21 +2832,7 @@ function shareStoreToKakao(){
   const d = window.currentShareData;
   if(!d || !d.chunks || !d.chunks.length){ alert('공유할 매장 데이터가 없습니다.'); return; }
   if(!window.Kakao || !Kakao.isInitialized()){ alert('카카오 SDK가 초기화되지 않았습니다.'); return; }
-
-  // 이미 자동전송이 돌고 있는 중에 버튼을 또 누르면: 수동으로 "다음 조각 즉시 전송" (자동이 막혔을 때 대비)
-  if (__kakaoAutoTimer && d.idx > 0) {
-    __sendKakaoChunk();
-    return;
-  }
-
-  const hasMore = __sendKakaoChunk();
-  if (hasMore) {
-    if (__kakaoAutoTimer) clearInterval(__kakaoAutoTimer);
-    __kakaoAutoTimer = setInterval(() => {
-      const more = __sendKakaoChunk();
-      if (!more && __kakaoAutoTimer) { clearInterval(__kakaoAutoTimer); __kakaoAutoTimer = null; }
-    }, 1000);
-  }
+  __sendKakaoChunk();
 }
 document.getElementById('branchModal').addEventListener('click',function(e){
   if(e.target===this) closeModal();
