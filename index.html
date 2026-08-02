@@ -10557,6 +10557,29 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     if(!t) return { x: AI_DESK.x, y: AI_DESK.y };
     return { x: t.x, y: t.y - (t.h/2) - 34 };
   }
+  // ── 테이블 점유 관리: 한 테이블에는 항상 "말하는 사람" 1명만 배정해서 말풍선이 겹치지 않게 함 ──
+  function officeTableIsFree(tableKey, forId){
+    const owner = officeTableOwner[tableKey];
+    return !owner || owner === forId;
+  }
+  function officeClaimTable(tableKey, id){
+    if(!officeTableIsFree(tableKey, id)) return false;
+    officeTableOwner[tableKey] = id;
+    return true;
+  }
+  function officeReleaseTable(tableKey, id){
+    if(tableKey && officeTableOwner[tableKey] === id) officeTableOwner[tableKey] = null;
+  }
+  // 우선순위가 높은 동작(직접 클릭)이 테이블을 필요로 할 때, 그 테이블에서 앰비언트로
+  // 이야기 중이던 다른 담당자가 있으면 자리를 비켜주고 회의 테이블로 돌려보냄
+  function officeClaimTableForce(tableKey, id){
+    const owner = officeTableOwner[tableKey];
+    if(owner && owner !== id){
+      const other = (officeChars||[]).find(x=>x.id===owner);
+      if(other) officeClearOwnAmbient(other, true);
+    }
+    officeTableOwner[tableKey] = id;
+  }
   const AI_IDLE_LINES = [
     '안녕하세요! 저는 매출 데이터를 분석하는 AI 담당자예요.',
     '이슈가 있는 담당자를 클릭하면 저를 찾아와서 원인을 함께 이야기해요.',
@@ -10608,12 +10631,12 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   let officeAiCycleList = null;
   let officeAiCycleIdx = -1;
 
-  // 다른 담당자들이 클릭 없이도 자동으로 담당 매장 정보를 말하는 "앰비언트" 말풍선 상태
-  let officeAmbientId = null;
-  let officeAmbientMsgIdx = 0;
-  let officeAmbientTypeTimer = null;
-  let officeAmbientSeq = -1;
-  let officeAmbientBeatTimer = null;
+  // 다른 담당자들이 클릭 없이도 자동으로 담당 매장 정보를 말하는 "앰비언트" 말풍선 상태.
+  // 예전엔 전역으로 "지금 말하는 사람 1명"만 관리했지만, 지금은 담당자별로 각자 독립적인
+  // 스케줄을 갖고 동시에 여러 명이 서로 다른 테이블로 가서 동시에 이야기할 수 있음.
+  // (개별 상태는 각 캐릭터 객체(c.ambientActive 등)에 저장됨)
+  // 테이블별로 "지금 그 테이블을 쓰고 있는 담당자 1명"만 기록 (겹쳐서 말풍선이 가려지는 것을 방지)
+  let officeTableOwner = {};
 
   function storeCountOf(mgrLabel){
     const all = window.ALL || (typeof ALL!=='undefined'?ALL:[]);
@@ -11078,76 +11101,106 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   }
 
   // ── 다른 담당자들이 클릭 없이도 자동으로 담당 매장 정보를 말하는 "앰비언트" 말풍선 ──
-  // 일정 주기마다 한 명씩 순서대로 골라 자신의 브리핑 문장 중 하나를 말풍선으로 보여줌.
-  // 매출 부진/이슈 문장(status가 good이 아님)이면 빨간 "‼️" 표시를 함께 보여줌.
-  function officeAmbientPickNext(){
-    const ids = (officeChars||[]).filter(c=>!c.isAI).map(c=>c.id);
-    if(!ids.length) return null;
-    for(let i=0;i<ids.length;i++){
-      officeAmbientSeq = (officeAmbientSeq+1) % ids.length;
-      const id = ids[officeAmbientSeq];
-      if(id===officeTalkingId) continue; // 지금 클릭으로 혼자 말하는 중인 담당자는 건너뜀
-      if(officeDiscussion && officeDiscussion.managerId===id) continue; // AI와 토론 중인 담당자도 건너뜀
-      return id;
-    }
-    return null;
+  // 담당자마다 각자 독립된 타이머로 동작해서, 서로 다른 테이블로 동시에 걸어가
+  // 동시에 이야기할 수 있음. 한 테이블은 항상 1명만 쓰도록 예약해서(officeTableOwner)
+  // 말풍선이 겹쳐서 가려지는 일이 없게 하고, 클릭해서 이동 중인 담당자가 있는 테이블에는
+  // 다른 담당자가 오지 않도록 함. 매출 얘기만 반복되지 않도록 담당자별로 직전과 다른
+  // 주제(topic)를 우선 골라 매출/로열티/마케팅/물류/재계약 이야기가 고루 나오게 함.
+  function officeAmbientScheduleDelay(){ return rand(4200, 9500); }
+
+  function officeScheduleAmbientAttempt(c, delay){
+    if(!c || c.isAI) return;
+    if(c.ambientScheduleTimer) clearTimeout(c.ambientScheduleTimer);
+    c.ambientScheduleTimer = setTimeout(()=>officeTryAmbientSpeak(c), delay!=null ? delay : officeAmbientScheduleDelay());
   }
 
-  function officeStopAmbientBubble(){
-    if(officeAmbientTypeTimer) clearInterval(officeAmbientTypeTimer);
-    officeAmbientTypeTimer = null;
-    const prevId = officeAmbientId;
-    officeAmbientId = null;
-    if(prevId){
-      const c = (officeChars||[]).find(x=>x.id===prevId);
-      if(c){
-        c.headingToTable = null;
-        c.waitUntil = 0;
-        const seat = officeSeatFor('meeting', c.id); // 이야기가 끝나면 회의 테이블 자기 자리로 돌아감
-        if(seat){ c.tx = seat.x; c.ty = seat.y; }
-      }
+  // 담당자 본인의 앰비언트 상태(말풍선/이동/테이블 예약)를 정리.
+  // sendHome=true면 즉시 회의 테이블 자기 자리로 돌아가도록 목적지를 재설정함.
+  function officeClearOwnAmbient(c, sendHome){
+    if(!c) return;
+    if(c.ambientTypeTimer){ clearInterval(c.ambientTypeTimer); c.ambientTypeTimer = null; }
+    if(c.ambientTable){ officeReleaseTable(c.ambientTable, c.id); }
+    c.ambientActive = false;
+    c.ambientTable = null;
+    c.ambientMsg = null;
+    c.headingToTable = null;
+    if(sendHome){
+      c.waitUntil = 0;
+      const seat = officeSeatFor('meeting', c.id);
+      if(seat){ c.tx = seat.x; c.ty = seat.y; }
+      officeScheduleAmbientAttempt(c, rand(2500, 6000));
     }
-    renderOfficeChars();
   }
 
   function officeAmbientBubbleHTML(c, partialText, showCursor){
-    const msg = (c.msgs && c.msgs.length) ? c.msgs[officeAmbientMsgIdx % c.msgs.length] : null;
-    const isAlert = msg && msg.status !== 'good';
+    const isAlert = c.ambientMsg && c.ambientMsg.status !== 'good';
     const badge = isAlert ? '<span style="color:#dc2626;font-weight:800;margin-right:4px;">‼️</span>' : '';
     return badge + partialText + (showCursor ? '<span style="opacity:.5;">▍</span>' : '');
   }
 
   function startAmbientTyping(c){
-    const text = (c.msgs && c.msgs.length) ? c.msgs[officeAmbientMsgIdx % c.msgs.length].text : (c.headline || '');
+    const text = (c.ambientMsg && c.ambientMsg.text) || c.headline || '';
     let idx = 0;
-    if(officeAmbientTypeTimer) clearInterval(officeAmbientTypeTimer);
-    officeAmbientTypeTimer = setInterval(()=>{
-      if(officeAmbientId !== c.id){ clearInterval(officeAmbientTypeTimer); return; }
+    if(c.ambientTypeTimer) clearInterval(c.ambientTypeTimer);
+    c.ambientTypeTimer = setInterval(()=>{
+      if(!c.ambientActive){ clearInterval(c.ambientTypeTimer); return; }
       const b = document.getElementById('officeBubble-'+c.id);
-      if(!b){ clearInterval(officeAmbientTypeTimer); return; }
+      if(!b){ clearInterval(c.ambientTypeTimer); return; }
       idx++;
       b.innerHTML = officeAmbientBubbleHTML(c, text.slice(0, idx), idx<text.length);
-      if(idx>=text.length){ clearInterval(officeAmbientTypeTimer); }
+      if(idx>=text.length){
+        clearInterval(c.ambientTypeTimer);
+        setTimeout(()=>{
+          if(!c.ambientActive || officeTalkingId===c.id) return; // 그 사이 다른 상태로 전환된 경우 중단
+          officeFinishAmbientSpeak(c);
+        }, 2400);
+      }
     }, 26);
   }
 
-  // 일정 주기(비트)마다 호출: 이전 담당자의 말풍선을 닫고 다음 담당자의 말풍선을 새로 띄움.
-  // 이번엔 말할 내용의 topic(sales/royalty/marketing/logistics/meeting)에 맞는 테이블로 걸어가서 앉아 이야기함.
-  function officeAmbientBeat(){
-    if(officeAmbientId){ officeStopAmbientBubble(); }
-    const id = officeAmbientPickNext();
-    if(!id) return;
-    const c = (officeChars||[]).find(x=>x.id===id);
-    if(!c || !c.msgs || !c.msgs.length) return;
-    officeAmbientId = id;
-    officeAmbientMsgIdx = Math.floor(Math.random()*c.msgs.length);
-    const msg = c.msgs[officeAmbientMsgIdx];
-    const topic = (msg && msg.topic) || 'meeting';
+  // 말풍선을 다 보여준 뒤 테이블을 반납하고 회의 테이블로 복귀, 잠시 후 다음 이야기 기회를 다시 시도함
+  function officeFinishAmbientSpeak(c){
+    officeClearOwnAmbient(c, true);
+    renderOfficeChars();
+  }
+
+  // 담당자 한 명이 "지금 이야기할 수 있는지" 판단해서, 가능하면 아직 비어 있는 테이블 중
+  // 하나를 골라 그 테이블로 걸어가서 이야기를 시작함. 갈 수 있는 테이블이 없으면 잠시 후 재시도.
+  function officeTryAmbientSpeak(c){
+    if(!officeChars || !c) return;
+    if(c.isAI || c.ambientActive) return;
+    if(officeTalkingId===c.id) { officeScheduleAmbientAttempt(c, rand(2000,4000)); return; }
+    if(officeDiscussion && officeDiscussion.managerId===c.id) { officeScheduleAmbientAttempt(c, rand(2000,4000)); return; }
+    if(!c.msgs || !c.msgs.length){ officeScheduleAmbientAttempt(c, rand(6000,10000)); return; }
+
+    // 담당자가 말할 수 있는 주제(topic) 목록 중, 지금 비어 있는 테이블에 해당하는 것만 후보로 남김
+    const topics = Array.from(new Set(c.msgs.map(m=>m.topic).filter(t=>OFFICE_TABLES[t])));
+    let candidates = topics.filter(t=>officeTableIsFree(t, c.id));
+    if(!candidates.length){ officeScheduleAmbientAttempt(c, rand(1800,3500)); return; }
+    // 직전에 했던 주제와 다른 주제를 우선 선택해서 "매출 얘기만 계속" 되는 것을 방지
+    if(candidates.length>1 && c.lastAmbientTopic){
+      const varied = candidates.filter(t=>t!==c.lastAmbientTopic);
+      if(varied.length) candidates = varied;
+    }
+    // 이슈(‼️)가 있는 주제가 있으면 조금 더 자주 다루되, 항상 그런 것만 나오진 않게 확률을 둠
+    const issueTopics = candidates.filter(t=>c.msgs.some(m=>m.topic===t && m.status!=='good'));
+    let pool = candidates;
+    if(issueTopics.length && Math.random()<0.6) pool = issueTopics;
+    const topic = pool[Math.floor(Math.random()*pool.length)];
+
+    if(!officeClaimTable(topic, c.id)){ officeScheduleAmbientAttempt(c, rand(1800,3500)); return; }
+
+    const topicMsgs = c.msgs.filter(m=>m.topic===topic);
+    const msg = topicMsgs[Math.floor(Math.random()*topicMsgs.length)];
+    c.ambientMsg = msg;
+    c.ambientTable = topic;
+    c.lastAmbientTopic = topic;
+    c.ambientActive = true;
+
     const seat = officeSeatFor(topic, c.id) || { x:c.x, y:c.y };
     c.tx = seat.x; c.ty = seat.y; c.waitUntil = 0;
     const dist = Math.hypot(c.tx-c.x, c.ty-c.y);
     if(dist < 4){
-      // 이미 해당 테이블 근처(대부분 회의 테이블)에 있으면 바로 이야기 시작
       c.headingToTable = null;
       c.phase = 'talking';
       renderOfficeChars();
@@ -11205,6 +11258,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         });
       });
     }
+    officeTableOwner = {};
+    Object.keys(OFFICE_TABLES).forEach(k=>{ officeTableOwner[k] = null; });
     officeChars = OFFICE_MANAGER_DEFS.map((m,i)=>{
       if(m.isAI){
         return Object.assign({}, m, {
@@ -11227,9 +11282,15 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         homeTable: 'meeting', headingToTable: null,
         x: baseX+rand(-8,8), y: baseY+rand(-6,6),
         tx: baseX, ty: baseY,
-        dir: 1, phase: 'walking', waitUntil: 0
-
+        dir: 1, phase: 'walking', waitUntil: 0,
+        // 앰비언트(자동 발화) 관련 개별 상태 — 담당자마다 독립적으로 동작해서 동시에 여러 명이 이야기할 수 있음
+        ambientActive: false, ambientTable: null, ambientMsg: null,
+        ambientTypeTimer: null, ambientScheduleTimer: null, lastAmbientTopic: null
       });
+    });
+    // 담당자마다 서로 다른 시각에 첫 이야기를 시작하도록 시작 시점을 흩어놓음(동시에 우르르 몰리는 것 방지)
+    officeChars.filter(c=>!c.isAI).forEach((c,i)=>{
+      officeScheduleAmbientAttempt(c, rand(900, 1200) + i*rand(700, 1400));
     });
   }
 
@@ -11301,10 +11362,10 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   function officeIsSpeaking(id){
     if(officeTalkingId===id) return true;
     if(officeDiscussion && officeDiscussion.started && officeDiscussion.speakerId===id) return true;
-    if(officeAmbientId===id){
+    const c = (officeChars||[]).find(x=>x.id===id);
+    if(c && c.ambientActive){
       // 테이블로 걸어가는 중(headingToTable)에는 말풍선을 띄우지 않고, 도착해서 자리에 앉은 뒤에만 이야기함
-      const c = (officeChars||[]).find(x=>x.id===id);
-      if(c && c.headingToTable) return false;
+      if(c.headingToTable) return false;
       return true;
     }
     return false;
@@ -11326,12 +11387,12 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       el.style.left = c.x+'px';
       el.style.top = c.y+'px';
       const talking = officeIsSpeaking(c.id);
-      el.style.zIndex = talking ? 10 : 2;
+      el.style.zIndex = talking ? 50 : 2;
 
       // phase/talking/스타일이 바뀔 때만 모양을 다시 그림.
       // (매 tick마다 innerHTML을 통째로 재생성하면 팔다리 CSS 애니메이션이
       //  계속 0%로 리셋되어 거의 멈춘 것처럼 보이는 문제가 있었음)
-      const isAmbientAlert = (officeAmbientId===c.id && c.msgs && c.msgs.length && c.msgs[officeAmbientMsgIdx % c.msgs.length].status !== 'good');
+      const isAmbientAlert = (c.ambientActive && c.ambientMsg && c.ambientMsg.status !== 'good');
       const renderKey = c.phase+'|'+talking+'|'+isAmbientAlert;
       if(isNew || el.dataset.renderKey !== renderKey){
         el.dataset.renderKey = renderKey;
@@ -11341,7 +11402,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
           <div class="office-char-name ${talking?'talking':''}">${c.shortName}</div>
         `;
         if(talking && officeTalkingId===c.id){ startOfficeTyping(c); }
-        if(talking && officeAmbientId===c.id && !officeAmbientTypeTimer){ startAmbientTyping(c); }
+        if(talking && c.ambientActive && !c.ambientTypeTimer){ startAmbientTyping(c); }
       } else {
         // 모양은 그대로 두고 좌우 방향(scaleX)만 갱신 (애니메이션 유지)
         const figure = el.querySelector('.office-char-figure');
@@ -11357,11 +11418,12 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     // 클릭 시점에 이 담당자가 앰비언트 말풍선으로 보여주고 있던 "특정 매장/주제"를 먼저 기억해둠
     // (말풍선을 정리하기 전에 확인해야 무엇을 보고 클릭했는지 알 수 있음)
     let ambientTargetStore = null, ambientTargetTopic = null;
-    if(officeAmbientId===id && c.msgs && c.msgs.length){
-      const shownMsg = c.msgs[officeAmbientMsgIdx % c.msgs.length];
-      if(shownMsg){ ambientTargetStore = shownMsg.store || null; ambientTargetTopic = shownMsg.topic || null; }
+    if(c.ambientActive && c.ambientMsg){
+      ambientTargetStore = c.ambientMsg.store || null;
+      ambientTargetTopic = c.ambientMsg.topic || null;
     }
-    if(officeAmbientId===id) officeStopAmbientBubble();
+    if(c.ambientActive) officeClearOwnAmbient(c);
+    if(c.ambientScheduleTimer){ clearTimeout(c.ambientScheduleTimer); c.ambientScheduleTimer = null; }
 
     // AI 담당자 본인을 클릭한 경우: 클릭할 때마다 다른 매장을 하나씩 순서대로 분석함
     // (다시 클릭해도 멈추지 않고 항상 다음 매장으로 넘어감)
@@ -11372,7 +11434,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     }
 
     // 이미 혼자 말하고 있는 캐릭터를 다시 클릭 → 종료
-    if(officeTalkingId===id){ officeStopTalking(); return; }
+    if(officeTalkingId===id){ officeStopTalking(); officeScheduleAmbientAttempt(c, rand(3000, 6500)); return; }
 
     // 이미 AI와 토론 중인 매니저를 다시 클릭 → 토론 종료
     if(officeDiscussion && officeDiscussion.managerId===id){ officeEndDiscussion(); return; }
@@ -11401,6 +11463,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       officeStopTalking();
       if(officeDiscussion) officeEndDiscussion();
       officeDiscussion = { managerId:id, script:null, idx:0, started:false, scriptStarted:false, speakerId:null, headingTable: topic, mgrArrived:false, aiArrived:false };
+      // 이 테이블은 이 담당자 전용으로 예약 — 다른 5명은 이 테이블로 찾아오지 않음
+      officeClaimTableForce(topic, id);
       officeLog = [];
       renderOfficeLog();
       pushOfficeLog('ai', 'AI 담당자', '#38bdf8', `${c.shortName} 담당자님, ${tableInfo.label}에서 ${issueLabel} 관련 데이터를 자동으로 분석하고 있어요. 잠시만요...`);
@@ -11461,12 +11525,14 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     if(officeMsgTimer) clearTimeout(officeMsgTimer);
     officeTypeTimer = null; officeMsgTimer = null;
     const mgr = (officeChars||[]).find(x=>x.id===officeDiscussion.managerId);
+    officeReleaseTable(officeDiscussion.headingTable, officeDiscussion.managerId);
     if(mgr){
       mgr.headingToAI = false;
       mgr.waitUntil = 0;
       const seat = officeSeatFor('meeting', mgr.id); // 대화가 끝나면 회의 테이블 자기 자리로 돌아감
       mgr.tx = seat ? seat.x : rand(PAD, OFFICE_W-PAD);
       mgr.ty = seat ? seat.y : rand(PAD+40, OFFICE_H-PAD);
+      officeScheduleAmbientAttempt(mgr, rand(3000, 6500)); // 잠시 후 다시 다른 테이블에서 이야기할 수 있음
     }
     const aiChar = (officeChars||[]).find(x=>x.isAI);
     if(aiChar){ aiChar.headingHome = true; } // AI 담당자도 자기 데스크로 돌아감
@@ -11534,6 +11600,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
             const seat = officeSeatFor('meeting', c.id);
             c.tx = seat ? seat.x : rand(PAD, OFFICE_W-PAD);
             c.ty = seat ? seat.y : rand(PAD+40, OFFICE_H-PAD);
+            officeScheduleAmbientAttempt(c, rand(3000, 6500));
             renderOfficeChars();
             return;
           }
@@ -11666,7 +11733,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 
       if(c.id===officeTalkingId){ c.phase='talking'; return; }
 
-      if(c.id===officeAmbientId){
+      if(c.ambientActive){
         // 앰비언트 말풍선 주제에 맞는 테이블로 후다닥 걸어가는 중
         if(c.headingToTable){
           const dx = c.tx-c.x, dy = c.ty-c.y, dist = Math.hypot(dx,dy);
@@ -11722,8 +11789,6 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       renderOfficeChips();
       renderOfficeLog();
       officeTickTimer = setInterval(officeTick, 40);
-      officeAmbientBeatTimer = setInterval(officeAmbientBeat, 5200);
-      setTimeout(officeAmbientBeat, 900); // 첫 말풍선은 조금 빨리 보여줌
     } else {
       // 페이지 재방문 시: 캐릭터 위치/애니메이션은 유지하고 브리핑 내용만 최신 데이터로 갱신
       window.refreshOfficeBriefings();
