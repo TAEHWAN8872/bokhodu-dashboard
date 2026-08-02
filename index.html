@@ -10643,6 +10643,19 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     return all.filter(b=>b.manager===mgrLabel).length;
   }
 
+  // 계약회차가 1회차이면서 계약 종료일까지 남은 기간이 계약기간(2년=약730일)에 가까우면,
+  // 최근에 오픈한 매장으로 판단함 (1회차인데 아직 만료가 한참 남았다는 건 개점한 지 얼마 안 됐다는 뜻).
+  function isNewlyOpenedStore(storeName){
+    const contractData = window.CONTRACT_DATA || [];
+    const row = contractData.find(r=>r[1]===storeName);
+    if(!row || row[4]==null || !row[5]) return false;
+    const round = Number(row[4]);
+    const end = new Date(row[5]+'T00:00:00');
+    const today = new Date(); today.setHours(0,0,0,0);
+    const daysLeft = Math.round((end-today)/86400000);
+    return round===1 && daysLeft>=600; // 2년 계약 중 20개월(약600일) 이상 남았으면 최근 오픈으로 간주
+  }
+
   // 담당자 매장들의 최근 매출 합계 / 전월 대비 증감 / 최고 매출 매장을 계산
   function managerSalesSummary(mgrLabel){
     const all = window.ALL || (typeof ALL!=='undefined'?ALL:[]);
@@ -10693,6 +10706,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     });
 
     // 3) 재계약 테이블 — 재계약 임박
+    // "재계약 안내가 필요한지"는 남은 일수만으로 판단하지 않고, 실제 안내문 발송 여부(완/미발송)를 확인해서 판단함.
+    // 이미 안내문을 보냈다면 "필요해요"라고 말하지 않고, 발송을 이미 했다는 사실만 알려줌.
     const contractData = window.CONTRACT_DATA || [];
     const today = new Date(); today.setHours(0,0,0,0);
     const contracts = contractData
@@ -10700,41 +10715,47 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       .map(r=>{
         const end = new Date(r[5]+'T00:00:00');
         const days = Math.round((end-today)/86400000);
-        return { name:r[1], days };
+        return { name:r[1], days, sent: r[8] };
       })
       .filter(x=>x.days>=0 && x.days<=180)
       .sort((a,b)=>a.days-b.days);
     contracts.slice(0,2).forEach(w=>{
-      msgs.push({ status:'warn', text: `${w.name} 계약 종료까지 ${w.days}일 남았어요. 재계약 안내가 필요해요.`, store: w.name, topic:'contract' });
-      problems.push({ type:'contract', store: w.name, days: w.days, topic:'contract' });
+      const noticeSent = w.sent === '완';
+      if(noticeSent){
+        msgs.push({ status:'good', text: `${w.name} 계약 종료까지 ${w.days}일 남았는데, 재계약 안내문은 이미 발송했어요.`, store: w.name, topic:'contract' });
+      } else {
+        msgs.push({ status:'warn', text: `${w.name} 계약 종료까지 ${w.days}일 남았어요. 아직 재계약 안내문을 발송하지 않았어요.`, store: w.name, topic:'contract' });
+        problems.push({ type:'contract', store: w.name, days: w.days, topic:'contract' });
+      }
     });
 
-    // 4) 마케팅 테이블 — 담당 매장 전체 기준 채널 미실시 현황
+
+    // 4) 마케팅 테이블 — 채널 미실시 매장을 "외 N곳"으로 뭉치지 않고 매장별로 하나씩 말함
     const missingByStore = [];
     managerStores.forEach(s=>{
       const gap = (typeof getMarketingGapsForStore==='function') ? getMarketingGapsForStore(s.name) : null;
       if(gap && gap.missing.length) missingByStore.push({ name:s.name, missing:gap.missing });
     });
     if(missingByStore.length){
-      const detail = missingByStore.slice(0,3).map(x=>`${x.name}(${x.missing.join('·')} 미실시)`).join(', ');
-      const more = missingByStore.length>3 ? ` 외 ${missingByStore.length-3}곳` : '';
-      msgs.push({ status:'warn', text: `마케팅 미실시 매장이 있어요: ${detail}${more}.`, topic:'marketing' });
-      problems.push({ type:'marketing', topic:'marketing', stores: missingByStore });
+      missingByStore.forEach(x=>{
+        msgs.push({ status:'warn', text: `${x.name} 마케팅 채널 중 ${x.missing.join('·')}을(를) 전혀 진행하지 않았어요.`, store: x.name, topic:'marketing' });
+        problems.push({ type:'marketing', store: x.name, missing: x.missing, topic:'marketing' });
+      });
     } else if(managerStores.length){
       msgs.push({ status:'good', text: `담당 매장 마케팅 채널(블로그체험단·네이버 플레이스 광고·메타광고·배너)은 모두 한 번 이상 진행했어요.`, topic:'marketing' });
     }
 
-    // 5) 물류 테이블 — 담당 매장 전체 기준 물류 매입률 이상 현황
+    // 5) 물류 테이블 — 매입률 이상 매장도 "외 N곳"으로 뭉치지 않고 매장별로 하나씩 말함
     const abnormalLogi = [];
     managerStores.forEach(s=>{
       const logi = (typeof computeLogisticsRatio==='function') ? computeLogisticsRatio(s.name, s.months) : null;
       if(logi && !logi.normal) abnormalLogi.push({ name:s.name, ratio:logi.ratio, guide:logi.guide });
     });
     if(abnormalLogi.length){
-      const detail = abnormalLogi.slice(0,3).map(x=>`${x.name}(${x.ratio.toFixed(1)}%)`).join(', ');
-      const more = abnormalLogi.length>3 ? ` 외 ${abnormalLogi.length-3}곳` : '';
-      msgs.push({ status:'warn', text: `물류 매입률이 정상 범위(32~36%)를 벗어난 매장이 있어요: ${detail}${more}.`, topic:'logistics' });
-      problems.push({ type:'logistics', topic:'logistics', stores: abnormalLogi });
+      abnormalLogi.forEach(x=>{
+        msgs.push({ status:'warn', text: `${x.name} 물류 매입률이 ${x.ratio.toFixed(1)}%로 정상 범위(32~36%)를 벗어났어요.`, store: x.name, topic:'logistics' });
+        problems.push({ type:'logistics', store: x.name, ratio: x.ratio, guide: x.guide, topic:'logistics' });
+      });
     } else if(managerStores.length){
       msgs.push({ status:'good', text: `담당 매장 물류 매입률은 모두 정상 범위(32~36%)예요.`, topic:'logistics' });
     }
@@ -10750,10 +10771,15 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       }
     }
 
+    // 담당 매장 중 5개 항목(매출/로열티/재계약/마케팅/물류) 어디에서도 이슈로 잡히지 않은 매장 수를 정확히 계산.
+    // storeCount(전체 매장 수)를 그대로 "특이사항 없다"고 말하면, 이미 위에서 이슈로 짚은 매장까지 포함해
+    // 사실과 다른 말이 되므로, 실제로 이슈가 하나도 없었던 매장만 걸러서 그 수로 말함.
+    const issueStoreNames = new Set(problems.filter(p=>p.store).map(p=>p.store));
+    const cleanCount = Math.max(storeCount - issueStoreNames.size, 0);
     if(!msgs.length){
-      msgs.push({ status:'good', text: `담당 매장 ${storeCount}곳 모두 특이사항 없어요. 안정적으로 운영되고 있습니다.`, topic:'meeting' });
-    } else if(problems.length){
-      msgs.push({ status:'good', text: `그 외 담당 매장 ${storeCount}곳은 특이사항 없이 안정적으로 운영되고 있어요.`, topic:'meeting' });
+      msgs.push({ status:'good', text: `담당 매장 ${storeCount}곳 모두 매출·로열티·재계약·마케팅·물류 5개 항목을 확인했는데 특이사항 없어요.`, topic:'meeting' });
+    } else if(problems.length && cleanCount>0){
+      msgs.push({ status:'good', text: `그 외 담당 매장 ${cleanCount}곳은 매출·로열티·재계약·마케팅·물류 5개 항목 모두 확인했고 특이사항 없어요.`, topic:'meeting' });
     }
 
     const worst = problems.some(p=>p.type==='royalty') ? 'bad' : (problems.length ? 'warn' : 'good');
@@ -10969,31 +10995,30 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     }
     if(problem.type==='contract'){
       return [
-        {who:'ai', text:`${problem.store} 계약 종료까지 ${problem.days}일 남았어요. 재계약 협상은 어떻게 진행하면 좋을까요?`},
-        {who:'mgr', text:`매장 사장님과 통화해봤는데 조건 조정을 원하시더라고요.`},
+        {who:'ai', text:`${problem.store} 계약 종료까지 ${problem.days}일 남았는데, 아직 재계약 안내문을 발송하지 않았어요. 재계약 협상은 어떻게 진행하면 좋을까요?`},
+        {who:'mgr', text:`매장 사장님과 통화해봤는데 조건 조정을 원하시더라고요. 안내문은 바로 발송할게요.`},
         {who:'ai', text:`경쟁사 조건을 비교해서 제안서를 준비해드릴까요?`},
         {who:'mgr', text:`네, 이번 주 안에 자료 부탁드려요.`}
       ];
     }
     if(problem.type==='marketing'){
-      const list = problem.stores || [];
-      const detail = list.slice(0,3).map(x=>`${x.name}(${x.missing.join('·')})`).join(', ');
-      const more = list.length>3 ? ` 외 ${list.length-3}곳` : '';
+      // 실제 계약회차·계약종료일 데이터를 확인해서 정말 최근에 오픈한 매장인지 판단함
+      const newlyOpened = isNewlyOpenedStore(problem.store);
+      const mgrReply = newlyOpened
+        ? `아, ${problem.store}는 확인해보니 오픈한 지 얼마 안 돼서(1회차 계약) 아직 채널 세팅을 못 했어요.`
+        : `확인해봤는데 오픈한 지는 좀 됐더라고요. 그동안 채널 세팅이 미뤄진 것 같아요, 바로 챙기겠습니다.`;
       return [
-        {who:'ai', text:`담당 매장 중 마케팅 채널을 아예 진행하지 않은 곳이 있어요: ${detail}${more}.`},
-        {who:'mgr', text:`아, 거기는 오픈한 지 얼마 안 돼서 아직 채널 세팅을 못 했어요.`},
+        {who:'ai', text:`${problem.store}는 마케팅 채널 중 ${(problem.missing||[]).join('·')}을(를) 전혀 진행하지 않았어요.`},
+        {who:'mgr', text: mgrReply},
         {who:'ai', text:`그럼 블로그체험단이나 네이버 플레이스 광고부터 먼저 진행해보시는 걸 추천드려요.`},
         {who:'mgr', text:`네, 이번 주에 순서대로 진행해볼게요.`}
       ];
     }
     if(problem.type==='logistics'){
-      const list = problem.stores || [];
-      const detail = list.slice(0,3).map(x=>`${x.name}(${x.ratio.toFixed(1)}%)`).join(', ');
-      const more = list.length>3 ? ` 외 ${list.length-3}곳` : '';
       return [
-        {who:'ai', text:`물류 매입률이 정상 범위(32~36%)를 벗어난 매장이 있어요: ${detail}${more}.`},
+        {who:'ai', text:`${problem.store} 물류 매입률이 ${problem.ratio!=null ? problem.ratio.toFixed(1)+'%' : '비정상 수치'}로 정상 범위(32~36%)를 벗어났어요.`},
         {who:'mgr', text:`확인해볼게요. 발주량이 조금 안 맞았을 수도 있겠네요.`},
-        {who:'ai', text:`${list[0] ? list[0].guide : '발주량 조정'}을 검토해보시면 좋겠어요.`},
+        {who:'ai', text:`${problem.guide || '발주량 조정'}을 검토해보시면 좋겠어요.`},
         {who:'mgr', text:`네, 매장별로 발주 데이터 다시 확인해볼게요.`}
       ];
     }
