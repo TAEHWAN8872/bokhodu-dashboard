@@ -2575,7 +2575,7 @@ function openBranchModal(b){
     if (yoyR !== null) rateParts.push(`YoY ${yoyR >= 0 ? '▲' : '▼'}${Math.abs(yoyR).toFixed(1)}%`);
     if (rateParts.length) salesLine += ` (${rateParts.join(' · ')})`;
 
-    // 재계약 정보
+    // 재계약 정보 (종료일 포함, 상세)
     let contractLine = '📑 재계약: 데이터 없음';
     const contractRow = (window.CONTRACT_DATA || []).find(r => normNameForShare(r[1]) === normNameForShare(b.name));
     if (contractRow && contractRow[5]) {
@@ -2583,19 +2583,30 @@ function openBranchModal(b){
       const todayD = new Date(); todayD.setHours(0, 0, 0, 0);
       const dday = Math.round((endD - todayD) / 86400000);
       const ddayStr = dday >= 0 ? `D-${dday}` : `만료+${Math.abs(dday)}일`;
-      contractLine = `📑 재계약 ${ddayStr}${contractRow[8] === '미발송' ? ' (안내 미발송)' : ''}`;
+      contractLine = `📑 재계약 종료 ${contractRow[5]} (${ddayStr})${contractRow[8] === '미발송' ? ' · 안내 미발송' : ' · 안내 발송완료'}`;
     }
 
-    // 로열티 미입금 정보
+    // 로열티 미입금 정보 (건수/월/합계 상세)
     let royaltyLine = '💰 로열티 미입금 없음 ✅';
     const royaltyItems = (window.__ROYALTY_CACHE || []).filter(it => normNameForShare(it.store) === normNameForShare(b.name));
     if (royaltyItems.length) {
       const totalAmt = royaltyItems.reduce((s, it) => s + (Number(it.amount) || 0), 0);
-      royaltyLine = `💰 로열티 미입금 ${royaltyItems.length}건 · ${totalAmt.toLocaleString()}원`;
+      const monthsStr = royaltyItems.map(it => (it.month || '').slice(0, 7)).filter(Boolean).join(',');
+      royaltyLine = `💰 로열티 미입금 ${royaltyItems.length}건${monthsStr ? '(' + monthsStr + ')' : ''} · 합계 ${totalAmt.toLocaleString()}원`;
     }
 
-    let shareText = `📊 [복호두 ${b.name}]\n${salesLine}\n${contractLine}\n${royaltyLine}`;
-    if (shareText.length > 195) shareText = shareText.slice(0, 195) + '…';
+    // ── 200자 예산 안에서 우선순위대로 최대한 채워넣기 (제목→매출→인사이트 1~2줄→재계약→로열티) ──
+    const BUDGET = 195;
+    const header = `📊 [복호두 ${b.name}]`;
+    const insightPlain = lines.map(l => l.replace(/<[^>]+>/g, ''));
+    const candidates = [header, salesLine, ...insightPlain.slice(0, 2), contractLine, royaltyLine];
+    let shareText = '';
+    for (const c of candidates) {
+      const next = shareText ? shareText + '\n' + c : c;
+      if (next.length > BUDGET) break;
+      shareText = next;
+    }
+    if (!shareText) shareText = header;
 
     window.currentShareData = { text: shareText };
 
@@ -2785,8 +2796,8 @@ function shareStoreToKakao(){
     objectType: 'text',
     text: d.text,
     link: {
-      mobileWebUrl: 'https://taehwan8872.github.io/franchise-dashboard/',
-      webUrl: 'https://taehwan8872.github.io/franchise-dashboard/'
+      mobileWebUrl: 'https://taehwan8872.github.io/bokhodu-dashboard/',
+      webUrl: 'https://taehwan8872.github.io/bokhodu-dashboard/'
     },
     buttonTitle: '대시보드 보기'
   });
