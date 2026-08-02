@@ -11,6 +11,14 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js"></script>
+<script>
+  window.addEventListener('DOMContentLoaded', function(){
+    if (window.Kakao && !Kakao.isInitialized()) {
+      Kakao.init('5cf7972d56f011d7eaa0880d727d0b09');
+    }
+  });
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-serif;min-height:100vh;padding:16px;}
@@ -1251,6 +1259,7 @@ body.hide-names .store-name:hover{
 <div class="modal-overlay" id="branchModal" style="z-index:4000;">
   <div class="modal-box">
     <button class="modal-close" onclick="closeModal()">✕</button>
+    <button onclick="shareStoreToKakao()" style="position:absolute;top:14px;right:46px;background:#FEE500;color:#3c1e1e;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;">💬 카톡공유</button>
     <div class="modal-title" id="modalTitle">-</div>
     <div class="modal-sub" id="modalSub">-</div>
     <div class="modal-cw"><canvas id="modalChart"></canvas></div>
@@ -2554,6 +2563,42 @@ function openBranchModal(b){
       }
     }
 
+    // ── 카톡 공유용 텍스트 요약 저장 (카카오 텍스트 템플릿 200자 제한 대응, 핵심 정보만 압축) ─────
+    const curVFmt = curV != null ? fmtD(curV) : '-';
+
+    const normNameForShare = (name) => !name ? '' : String(name)
+      .replace(/^\(폐점\)/, '').replace(/복호두\s*/g, '').replace(/\s+/g, '').trim();
+
+    let salesLine = `${monthLabel} 매출 ${curVFmt}`;
+    const rateParts = [];
+    if (momR !== null) rateParts.push(`MoM ${momR >= 0 ? '▲' : '▼'}${Math.abs(momR).toFixed(1)}%`);
+    if (yoyR !== null) rateParts.push(`YoY ${yoyR >= 0 ? '▲' : '▼'}${Math.abs(yoyR).toFixed(1)}%`);
+    if (rateParts.length) salesLine += ` (${rateParts.join(' · ')})`;
+
+    // 재계약 정보
+    let contractLine = '📑 재계약: 데이터 없음';
+    const contractRow = (window.CONTRACT_DATA || []).find(r => normNameForShare(r[1]) === normNameForShare(b.name));
+    if (contractRow && contractRow[5]) {
+      const endD = new Date(contractRow[5] + 'T00:00:00');
+      const todayD = new Date(); todayD.setHours(0, 0, 0, 0);
+      const dday = Math.round((endD - todayD) / 86400000);
+      const ddayStr = dday >= 0 ? `D-${dday}` : `만료+${Math.abs(dday)}일`;
+      contractLine = `📑 재계약 ${ddayStr}${contractRow[8] === '미발송' ? ' (안내 미발송)' : ''}`;
+    }
+
+    // 로열티 미입금 정보
+    let royaltyLine = '💰 로열티 미입금 없음 ✅';
+    const royaltyItems = (window.__ROYALTY_CACHE || []).filter(it => normNameForShare(it.store) === normNameForShare(b.name));
+    if (royaltyItems.length) {
+      const totalAmt = royaltyItems.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+      royaltyLine = `💰 로열티 미입금 ${royaltyItems.length}건 · ${totalAmt.toLocaleString()}원`;
+    }
+
+    let shareText = `📊 [복호두 ${b.name}]\n${salesLine}\n${contractLine}\n${royaltyLine}`;
+    if (shareText.length > 195) shareText = shareText.slice(0, 195) + '…';
+
+    window.currentShareData = { text: shareText };
+
     insightEl.innerHTML = `
 <div style="border-top:0.5px solid #1a2f44;padding-top:12px;background:linear-gradient(135deg,#0d1e30,#111e2e);border:0.5px solid #2a5a8a;border-radius:10px;padding:12px 14px;">
   <div style="font-size:10px;color:#7eb8e8;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px;">✨ AI 매출 인사이트</div>
@@ -2730,6 +2775,21 @@ function openBranchModal(b){
 function closeModal(){
   document.getElementById('branchModal').classList.remove('open');
   if(modalChartInst){modalChartInst.destroy();modalChartInst=null;}
+}
+
+function shareStoreToKakao(){
+  const d = window.currentShareData;
+  if(!d || !d.text){ alert('공유할 매장 데이터가 없습니다.'); return; }
+  if(!window.Kakao || !Kakao.isInitialized()){ alert('카카오 SDK가 초기화되지 않았습니다.'); return; }
+  Kakao.Share.sendDefault({
+    objectType: 'text',
+    text: d.text,
+    link: {
+      mobileWebUrl: 'https://taehwan8872.github.io/franchise-dashboard/',
+      webUrl: 'https://taehwan8872.github.io/franchise-dashboard/'
+    },
+    buttonTitle: '대시보드 보기'
+  });
 }
 document.getElementById('branchModal').addEventListener('click',function(e){
   if(e.target===this) closeModal();
