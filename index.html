@@ -1259,7 +1259,7 @@ body.hide-names .store-name:hover{
 <div class="modal-overlay" id="branchModal" style="z-index:4000;">
   <div class="modal-box">
     <button class="modal-close" onclick="closeModal()">✕</button>
-    <button onclick="shareStoreToKakao()" style="position:absolute;top:14px;right:46px;background:#FEE500;color:#3c1e1e;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;">💬 카톡공유</button>
+    <button id="kakaoShareBtn" onclick="shareStoreToKakao()" style="position:absolute;top:14px;right:46px;background:#FEE500;color:#3c1e1e;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;">💬 카톡공유</button>
     <div class="modal-title" id="modalTitle">-</div>
     <div class="modal-sub" id="modalSub">-</div>
     <div class="modal-cw"><canvas id="modalChart"></canvas></div>
@@ -2595,20 +2595,34 @@ function openBranchModal(b){
       royaltyLine = `💰 로열티 미입금 ${royaltyItems.length}건${monthsStr ? '(' + monthsStr + ')' : ''} · 합계 ${totalAmt.toLocaleString()}원`;
     }
 
-    // ── 200자 예산 안에서 우선순위대로 최대한 채워넣기 (제목→매출→인사이트 1~2줄→재계약→로열티) ──
+    // ── 전체 정보를 195자 단위로 나눠서 여러 번에 걸쳐 보낼 수 있도록 청크로 분할 ──
     const BUDGET = 195;
     const header = `📊 [복호두 ${b.name}]`;
     const insightPlain = lines.map(l => l.replace(/<[^>]+>/g, ''));
-    const candidates = [header, salesLine, ...insightPlain.slice(0, 2), contractLine, royaltyLine];
-    let shareText = '';
-    for (const c of candidates) {
-      const next = shareText ? shareText + '\n' + c : c;
-      if (next.length > BUDGET) break;
-      shareText = next;
-    }
-    if (!shareText) shareText = header;
+    const allParts = [header, salesLine, ...insightPlain, contractLine, royaltyLine];
 
-    window.currentShareData = { text: shareText };
+    const chunks = [];
+    let cur = '';
+    for (const part of allParts) {
+      const next = cur ? cur + '\n' + part : part;
+      if (next.length > BUDGET) {
+        if (cur) chunks.push(cur);
+        cur = part.length > BUDGET ? part.slice(0, BUDGET) : part;
+      } else {
+        cur = next;
+      }
+    }
+    if (cur) chunks.push(cur);
+    if (!chunks.length) chunks.push(header);
+    // 청크가 여러 개면 각 조각에 진행 표시 추가 (예: "(1/3)")
+    const taggedChunks = chunks.length > 1
+      ? chunks.map((c, i) => `${c}\n(${i + 1}/${chunks.length})`)
+      : chunks;
+
+    if (typeof __kakaoAutoTimer !== 'undefined' && __kakaoAutoTimer) { clearInterval(__kakaoAutoTimer); __kakaoAutoTimer = null; }
+    window.currentShareData = { chunks: taggedChunks, idx: 0 };
+    const btn = document.getElementById('kakaoShareBtn');
+    if (btn) btn.textContent = taggedChunks.length > 1 ? `💬 카톡공유 (1/${taggedChunks.length})` : '💬 카톡공유';
 
     insightEl.innerHTML = `
 <div style="border-top:0.5px solid #1a2f44;padding-top:12px;background:linear-gradient(135deg,#0d1e30,#111e2e);border:0.5px solid #2a5a8a;border-radius:10px;padding:12px 14px;">
@@ -2788,19 +2802,55 @@ function closeModal(){
   if(modalChartInst){modalChartInst.destroy();modalChartInst=null;}
 }
 
-function shareStoreToKakao(){
+let __kakaoAutoTimer = null;
+
+function __sendKakaoChunk(){
   const d = window.currentShareData;
-  if(!d || !d.text){ alert('공유할 매장 데이터가 없습니다.'); return; }
-  if(!window.Kakao || !Kakao.isInitialized()){ alert('카카오 SDK가 초기화되지 않았습니다.'); return; }
+  if(!d || !d.chunks || d.idx >= d.chunks.length) return false;
+
+  const text = d.chunks[d.idx];
   Kakao.Share.sendDefault({
     objectType: 'text',
-    text: d.text,
+    text: text,
     link: {
       mobileWebUrl: 'https://taehwan8872.github.io/bokhodu-dashboard/',
       webUrl: 'https://taehwan8872.github.io/bokhodu-dashboard/'
     },
     buttonTitle: '대시보드 보기'
   });
+
+  d.idx++;
+  const btn = document.getElementById('kakaoShareBtn');
+  if (d.idx >= d.chunks.length) {
+    if (__kakaoAutoTimer) { clearInterval(__kakaoAutoTimer); __kakaoAutoTimer = null; }
+    d.idx = 0; // 마지막까지 보냈으면 처음으로 리셋
+    if (btn) btn.textContent = d.chunks.length > 1 ? `💬 카톡공유 (1/${d.chunks.length})` : '💬 카톡공유';
+    return false;
+  } else {
+    if (btn) btn.textContent = `💬 카톡공유 (${d.idx + 1}/${d.chunks.length}) 자동전송중...`;
+    return true;
+  }
+}
+
+function shareStoreToKakao(){
+  const d = window.currentShareData;
+  if(!d || !d.chunks || !d.chunks.length){ alert('공유할 매장 데이터가 없습니다.'); return; }
+  if(!window.Kakao || !Kakao.isInitialized()){ alert('카카오 SDK가 초기화되지 않았습니다.'); return; }
+
+  // 이미 자동전송이 돌고 있는 중에 버튼을 또 누르면: 수동으로 "다음 조각 즉시 전송" (자동이 막혔을 때 대비)
+  if (__kakaoAutoTimer && d.idx > 0) {
+    __sendKakaoChunk();
+    return;
+  }
+
+  const hasMore = __sendKakaoChunk();
+  if (hasMore) {
+    if (__kakaoAutoTimer) clearInterval(__kakaoAutoTimer);
+    __kakaoAutoTimer = setInterval(() => {
+      const more = __sendKakaoChunk();
+      if (!more && __kakaoAutoTimer) { clearInterval(__kakaoAutoTimer); __kakaoAutoTimer = null; }
+    }, 1000);
+  }
 }
 document.getElementById('branchModal').addEventListener('click',function(e){
   if(e.target===this) closeModal();
