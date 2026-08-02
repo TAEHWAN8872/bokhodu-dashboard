@@ -93,9 +93,6 @@ body.hide-names .store-name:hover{
 .tab[data-region="강원"]:hover{border-color:#f59e0b;color:#f59e0b;}
 
 /* AI 오피스 */
-.office-style-toggle{display:flex;gap:4px;background:#0d1e30;border:0.5px solid #1e3347;border-radius:20px;padding:3px;}
-.office-style-btn{border:none;cursor:pointer;font-size:11px;font-weight:700;padding:5px 12px;border-radius:16px;background:transparent;color:#6b8fa8;transition:all .15s ease;}
-.office-style-btn.active{background:#1a3a5c;color:#7eb8e8;}
 .office-stage{position:relative;width:100%;max-width:920px;height:500px;margin:0 auto;background:linear-gradient(180deg,#fbf7f0 0%,#f3ead9 100%);border:1px solid #e2d9c8;border-radius:16px;overflow:hidden;}
 .office-header-band{position:absolute;top:0;left:0;width:100%;height:100px;background:#eef2f7;border-bottom:3px solid #d9e2ec;}
 .office-window{position:absolute;width:90px;height:64px;border-radius:6px;overflow:hidden;border:5px solid #ffffff;box-shadow:0 2px 6px rgba(0,0,0,.08);background:linear-gradient(180deg,#bfe3fb 0%,#e6f4fd 100%);}
@@ -109,10 +106,24 @@ body.hide-names .store-name:hover{
 .office-desk-top{position:absolute;bottom:0;width:100%;height:26px;background:#c98a53;border-radius:5px;box-shadow:0 3px 4px rgba(0,0,0,.12);}
 .office-desk-mon{position:absolute;bottom:22px;left:16px;width:30px;height:18px;background:#334155;border-radius:3px 3px 1px 1px;}
 .office-desk-screen{position:absolute;bottom:25px;left:19px;width:24px;height:12px;background:#7dd3fc;}
+.office-table{position:absolute;transform:translate(-50%,-50%);pointer-events:none;z-index:1;}
+.office-table-top{position:absolute;inset:0;background:linear-gradient(180deg,#e2b483 0%,#c98a53 55%,#b8794a 100%);border:2px solid #a86c3f;border-radius:14px;box-shadow:0 4px 10px rgba(0,0,0,.18), inset 0 0 0 4px rgba(255,255,255,.08);}
+.office-table-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;font-size:12px;font-weight:800;line-height:1.3;padding:4px 10px;color:#475569;text-shadow:0 1px 0 rgba(255,255,255,.55);}
+.office-table-label.sales{color:#075985;}
+.office-table-label.royalty{color:#991b1b;}
+.office-table-label.marketing{color:#6d28d9;}
+.office-table-label.logistics{color:#166534;}
+.office-table-label.meeting{color:#1e293b;}
+.office-chair{position:absolute;transform:translate(-50%,-50%);width:26px;height:28px;pointer-events:none;z-index:1;}
+.office-chair-back{position:absolute;top:0;left:4px;width:18px;height:14px;background:#9a6b3f;border:1px solid #7c552f;border-radius:4px 4px 2px 2px;}
+.office-chair-seat{position:absolute;bottom:2px;left:1px;width:24px;height:11px;background:#c98a53;border:1px solid #a86c3f;border-radius:4px;box-shadow:0 2px 4px rgba(0,0,0,.18);}
+.office-chair-leg{position:absolute;bottom:-3px;width:3px;height:6px;background:#7c552f;border-radius:1px;}
+.office-chair-leg.l{left:2px;} .office-chair-leg.r{right:2px;}
 .office-plant{position:absolute;}
 .office-char{position:absolute;transform:translate(-50%,-50%);cursor:pointer;}
 .office-char-figure{width:38px;height:60px;filter:drop-shadow(0 3px 3px rgba(0,0,0,.2));}
 .office-char-figure.walking{animation:officeWalkBob .32s ease-in-out infinite;}
+.office-char-figure.running{animation:officeRunBob .16s ease-in-out infinite;}
 .office-char-figure.idle,.office-char-figure.talking{animation:officeIdleBob 2s ease-in-out infinite;}
 .office-char-name{text-align:center;font-size:9.5px;margin-top:2px;color:#64748b;font-weight:600;white-space:nowrap;text-shadow:0 1px 2px rgba(255,255,255,.8);}
 .office-char-name.talking{color:#1e293b;font-weight:700;}
@@ -133,6 +144,7 @@ body.hide-names .store-name:hover{
 .office-log-name{font-size:10.5px;font-weight:700;margin-bottom:2px;}
 .office-log-text{font-size:12px;color:#c8dff0;line-height:1.5;word-break:break-word;}
 @keyframes officeWalkBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}
+@keyframes officeRunBob{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-5px) rotate(2deg)}}
 @keyframes officeIdleBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
 @keyframes officeLegL{0%,100%{transform:rotate(22deg)}50%{transform:rotate(-22deg)}}
 @keyframes officeLegR{0%,100%{transform:rotate(-22deg)}50%{transform:rotate(22deg)}}
@@ -622,10 +634,6 @@ body.hide-names .store-name:hover{
     <div class="card" style="padding:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
         <div style="font-size:11px;color:#6b8fa8;">캐릭터를 누르면 멈춰서 실제 매출·재계약·로열티 데이터 기반 브리핑을 말해요</div>
-        <div class="office-style-toggle">
-          <button id="officeStyleBtn-human" class="office-style-btn active" onclick="setOfficeStyle('human')">사람</button>
-          <button id="officeStyleBtn-ac" class="office-style-btn" onclick="setOfficeStyle('ac')">동물의숲풍</button>
-        </div>
       </div>
       <div id="officeStage" class="office-stage">
         <div class="office-header-band"></div>
@@ -10508,26 +10516,45 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 (function(){
   const OFFICE_W = 920, OFFICE_H = 500, PAD = 55;
   const HAIR_COLORS = ["#3f2e1e","#2b2b2b","#4a3826","#1f1f1f","#5a4530","#332222"];
-  const ANIMAL_FUR = {
-    fox:{base:"#f0a458",light:"#fff5e6"},
-    bear:{base:"#a9764f",light:"#f2d9b8"},
-    cat:{base:"#d9d2c7",light:"#ffffff"},
-    rabbit:{base:"#f6e9df",light:"#ffffff"},
-    dog:{base:"#e0b878",light:"#fffaf0"},
-    deer:{base:"#c99a6b",light:"#f5e6cf"}
-  };
   // label은 ALL 데이터의 b.manager 값과 정확히 일치해야 매출/재계약/로열티 매칭이 됩니다.
   const OFFICE_MANAGER_DEFS = [
-    {id:"kth", label:"김태환 과장", shortName:"김태환", color:"#22c55e", animal:"fox"},
-    {id:"ldh", label:"임도형 과장", shortName:"임도형", color:"#ef4444", animal:"bear"},
-    {id:"ljs", label:"이중섭 대리", shortName:"이중섭", color:"#facc15", animal:"cat"},
-    {id:"pyt", label:"박영태 대리", shortName:"박영태", color:"#3b82f6", animal:"rabbit"},
-    {id:"kdw", label:"강동우 사원", shortName:"강동우", color:"#a855f7", animal:"dog"},
-    {id:"lhm", label:"이현민 사원", shortName:"이현민", color:"#f472b6", animal:"deer"},
+    {id:"kth", label:"김태환 과장", shortName:"김태환", color:"#22c55e"},
+    {id:"ldh", label:"임도형 과장", shortName:"임도형", color:"#ef4444"},
+    {id:"ljs", label:"이중섭 대리", shortName:"이중섭", color:"#facc15"},
+    {id:"pyt", label:"박영태 대리", shortName:"박영태", color:"#3b82f6"},
+    {id:"kdw", label:"강동우 사원", shortName:"강동우", color:"#a855f7"},
+    {id:"lhm", label:"이현민 사원", shortName:"이현민", color:"#f472b6"},
     {id:"ai", label:"AI 담당자", shortName:"AI", color:"#38bdf8", isAI:true}
   ];
   const STATUS_COLOR = { good:'#16a34a', warn:'#d97706', bad:'#dc2626', ai:'#38bdf8' };
-  const AI_DESK = { x: OFFICE_W/2, y: 150 };
+  const AI_DESK = { x: OFFICE_W/2, y: 128 };
+
+  // 담당자들이 평소 모여 있는 회의 테이블 + 주제별로 찾아가 앉아서 이야기하는 4개의 테이블.
+  // w/h는 테이블 사각형의 실제 크기이고, seats는 테이블 가장자리에서 충분히 떨어진(의자/이름표와 겹치지 않는) 좌석 좌표.
+  const OFFICE_TABLES = {
+    meeting:   { key:'meeting',   label:'회의 테이블',   icon:'🗂️', x:460, y:345, w:240, h:100, seats:[[-90,-70],[0,-70],[90,-70],[-90,70],[0,70],[90,70]] },
+    sales:     { key:'sales',     label:'매출 테이블',   icon:'💰', x:165, y:240, w:150, h:80,  seats:[[-45,-56],[45,-56],[0,60]] },
+    royalty:   { key:'royalty',   label:'로열티 테이블', icon:'🧾', x:755, y:240, w:150, h:80,  seats:[[-45,-56],[45,-56],[0,60]] },
+    marketing: { key:'marketing', label:'마케팅 테이블', icon:'📣', x:165, y:400, w:150, h:80,  seats:[[-45,-56],[45,-56],[0,60]] },
+    logistics: { key:'logistics', label:'물류 테이블',   icon:'🚚', x:755, y:400, w:150, h:80,  seats:[[-45,-56],[45,-56],[0,60]] }
+  };
+
+  // 담당자(매니저) 캐릭터가 특정 테이블에서 앉을 자리를 계산 (인덱스 기반, 항상 같은 자리)
+  function officeSeatFor(tableKey, id){
+    const t = OFFICE_TABLES[tableKey];
+    if(!t) return null;
+    const nonAiIds = (officeChars||[]).filter(x=>!x.isAI).map(x=>x.id);
+    let idx = nonAiIds.indexOf(id);
+    if(idx<0) idx = 0;
+    const seat = t.seats[idx % t.seats.length];
+    return { x: t.x+seat[0], y: t.y+seat[1] };
+  }
+  // AI 담당자가 특정 테이블에 합류할 때 앉는 자리 (테이블 위쪽 바깥, 매니저 좌석과 겹치지 않는 고정 위치)
+  function officeAiSeatFor(tableKey){
+    const t = OFFICE_TABLES[tableKey];
+    if(!t) return { x: AI_DESK.x, y: AI_DESK.y };
+    return { x: t.x, y: t.y - (t.h/2) - 34 };
+  }
   const AI_IDLE_LINES = [
     '안녕하세요! 저는 매출 데이터를 분석하는 AI 담당자예요.',
     '이슈가 있는 담당자를 클릭하면 저를 찾아와서 원인을 함께 이야기해요.',
@@ -10566,7 +10593,6 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   function fmtPct(v){ return (v>0?'+':'') + v.toFixed(1) + '%'; }
 
   let officeChars = null;
-  let officeStyleMode = 'human';
   let officeTalkingId = null;
   let officeDiscussion = null; // { managerId, script, idx, started, speakerId }
   let officeTickTimer = null;
@@ -10610,33 +10636,38 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     return { curTotal, rate, top, storeCount: stores.length };
   }
 
-  // 담당자별 브리핑: 로열티 미입금 / 매출 급락 / 재계약 임박 등 이슈 + 매출 요약을
-  // 여러 개의 멘트 배열로 만들어, 캐릭터가 순서대로 계속 말할 수 있게 함.
-  // 가장 우선순위 높은 이슈는 issue로 함께 반환해 AI 담당자와의 토론에 사용함.
+  // 담당자별 브리핑: 로열티 미입금 / 매출 급락 / 재계약 임박 / 마케팅 미실시 / 물류 이상 등
+  // "매장 단위" 문제를 여러 개의 멘트로 만들고, 각 멘트에 어느 테이블(주제)에서 이야기할지
+  // topic('sales'|'royalty'|'marketing'|'logistics'|'meeting')을 함께 표시함.
+  // 캐릭터는 이 topic을 보고 해당 테이블로 걸어가 앉아서 이야기함.
   function computeManagerBriefings(mgrLabel){
     const storeCount = storeCountOf(mgrLabel);
     const getMgr = (typeof window.mkStoreManager==='function') ? window.mkStoreManager : function(){ return null; };
+    const all = window.ALL || (typeof ALL!=='undefined'?ALL:[]);
+    const managerStores = all.filter(b=>b.manager===mgrLabel);
     const msgs = [];
     const problems = []; // 이 담당자가 짚어야 할 "매장 단위" 문제 목록. 클릭할 때마다 하나씩 순환하며 분석함.
 
+    // 1) 로열티 테이블 — 미입금 매장
     const royalty = (window.__ROYALTY_CACHE || []).filter(it => getMgr(it.store) === mgrLabel);
     royalty.forEach(r=>{
-      msgs.push({ status:'bad', text: `${r.store} 로열티가 미입금 상태예요. 확인 부탁드려요.`, store: r.store });
-      problems.push({ type:'royalty', store: r.store });
+      msgs.push({ status:'bad', text: `${r.store} 로열티가 미입금 상태예요. 확인 부탁드려요.`, store: r.store, topic:'royalty' });
+      problems.push({ type:'royalty', store: r.store, topic:'royalty' });
     });
 
+    // 2) 매출 테이블 — 하락 매장 (-10% 이상)
     const declineList = (typeof window.getDeclineBranches==='function') ? window.getDeclineBranches().list : [];
     const declines = declineList.filter(r=>r.manager===mgrLabel);
-    // -10% 이상 하락한 매장은 개수 제한 없이 전부 노출하고, 매장별 마케팅 미실시 채널도 함께 지적
     declines.forEach(w=>{
       const gap = (typeof getMarketingGapsForStore==='function') ? getMarketingGapsForStore(w.name) : null;
       const gapText = (gap && gap.missing.length)
         ? ` 마케팅은 ${gap.missing.join(', ')}을(를) 전혀 진행하지 않았어요.`
         : (gap ? ` 마케팅 채널(블로그체험단·네이버 플레이스 광고·메타광고·배너)은 모두 한 번 이상 진행했었어요.` : '');
-      msgs.push({ status:'warn', text: `${w.name} 매출이 작년 상반기 평균 대비 ${fmtPct(w.rate)} 하락했어요.${gapText}`, store: w.name });
-      problems.push({ type:'decline', store: w.name, data: w });
+      msgs.push({ status:'warn', text: `${w.name} 매출이 작년 상반기 평균 대비 ${fmtPct(w.rate)} 하락했어요.${gapText}`, store: w.name, topic:'sales' });
+      problems.push({ type:'decline', store: w.name, data: w, topic:'sales' });
     });
 
+    // 3) 회의 테이블 — 재계약 임박 (일반 업무 안건으로 분류)
     const contractData = window.CONTRACT_DATA || [];
     const today = new Date(); today.setHours(0,0,0,0);
     const contracts = contractData
@@ -10649,24 +10680,55 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       .filter(x=>x.days>=0 && x.days<=180)
       .sort((a,b)=>a.days-b.days);
     contracts.slice(0,2).forEach(w=>{
-      msgs.push({ status:'warn', text: `${w.name} 계약 종료까지 ${w.days}일 남았어요. 재계약 안내가 필요해요.`, store: w.name });
-      problems.push({ type:'contract', store: w.name, days: w.days });
+      msgs.push({ status:'warn', text: `${w.name} 계약 종료까지 ${w.days}일 남았어요. 재계약 안내가 필요해요.`, store: w.name, topic:'meeting' });
+      problems.push({ type:'contract', store: w.name, days: w.days, topic:'meeting' });
     });
 
+    // 4) 마케팅 테이블 — 담당 매장 전체 기준 채널 미실시 현황
+    const missingByStore = [];
+    managerStores.forEach(s=>{
+      const gap = (typeof getMarketingGapsForStore==='function') ? getMarketingGapsForStore(s.name) : null;
+      if(gap && gap.missing.length) missingByStore.push({ name:s.name, missing:gap.missing });
+    });
+    if(missingByStore.length){
+      const detail = missingByStore.slice(0,3).map(x=>`${x.name}(${x.missing.join('·')} 미실시)`).join(', ');
+      const more = missingByStore.length>3 ? ` 외 ${missingByStore.length-3}곳` : '';
+      msgs.push({ status:'warn', text: `마케팅 미실시 매장이 있어요: ${detail}${more}.`, topic:'marketing' });
+      problems.push({ type:'marketing', topic:'marketing', stores: missingByStore });
+    } else if(managerStores.length){
+      msgs.push({ status:'good', text: `담당 매장 마케팅 채널(블로그체험단·네이버 플레이스 광고·메타광고·배너)은 모두 한 번 이상 진행했어요.`, topic:'marketing' });
+    }
+
+    // 5) 물류 테이블 — 담당 매장 전체 기준 물류 매입률 이상 현황
+    const abnormalLogi = [];
+    managerStores.forEach(s=>{
+      const logi = (typeof computeLogisticsRatio==='function') ? computeLogisticsRatio(s.name, s.months) : null;
+      if(logi && !logi.normal) abnormalLogi.push({ name:s.name, ratio:logi.ratio, guide:logi.guide });
+    });
+    if(abnormalLogi.length){
+      const detail = abnormalLogi.slice(0,3).map(x=>`${x.name}(${x.ratio.toFixed(1)}%)`).join(', ');
+      const more = abnormalLogi.length>3 ? ` 외 ${abnormalLogi.length-3}곳` : '';
+      msgs.push({ status:'warn', text: `물류 매입률이 정상 범위(32~36%)를 벗어난 매장이 있어요: ${detail}${more}.`, topic:'logistics' });
+      problems.push({ type:'logistics', topic:'logistics', stores: abnormalLogi });
+    } else if(managerStores.length){
+      msgs.push({ status:'good', text: `담당 매장 물류 매입률은 모두 정상 범위(32~36%)예요.`, topic:'logistics' });
+    }
+
+    // 6) 매출 테이블 — 전체 요약(좋은 소식)
     const sales = managerSalesSummary(mgrLabel);
     if(sales){
       let salesText = `담당 매장 ${sales.storeCount}곳 최근 월 매출 합계는 ${fmt(sales.curTotal)}이에요.`;
       if(sales.rate!=null) salesText += ` 전월 대비 ${fmtPct(sales.rate)} ${sales.rate>=0?'증가':'감소'}했어요.`;
-      msgs.push({ status:'good', text: salesText });
+      msgs.push({ status:'good', text: salesText, topic:'sales' });
       if(sales.top){
-        msgs.push({ status:'good', text: `이번 달은 ${sales.top.name}이 ${fmt(sales.top.val)}로 가장 매출이 높았어요.` });
+        msgs.push({ status:'good', text: `이번 달은 ${sales.top.name}이 ${fmt(sales.top.val)}로 가장 매출이 높았어요.`, topic:'sales' });
       }
     }
 
     if(!msgs.length){
-      msgs.push({ status:'good', text: `담당 매장 ${storeCount}곳 모두 특이사항 없어요. 안정적으로 운영되고 있습니다.` });
+      msgs.push({ status:'good', text: `담당 매장 ${storeCount}곳 모두 특이사항 없어요. 안정적으로 운영되고 있습니다.`, topic:'meeting' });
     } else if(problems.length){
-      msgs.push({ status:'good', text: `그 외 담당 매장 ${storeCount}곳은 특이사항 없이 안정적으로 운영되고 있어요.` });
+      msgs.push({ status:'good', text: `그 외 담당 매장 ${storeCount}곳은 특이사항 없이 안정적으로 운영되고 있어요.`, topic:'meeting' });
     }
 
     const worst = problems.some(p=>p.type==='royalty') ? 'bad' : (problems.length ? 'warn' : 'good');
@@ -10888,6 +10950,28 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         {who:'mgr', text:`네, 이번 주 안에 자료 부탁드려요.`}
       ];
     }
+    if(problem.type==='marketing'){
+      const list = problem.stores || [];
+      const detail = list.slice(0,3).map(x=>`${x.name}(${x.missing.join('·')})`).join(', ');
+      const more = list.length>3 ? ` 외 ${list.length-3}곳` : '';
+      return [
+        {who:'ai', text:`담당 매장 중 마케팅 채널을 아예 진행하지 않은 곳이 있어요: ${detail}${more}.`},
+        {who:'mgr', text:`아, 거기는 오픈한 지 얼마 안 돼서 아직 채널 세팅을 못 했어요.`},
+        {who:'ai', text:`그럼 블로그체험단이나 네이버 플레이스 광고부터 먼저 진행해보시는 걸 추천드려요.`},
+        {who:'mgr', text:`네, 이번 주에 순서대로 진행해볼게요.`}
+      ];
+    }
+    if(problem.type==='logistics'){
+      const list = problem.stores || [];
+      const detail = list.slice(0,3).map(x=>`${x.name}(${x.ratio.toFixed(1)}%)`).join(', ');
+      const more = list.length>3 ? ` 외 ${list.length-3}곳` : '';
+      return [
+        {who:'ai', text:`물류 매입률이 정상 범위(32~36%)를 벗어난 매장이 있어요: ${detail}${more}.`},
+        {who:'mgr', text:`확인해볼게요. 발주량이 조금 안 맞았을 수도 있겠네요.`},
+        {who:'ai', text:`${list[0] ? list[0].guide : '발주량 조정'}을 검토해보시면 좋겠어요.`},
+        {who:'mgr', text:`네, 매장별로 발주 데이터 다시 확인해볼게요.`}
+      ];
+    }
     return null;
   }
 
@@ -11010,7 +11094,17 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   function officeStopAmbientBubble(){
     if(officeAmbientTypeTimer) clearInterval(officeAmbientTypeTimer);
     officeAmbientTypeTimer = null;
+    const prevId = officeAmbientId;
     officeAmbientId = null;
+    if(prevId){
+      const c = (officeChars||[]).find(x=>x.id===prevId);
+      if(c){
+        c.headingToTable = null;
+        c.waitUntil = 0;
+        const seat = officeSeatFor('meeting', c.id); // 이야기가 끝나면 회의 테이블 자기 자리로 돌아감
+        if(seat){ c.tx = seat.x; c.ty = seat.y; }
+      }
+    }
     renderOfficeChars();
   }
 
@@ -11035,7 +11129,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     }, 26);
   }
 
-  // 일정 주기(비트)마다 호출: 이전 담당자의 말풍선을 닫고 다음 담당자의 말풍선을 새로 띄움
+  // 일정 주기(비트)마다 호출: 이전 담당자의 말풍선을 닫고 다음 담당자의 말풍선을 새로 띄움.
+  // 이번엔 말할 내용의 topic(sales/royalty/marketing/logistics/meeting)에 맞는 테이블로 걸어가서 앉아 이야기함.
   function officeAmbientBeat(){
     if(officeAmbientId){ officeStopAmbientBubble(); }
     const id = officeAmbientPickNext();
@@ -11044,8 +11139,21 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     if(!c || !c.msgs || !c.msgs.length) return;
     officeAmbientId = id;
     officeAmbientMsgIdx = Math.floor(Math.random()*c.msgs.length);
-    renderOfficeChars();
-    startAmbientTyping(c);
+    const msg = c.msgs[officeAmbientMsgIdx];
+    const topic = (msg && msg.topic) || 'meeting';
+    const seat = officeSeatFor(topic, c.id) || { x:c.x, y:c.y };
+    c.tx = seat.x; c.ty = seat.y; c.waitUntil = 0;
+    const dist = Math.hypot(c.tx-c.x, c.ty-c.y);
+    if(dist < 4){
+      // 이미 해당 테이블 근처(대부분 회의 테이블)에 있으면 바로 이야기 시작
+      c.headingToTable = null;
+      c.phase = 'talking';
+      renderOfficeChars();
+      startAmbientTyping(c);
+    } else {
+      c.headingToTable = topic; // officeTick이 도착을 감지하면 자동으로 말풍선을 시작함
+      renderOfficeChars();
+    }
   }
 
   function initOfficeChars(){
@@ -11068,23 +11176,55 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       spot.textContent = 'AI 상담 데스크';
       stage.appendChild(spot);
     }
+    if(stage){
+      Object.values(OFFICE_TABLES).forEach(t=>{
+        if(!document.getElementById('officeTable-'+t.key)){
+          const el = document.createElement('div');
+          el.id = 'officeTable-'+t.key;
+          el.className = 'office-table';
+          el.style.left = t.x+'px';
+          el.style.top = t.y+'px';
+          el.style.width = t.w+'px';
+          el.style.height = t.h+'px';
+          el.innerHTML = `<div class="office-table-top"></div><div class="office-table-label ${t.key}">${t.icon} ${t.label}</div>`;
+          stage.appendChild(el);
+        }
+        // 각 좌석 위치에 실제 의자를 그려서, 담당자가 그 자리에 서면 의자에 앉은 것처럼 보이게 함
+        t.seats.forEach((seat, si)=>{
+          const chairId = 'officeChair-'+t.key+'-'+si;
+          if(document.getElementById(chairId)) return;
+          const chair = document.createElement('div');
+          chair.id = chairId;
+          chair.className = 'office-chair';
+          chair.style.left = (t.x+seat[0])+'px';
+          chair.style.top = (t.y+seat[1]+6)+'px';
+          chair.innerHTML = '<div class="office-chair-back"></div><div class="office-chair-seat"></div><div class="office-chair-leg l"></div><div class="office-chair-leg r"></div>';
+          stage.appendChild(chair);
+        });
+      });
+    }
     officeChars = OFFICE_MANAGER_DEFS.map((m,i)=>{
       if(m.isAI){
         return Object.assign({}, m, {
           hair: '#334155',
           status: 'ai', headlines: AI_IDLE_LINES, headline: AI_IDLE_LINES[0],
           x: AI_DESK.x, y: AI_DESK.y, tx: AI_DESK.x, ty: AI_DESK.y,
-          dir: -1, phase: 'idle', waitUntil: Infinity, issue: null
+          dir: -1, phase: 'idle', waitUntil: Infinity, issue: null, homeTable: null, headingToTable: null
         });
       }
+      // 담당자들의 기본 위치는 회의 테이블의 각자 지정된 자리 (평소엔 여기 모여 있음)
+      const meetingSeat = OFFICE_TABLES.meeting.seats[i % OFFICE_TABLES.meeting.seats.length];
+      const baseX = OFFICE_TABLES.meeting.x + meetingSeat[0];
+      const baseY = OFFICE_TABLES.meeting.y + meetingSeat[1];
       const briefing = computeManagerBriefings(m.label);
       return Object.assign({}, m, {
         hair: HAIR_COLORS[i % HAIR_COLORS.length],
         status: briefing.status, headlines: briefing.texts, headline: briefing.texts[0],
         msgs: briefing.msgs,
         problems: briefing.problems, problemIdx: -1,
-        x: rand(PAD, OFFICE_W-PAD), y: rand(PAD+40, OFFICE_H-PAD),
-        tx: rand(PAD, OFFICE_W-PAD), ty: rand(PAD+40, OFFICE_H-PAD),
+        homeTable: 'meeting', headingToTable: null,
+        x: baseX+rand(-8,8), y: baseY+rand(-6,6),
+        tx: baseX, ty: baseY,
         dir: 1, phase: 'walking', waitUntil: 0
 
       });
@@ -11103,34 +11243,18 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     officeAiCycleList = null; officeAiCycleIdx = -1; // 새 데이터 기준으로 매장 분석 순서 재계산
   };
 
-  function earsSVG(type, fur){
-    switch(type){
-      case 'fox': return `<path d="M20 10 L14 -4 L28 6 Z" fill="${fur.base}"/><path d="M50 10 L56 -4 L42 6 Z" fill="${fur.base}"/><path d="M21 8 L18 -1 L27 6 Z" fill="${fur.light}"/><path d="M49 8 L52 -1 L43 6 Z" fill="${fur.light}"/>`;
-      case 'cat': return `<path d="M19 9 L13 -6 L29 5 Z" fill="${fur.base}"/><path d="M51 9 L57 -6 L41 5 Z" fill="${fur.base}"/><path d="M20 7 L17 -1 L27 5 Z" fill="#f4b8c6"/><path d="M50 7 L53 -1 L43 5 Z" fill="#f4b8c6"/>`;
-      case 'bear': return `<circle cx="18" cy="4" r="8" fill="${fur.base}"/><circle cx="52" cy="4" r="8" fill="${fur.base}"/><circle cx="18" cy="4" r="4" fill="${fur.light}"/><circle cx="52" cy="4" r="4" fill="${fur.light}"/>`;
-      case 'dog': return `<path d="M17 6 Q6 14 12 30 Q22 26 22 12 Z" fill="${fur.base}"/><path d="M53 6 Q64 14 58 30 Q48 26 48 12 Z" fill="${fur.base}"/>`;
-      case 'rabbit': return `<path d="M22 6 Q18 -22 27 -22 Q31 -2 30 8 Z" fill="${fur.base}"/><path d="M48 6 Q52 -22 43 -22 Q39 -2 40 8 Z" fill="${fur.base}"/><path d="M23 3 Q21 -16 27 -17 Q29 -2 29 5 Z" fill="#f9c9d6"/><path d="M47 3 Q49 -16 43 -17 Q41 -2 41 5 Z" fill="#f9c9d6"/>`;
-      case 'deer': return `<path d="M22 2 Q14 -10 8 -8 M14 -6 Q10 -12 5 -12" stroke="#8a6a45" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M48 2 Q56 -10 62 -8 M56 -6 Q60 -12 65 -12" stroke="#8a6a45" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M19 8 L13 -2 L27 5 Z" fill="${fur.base}"/><path d="M51 8 L57 -2 L43 5 Z" fill="${fur.base}"/>`;
-      default: return '';
-    }
-  }
-  function faceSVG(type, fur, isTalking){
-    const muzzle = type==='cat'
-      ? `<ellipse cx="35" cy="24" rx="6" ry="4" fill="${fur.light}"/>`
-      : `<ellipse cx="35" cy="25" rx="7.5" ry="5.5" fill="${fur.light}"/>`;
-    const whiskers = type==='cat' ? `<path d="M27 25 L18 23 M27 27 L18 28" stroke="#c7bfb2" stroke-width="0.8"/><path d="M43 25 L52 23 M43 27 L52 28" stroke="#c7bfb2" stroke-width="0.8"/>` : '';
-    return `${muzzle}<circle cx="30" cy="19" r="1.6" fill="#1e293b"/><circle cx="40" cy="19" r="1.6" fill="#1e293b"/><ellipse cx="35" cy="26" rx="${type==='cat'?1.4:2.2}" ry="${isTalking?2.6:1.1}" fill="#7a4a3a"/>${whiskers}`;
-  }
-
   function personSVG(c){
     const isWalking = c.phase==='walking';
+    const isRunning = c.phase==='running';
+    const isMoving = isWalking || isRunning;
     const isTalking = c.phase==='talking';
-    const fur = ANIMAL_FUR[c.animal] || ANIMAL_FUR.fox;
-    const isAC = officeStyleMode==='ac';
-    const legAnim = isWalking ? 'officeLegL .32s linear infinite' : 'none';
-    const legAnimR = isWalking ? 'officeLegR .32s linear infinite' : 'none';
-    const armAnimL = isWalking ? 'officeArmL .32s linear infinite' : (isTalking ? 'officeWave 1.5s ease-in-out infinite' : 'none');
-    const armAnimR = isWalking ? 'officeArmR .32s linear infinite' : 'none';
+    // 걷기/뛰기가 아니면(대기·대화 중) 이제 항상 테이블이나 데스크 앞 의자에 앉아있는 것으로 표현함
+    const seated = !isMoving;
+    const legDur = isRunning ? '0.16s' : '0.32s';
+    const legAnim = isMoving ? `officeLegL ${legDur} linear infinite` : 'none';
+    const legAnimR = isMoving ? `officeLegR ${legDur} linear infinite` : 'none';
+    const armAnimL = isMoving ? `officeArmL ${legDur} linear infinite` : (isTalking ? 'officeWave 1.5s ease-in-out infinite' : 'none');
+    const armAnimR = isMoving ? `officeArmR ${legDur} linear infinite` : 'none';
     const headPart = c.isAI ? `
         <rect x="33" y="2" width="4" height="6" fill="#64748b"/>
         <circle cx="35" cy="3" r="3" fill="${isTalking?'#7dd3fc':'#38bdf8'}"/>
@@ -11138,12 +11262,6 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         <circle cx="29" cy="20" r="3.2" fill="${isTalking?'#7dd3fc':'#38bdf8'}"/>
         <circle cx="41" cy="20" r="3.2" fill="${isTalking?'#7dd3fc':'#38bdf8'}"/>
         <rect x="29" y="26" width="12" height="${isTalking?3.2:2}" rx="1.4" fill="#7dd3fc"/>
-      ` : isAC ? `
-        ${earsSVG(c.animal, fur)}
-        <circle cx="35" cy="20" r="14" fill="${fur.base}"/>
-        ${faceSVG(c.animal, fur, isTalking)}
-        <circle cx="24" cy="24" r="2.2" fill="#f7b6b6" opacity="0.7"/>
-        <circle cx="46" cy="24" r="2.2" fill="#f7b6b6" opacity="0.7"/>
       ` : `
         <circle cx="35" cy="20" r="14" fill="#f0b98d"/>
         <path d="M21 18 Q21 4 35 4 Q49 4 49 18 Q49 10 35 10 Q21 10 21 18Z" fill="${c.hair}"/>
@@ -11151,13 +11269,23 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         <circle cx="40" cy="20" r="1.6" fill="#1e293b"/>
         <ellipse cx="35" cy="26" rx="4.5" ry="${isTalking?3.2:1.1}" fill="#c2664a"/>
       `;
-    const handFill = c.isAI ? '#94a3b8' : (isAC ? fur.light : '#f0b98d');
-    const neckFill = c.isAI ? '#1e293b' : (isAC ? fur.base : '#f0b98d');
-    return `<svg viewBox="0 0 70 110" width="38" height="60" style="display:block;">
+    const handFill = c.isAI ? '#94a3b8' : '#f0b98d';
+    const neckFill = c.isAI ? '#1e293b' : '#f0b98d';
+    const legsSVG = seated ? `
+      <rect x="20" y="76" width="14" height="9" rx="3" fill="#334155"/>
+      <rect x="22" y="83" width="8" height="18" rx="3" fill="#334155"/>
+      <rect x="36" y="76" width="14" height="9" rx="3" fill="#475569"/>
+      <rect x="40" y="83" width="8" height="18" rx="3" fill="#475569"/>
+      <ellipse cx="26" cy="101" rx="6" ry="3" fill="#1e293b"/>
+      <ellipse cx="44" cy="101" rx="6" ry="3" fill="#1e293b"/>
+    ` : `
       <g style="transform-origin:30px 78px;animation:${legAnim}"><rect x="26" y="76" width="8" height="28" rx="3.5" fill="#334155"/></g>
       <g style="transform-origin:40px 78px;animation:${legAnimR}"><rect x="36" y="76" width="8" height="28" rx="3.5" fill="#475569"/></g>
       <ellipse cx="30" cy="105" rx="6" ry="3" fill="#1e293b"/>
       <ellipse cx="40" cy="105" rx="6" ry="3" fill="#1e293b"/>
+    `;
+    return `<svg viewBox="0 0 70 110" width="38" height="60" style="display:block;">
+      ${legsSVG}
       <g style="transform-origin:20px 48px;animation:${armAnimL}"><rect x="14" y="45" width="8" height="26" rx="4" fill="${c.color}"/><circle cx="18" cy="72" r="4.2" fill="${handFill}"/></g>
       <g style="transform-origin:50px 48px;animation:${armAnimR}"><rect x="48" y="45" width="8" height="26" rx="4" fill="${c.color}"/><circle cx="52" cy="72" r="4.2" fill="${handFill}"/></g>
       <path d="M22 40 Q35 32 48 40 L50 78 Q35 84 20 78 Z" fill="${c.color}"/>
@@ -11197,7 +11325,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       // (매 tick마다 innerHTML을 통째로 재생성하면 팔다리 CSS 애니메이션이
       //  계속 0%로 리셋되어 거의 멈춘 것처럼 보이는 문제가 있었음)
       const isAmbientAlert = (officeAmbientId===c.id && c.msgs && c.msgs.length && c.msgs[officeAmbientMsgIdx % c.msgs.length].status !== 'good');
-      const renderKey = c.phase+'|'+talking+'|'+officeStyleMode+'|'+isAmbientAlert;
+      const renderKey = c.phase+'|'+talking+'|'+isAmbientAlert;
       if(isNew || el.dataset.renderKey !== renderKey){
         el.dataset.renderKey = renderKey;
         el.innerHTML = `
@@ -11219,12 +11347,12 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     const c = (officeChars||[]).find(x=>x.id===id);
     if(!c) return;
 
-    // 클릭 시점에 이 담당자가 앰비언트 말풍선으로 보여주고 있던 "특정 매장"을 먼저 기억해둠
-    // (말풍선을 정리하기 전에 확인해야 어떤 매장을 보고 클릭했는지 알 수 있음)
-    let ambientTargetStore = null;
+    // 클릭 시점에 이 담당자가 앰비언트 말풍선으로 보여주고 있던 "특정 매장/주제"를 먼저 기억해둠
+    // (말풍선을 정리하기 전에 확인해야 무엇을 보고 클릭했는지 알 수 있음)
+    let ambientTargetStore = null, ambientTargetTopic = null;
     if(officeAmbientId===id && c.msgs && c.msgs.length){
       const shownMsg = c.msgs[officeAmbientMsgIdx % c.msgs.length];
-      if(shownMsg && shownMsg.store) ambientTargetStore = shownMsg.store;
+      if(shownMsg){ ambientTargetStore = shownMsg.store || null; ambientTargetTopic = shownMsg.topic || null; }
     }
     if(officeAmbientId===id) officeStopAmbientBubble();
 
@@ -11243,50 +11371,61 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     if(officeDiscussion && officeDiscussion.managerId===id){ officeEndDiscussion(); return; }
 
     if(!c.isAI && c.problems && c.problems.length){
-      // 매장 1곳만 골라 AI 담당자에게 찾아가 논의함.
-      // 1) 방금 "‼️" 빨간 말풍선으로 보고 있던 매장이 있으면 그 매장을 그대로 분석
-      // 2) 없으면 클릭할 때마다 다음 문제 매장으로 순환
+      // 문제 1건만 골라 AI 담당자와 그 주제에 맞는 테이블(매출/로열티/마케팅/물류/회의)로 찾아가 논의함.
+      // 1) 방금 "‼️" 빨간 말풍선으로 보고 있던 매장/주제가 있으면 그것을 그대로 분석
+      // 2) 없으면 클릭할 때마다 다음 문제로 순환
       let target = null;
       if(ambientTargetStore){
         target = c.problems.find(p=>p.store===ambientTargetStore) || null;
-        if(target) c.problemIdx = c.problems.indexOf(target);
       }
+      if(!target && ambientTargetTopic){
+        target = c.problems.find(p=>p.topic===ambientTargetTopic && !p.store) || null;
+      }
+      if(target) c.problemIdx = c.problems.indexOf(target);
       if(!target){
         c.problemIdx = ((c.problemIdx==null || c.problemIdx<0) ? -1 : c.problemIdx);
         c.problemIdx = (c.problemIdx + 1) % c.problems.length;
         target = c.problems[c.problemIdx];
       }
-      const issueLabel = target.store;
+      const issueLabel = target.store || ({sales:'매출', royalty:'로열티', marketing:'마케팅', logistics:'물류', meeting:'담당 매장'}[target.topic] || '담당 매장');
+      const topic = target.topic || 'meeting';
+      const tableInfo = OFFICE_TABLES[topic] || OFFICE_TABLES.meeting;
 
       officeStopTalking();
       if(officeDiscussion) officeEndDiscussion();
-      officeDiscussion = { managerId:id, script:null, idx:0, started:false, speakerId:null };
+      officeDiscussion = { managerId:id, script:null, idx:0, started:false, scriptStarted:false, speakerId:null, headingTable: topic, mgrArrived:false, aiArrived:false };
       officeLog = [];
       renderOfficeLog();
-      pushOfficeLog('ai', 'AI 담당자', '#38bdf8', `${c.shortName} 담당자님, ${issueLabel} 매출·마케팅 데이터를 자동으로 분석하고 있어요. 잠시만요...`);
+      pushOfficeLog('ai', 'AI 담당자', '#38bdf8', `${c.shortName} 담당자님, ${tableInfo.label}에서 ${issueLabel} 관련 데이터를 자동으로 분석하고 있어요. 잠시만요...`);
       const spot = document.getElementById('officeAiSpot');
-      if(spot) spot.textContent = '🔎 데이터 분석 중...';
+      if(spot) spot.textContent = `🔎 ${tableInfo.label}에서 분석 중...`;
 
+      const mgrSeat = officeSeatFor(topic, id) || { x: AI_DESK.x, y: AI_DESK.y+48 };
       c.headingToAI = true;
       c.waitUntil = 0;
+      c.tx = mgrSeat.x; c.ty = mgrSeat.y;
+
       const aiChar = officeChars.find(x=>x.isAI);
-      c.tx = (aiChar? aiChar.x : AI_DESK.x) + rand(-36,36);
-      c.ty = (aiChar? aiChar.y : AI_DESK.y) + 48;
+      if(aiChar){
+        const aiSeat = officeAiSeatFor(topic);
+        aiChar.headingHome = false;
+        aiChar.tx = aiSeat.x; aiChar.ty = aiSeat.y;
+      }
       renderOfficeChars();
 
-      // 담당자가 걸어가는 동안 백그라운드에서 실제 매출/마케팅 데이터를 분석해 대본 생성
+      // 담당자와 AI 담당자가 테이블로 걸어가는 동안 백그라운드에서 실제 매출/마케팅/물류 데이터를 분석해 대본 생성
       buildDiscussionScriptAsync(c, target).then(script=>{
         if(!officeDiscussion || officeDiscussion.managerId!==id) return; // 그 사이 취소/전환된 경우 무시
         officeDiscussion.script = script || [{who:'ai', text:`${issueLabel} 관련 특이사항을 다시 확인했는데 뚜렷한 원인은 못 찾았어요. 함께 살펴봐 주시겠어요?`}];
         const spot2 = document.getElementById('officeAiSpot');
         if(spot2) spot2.textContent = 'AI 상담 데스크';
-        if(officeDiscussion.started && !officeTypeTimer){ startDiscussionTyping(); }
+        officeMaybeStartDiscussion();
       }).catch(()=>{
         if(!officeDiscussion || officeDiscussion.managerId!==id) return;
         officeDiscussion.script = [{who:'ai', text:`${issueLabel} 데이터를 분석하는 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.`}];
         const spot2 = document.getElementById('officeAiSpot');
         if(spot2) spot2.textContent = 'AI 상담 데스크';
-        if(officeDiscussion.started && !officeTypeTimer){ startDiscussionTyping(); }
+        officeMaybeStartDiscussion();
       });
       return;
     }
@@ -11318,13 +11457,47 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     if(mgr){
       mgr.headingToAI = false;
       mgr.waitUntil = 0;
-      mgr.tx = rand(PAD, OFFICE_W-PAD);
-      mgr.ty = rand(PAD+40, OFFICE_H-PAD);
+      const seat = officeSeatFor('meeting', mgr.id); // 대화가 끝나면 회의 테이블 자기 자리로 돌아감
+      mgr.tx = seat ? seat.x : rand(PAD, OFFICE_W-PAD);
+      mgr.ty = seat ? seat.y : rand(PAD+40, OFFICE_H-PAD);
     }
+    const aiChar = (officeChars||[]).find(x=>x.isAI);
+    if(aiChar){ aiChar.headingHome = true; } // AI 담당자도 자기 데스크로 돌아감
     officeDiscussion = null;
     const spot = document.getElementById('officeAiSpot');
     if(spot) spot.textContent = 'AI 상담 데스크';
     renderOfficeChars();
+  }
+
+  // 담당자와 AI 담당자가 둘 다 테이블에 도착했는지 확인하고, 도착했다면 대화를 시작함.
+  // 데이터 분석(대본 생성)이 아직 안 끝났다면 "분석 중" 말풍선을 먼저 보여주고,
+  // 대본이 준비되는 즉시(도착 이후라도) 실제 대사를 시작함.
+  function officeMaybeStartDiscussion(){
+    if(!officeDiscussion) return;
+    if(!officeDiscussion.mgrArrived || !officeDiscussion.aiArrived) return;
+    const mgrChar = officeChars.find(x=>x.id===officeDiscussion.managerId);
+    const aiChar = officeChars.find(x=>x.isAI);
+    if(!officeDiscussion.started){
+      officeDiscussion.started = true; // 둘 다 도착 완료 (말풍선 표시 가능 상태)
+      if(mgrChar && aiChar){ mgrChar.dir = (aiChar.x>=mgrChar.x)?1:-1; aiChar.dir = (mgrChar.x>=aiChar.x)?1:-1; }
+    }
+    if(officeDiscussion.scriptStarted) return; // 이미 실제 대사가 시작됨
+    if(!officeDiscussion.script){
+      // 아직 데이터 분석이 끝나지 않음: 분석 중 말풍선만 표시 (중복 방지)
+      if(officeDiscussion.speakerId !== 'ai'){
+        officeDiscussion.speakerId = 'ai';
+        if(mgrChar) mgrChar.phase = 'idle';
+        if(aiChar) aiChar.phase = 'idle';
+        renderOfficeChars();
+        const bubble = document.getElementById('officeBubble-ai');
+        if(bubble) bubble.innerHTML = '🔎 매출·마케팅·물류 데이터를 분석하고 있어요<span style="opacity:.5;">…</span>';
+      }
+      return;
+    }
+    officeDiscussion.scriptStarted = true;
+    if(mgrChar) mgrChar.phase = 'talking';
+    if(aiChar) aiChar.phase = 'talking';
+    startDiscussionTyping();
   }
 
   // 말풍선이 한 마디로 끝나지 않고, 담당 매장의 여러 데이터(이슈/매출 요약 등)를
@@ -11351,8 +11524,9 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
           if(!c.isAI && nextIndex >= messages.length){
             officeStopTalking();
             c.waitUntil = 0;
-            c.tx = rand(PAD, OFFICE_W-PAD);
-            c.ty = rand(PAD+40, OFFICE_H-PAD);
+            const seat = officeSeatFor('meeting', c.id);
+            c.tx = seat ? seat.x : rand(PAD, OFFICE_W-PAD);
+            c.ty = seat ? seat.y : rand(PAD+40, OFFICE_H-PAD);
             renderOfficeChars();
             return;
           }
@@ -11432,11 +11606,36 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     if(!officeChars) return;
     const now = Date.now();
     const speed = 1.15;
-    const rushSpeed = 6.5; // 이슈가 있어 AI 담당자를 찾아갈 때는 훨씬 빠르게 이동
+    const rushSpeed = 6.5; // 이슈가 있어 특정 테이블로 찾아갈 때는 훨씬 빠르게 이동
     officeChars.forEach(c=>{
       if(c.isAI){
-        // AI 담당자는 데스크에 고정. 토론 중이거나 혼자 말하는 중일 때만 talking으로 표시
-        c.phase = (officeTalkingId===c.id || (officeDiscussion && officeDiscussion.started)) ? 'talking' : 'idle';
+        // 토론 때문에 특정 테이블로 불려간 경우: 도착할 때까지 이동
+        if(officeDiscussion && officeDiscussion.headingTable && !officeDiscussion.aiArrived){
+          const dx = c.tx-c.x, dy = c.ty-c.y, dist = Math.hypot(dx,dy);
+          if(dist<4){
+            officeDiscussion.aiArrived = true;
+            c.phase = 'idle';
+            officeMaybeStartDiscussion();
+            return;
+          }
+          c.x += (dx/dist)*rushSpeed; c.y += (dy/dist)*rushSpeed;
+          c.dir = dx>=0?1:-1; c.phase = 'running';
+          return;
+        }
+        if(officeDiscussion && officeDiscussion.headingTable && officeDiscussion.aiArrived){
+          c.phase = officeDiscussion.scriptStarted ? 'talking' : 'idle';
+          return;
+        }
+        // 대화가 끝나 자기 데스크로 돌아가는 중
+        if(c.headingHome){
+          const dx = AI_DESK.x-c.x, dy = AI_DESK.y-c.y, dist = Math.hypot(dx,dy);
+          if(dist<4){ c.headingHome=false; c.x=AI_DESK.x; c.y=AI_DESK.y; c.phase='idle'; return; }
+          c.x += (dx/dist)*rushSpeed; c.y += (dy/dist)*rushSpeed;
+          c.dir = dx>=0?1:-1; c.phase='running';
+          return;
+        }
+        // 평소엔 데스크에 고정. 매장별 분석(클릭) 중일 때만 talking으로 표시
+        c.phase = (officeTalkingId===c.id) ? 'talking' : 'idle';
         return;
       }
 
@@ -11445,36 +11644,46 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
           const dx = c.tx-c.x, dy = c.ty-c.y, dist = Math.hypot(dx,dy);
           if(dist<4){
             c.headingToAI = false;
-            c.phase = 'talking';
-            const aiChar = officeChars.find(x=>x.isAI);
-            if(aiChar){ c.dir = (aiChar.x>=c.x)?1:-1; aiChar.dir = (c.x>=aiChar.x)?1:-1; }
-            officeDiscussion.started = true;
-            if(officeDiscussion.script){
-              startDiscussionTyping();
-            } else {
-              // 아직 데이터 분석(날씨 API 등)이 끝나지 않은 경우: AI가 분석 중임을 말풍선으로 표시
-              officeDiscussion.speakerId = 'ai';
-              renderOfficeChars();
-              const bubble = document.getElementById('officeBubble-ai');
-              if(bubble) bubble.innerHTML = '🔎 매출·마케팅·날씨 데이터를 분석하고 있어요<span style="opacity:.5;">…</span>';
-            }
+            c.phase = 'idle';
+            officeDiscussion.mgrArrived = true;
+            officeMaybeStartDiscussion();
             return;
           }
           c.x += (dx/dist)*rushSpeed; c.y += (dy/dist)*rushSpeed;
-          c.dir = dx>=0?1:-1; c.phase = 'walking';
+          c.dir = dx>=0?1:-1; c.phase = 'running';
           return;
         }
-        c.phase = 'talking';
+        c.phase = officeDiscussion.scriptStarted ? 'talking' : 'idle';
         return;
       }
 
       if(c.id===officeTalkingId){ c.phase='talking'; return; }
-      if(c.id===officeAmbientId){ c.phase='talking'; return; }
+
+      if(c.id===officeAmbientId){
+        // 앰비언트 말풍선 주제에 맞는 테이블로 후다닥 걸어가는 중
+        if(c.headingToTable){
+          const dx = c.tx-c.x, dy = c.ty-c.y, dist = Math.hypot(dx,dy);
+          if(dist<4){
+            c.headingToTable = null;
+            c.phase = 'talking';
+            startAmbientTyping(c);
+            return;
+          }
+          c.x += (dx/dist)*rushSpeed; c.y += (dy/dist)*rushSpeed;
+          c.dir = dx>=0?1:-1; c.phase = 'running';
+          return;
+        }
+        c.phase='talking';
+        return;
+      }
+
       if(c.waitUntil && now < c.waitUntil){ c.phase='idle'; return; }
       if(c.waitUntil && now >= c.waitUntil){
         c.waitUntil = 0;
-        c.tx = rand(PAD, OFFICE_W-PAD);
-        c.ty = rand(PAD+40, OFFICE_H-PAD);
+        // 특별히 할 이야기가 없을 땐 회의 테이블 자기 자리 주변에서 서성임
+        const seat = officeSeatFor('meeting', c.id);
+        c.tx = seat ? seat.x + rand(-16,16) : rand(PAD, OFFICE_W-PAD);
+        c.ty = seat ? seat.y + rand(-12,12) : rand(PAD+40, OFFICE_H-PAD);
         return;
       }
       const dx = c.tx-c.x, dy = c.ty-c.y;
@@ -11497,15 +11706,6 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       </div>
     `).join('');
   }
-
-  window.setOfficeStyle = function(mode){
-    officeStyleMode = mode;
-    const humanBtn = document.getElementById('officeStyleBtn-human');
-    const acBtn = document.getElementById('officeStyleBtn-ac');
-    if(humanBtn) humanBtn.classList.toggle('active', mode==='human');
-    if(acBtn) acBtn.classList.toggle('active', mode==='ac');
-    renderOfficeChars();
-  };
 
   window.initOfficePage = function(){
     if(!officeInited){
