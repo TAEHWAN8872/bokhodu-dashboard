@@ -10617,15 +10617,13 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     const storeCount = storeCountOf(mgrLabel);
     const getMgr = (typeof window.mkStoreManager==='function') ? window.mkStoreManager : function(){ return null; };
     const msgs = [];
-    let issue = null;
+    const problems = []; // 이 담당자가 짚어야 할 "매장 단위" 문제 목록. 클릭할 때마다 하나씩 순환하며 분석함.
 
     const royalty = (window.__ROYALTY_CACHE || []).filter(it => getMgr(it.store) === mgrLabel);
-    if(royalty.length){
-      const first = royalty[0];
-      const extra = royalty.length>1 ? ` 등 ${royalty.length}곳` : '';
-      msgs.push({ status:'bad', text: `${first.store}${extra} 로열티가 미입금 상태예요. 확인 부탁드려요.` });
-      if(!issue) issue = { type:'royalty', store: first.store, count: royalty.length };
-    }
+    royalty.forEach(r=>{
+      msgs.push({ status:'bad', text: `${r.store} 로열티가 미입금 상태예요. 확인 부탁드려요.`, store: r.store });
+      problems.push({ type:'royalty', store: r.store });
+    });
 
     const declineList = (typeof window.getDeclineBranches==='function') ? window.getDeclineBranches().list : [];
     const declines = declineList.filter(r=>r.manager===mgrLabel);
@@ -10635,9 +10633,9 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       const gapText = (gap && gap.missing.length)
         ? ` 마케팅은 ${gap.missing.join(', ')}을(를) 전혀 진행하지 않았어요.`
         : (gap ? ` 마케팅 채널(블로그체험단·네이버 플레이스 광고·메타광고·배너)은 모두 한 번 이상 진행했었어요.` : '');
-      msgs.push({ status:'warn', text: `${w.name} 매출이 작년 상반기 평균 대비 ${fmtPct(w.rate)} 하락했어요.${gapText}` });
+      msgs.push({ status:'warn', text: `${w.name} 매출이 작년 상반기 평균 대비 ${fmtPct(w.rate)} 하락했어요.${gapText}`, store: w.name });
+      problems.push({ type:'decline', store: w.name, data: w });
     });
-    if(!issue && declines.length){ issue = { type:'decline', stores: declines }; }
 
     const contractData = window.CONTRACT_DATA || [];
     const today = new Date(); today.setHours(0,0,0,0);
@@ -10651,9 +10649,9 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       .filter(x=>x.days>=0 && x.days<=180)
       .sort((a,b)=>a.days-b.days);
     contracts.slice(0,2).forEach(w=>{
-      msgs.push({ status:'warn', text: `${w.name} 계약 종료까지 ${w.days}일 남았어요. 재계약 안내가 필요해요.` });
+      msgs.push({ status:'warn', text: `${w.name} 계약 종료까지 ${w.days}일 남았어요. 재계약 안내가 필요해요.`, store: w.name });
+      problems.push({ type:'contract', store: w.name, days: w.days });
     });
-    if(!issue && contracts.length){ const w = contracts[0]; issue = { type:'contract', store: w.name, days: w.days }; }
 
     const sales = managerSalesSummary(mgrLabel);
     if(sales){
@@ -10667,12 +10665,12 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 
     if(!msgs.length){
       msgs.push({ status:'good', text: `담당 매장 ${storeCount}곳 모두 특이사항 없어요. 안정적으로 운영되고 있습니다.` });
-    } else {
+    } else if(problems.length){
       msgs.push({ status:'good', text: `그 외 담당 매장 ${storeCount}곳은 특이사항 없이 안정적으로 운영되고 있어요.` });
     }
 
-    const worst = msgs.some(m=>m.status==='bad') ? 'bad' : (msgs.some(m=>m.status==='warn') ? 'warn' : 'good');
-    return { status: worst, texts: msgs.map(m=>m.text), msgs, issue };
+    const worst = problems.some(p=>p.type==='royalty') ? 'bad' : (problems.length ? 'warn' : 'good');
+    return { status: worst, texts: msgs.map(m=>m.text), msgs, problems };
   }
 
   // 매장명으로 26년 매출 원본 데이터(months 배열 포함) 조회
@@ -10804,92 +10802,87 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     }
   }
 
-  async function buildDeclineDiscussionAsync(issue){
-    const stores = issue.stores || (issue.store ? [issue] : []);
-    if(!stores.length) return null;
-
+  async function buildDeclineDiscussionAsync(w){
+    if(!w) return null;
+    const storeAll = findStoreAll(w.name);
+    const monthsArr = storeAll ? storeAll.months : null;
     const lines = [];
-    lines.push({ who:'ai', text: `작년 상반기 평균 대비 매출이 10% 이상 하락한 매장이 ${stores.length}곳 있어요. 한 곳씩 매출·물류·마케팅·지역 평균·전체 매장 평균·로열티까지 차례로 짚어볼게요.` });
 
+    // 1) 매출 하락폭
+    lines.push({ who:'ai', text: `${w.name} — 작년 상반기 평균 대비 ${fmtPct(w.rate)} 하락했어요 (작년 평균 ${fmt(w.avg25)} → 올해 평균 ${fmt(w.avg26)}). 원인을 같이 짚어볼게요.` });
+
+    // 2) 물류 매입률 확인
+    const logi = monthsArr ? computeLogisticsRatio(w.name, monthsArr) : null;
+    if(logi){
+      lines.push({ who:'ai', text: logi.normal
+        ? `물류 매입률은 ${logi.ratio.toFixed(1)}%로 정상 범위예요. 물류 쪽 문제는 아닌 것 같아요.`
+        : `물류 매입률이 ${logi.ratio.toFixed(1)}%로 정상 범위(32~36%)를 벗어나 있어요 — "${logi.guide}"가 필요해 보여요.` });
+    } else {
+      lines.push({ who:'ai', text: `물류 데이터가 없어서 매입률은 확인이 어려웠어요.` });
+    }
+
+    // 3) 마케팅 채널 미실시 확인
     const adviceSet = new Set();
-    stores.forEach((w, idx)=>{
-      const storeAll = findStoreAll(w.name);
-      const monthsArr = storeAll ? storeAll.months : null;
+    const gap = (typeof getMarketingGapsForStore==='function') ? getMarketingGapsForStore(w.name) : null;
+    if(gap && gap.missing.length){
+      lines.push({ who:'ai', text: `마케팅은 ${gap.missing.join(', ')}을(를) 전혀 진행하지 않았어요.` });
+      gap.missing.forEach(m=>{ const a = channelAdvice(m); if(a) adviceSet.add(a); });
+    } else if(gap){
+      lines.push({ who:'ai', text: `마케팅 채널(블로그체험단·네이버 플레이스 광고·메타광고·배너)은 모두 한 번 이상 진행했었네요.` });
+    }
 
-      // 1) 매출 하락폭
-      lines.push({ who:'ai', text: `${idx+1}) ${w.name} — 작년 상반기 평균 대비 ${fmtPct(w.rate)} 하락했어요 (작년 평균 ${fmt(w.avg25)} → 올해 평균 ${fmt(w.avg26)}).` });
+    // 4) 지역 평균 대비 매출 수준
+    const regionAvg = w.region ? computeRegionAvgSales(w.region) : null;
+    if(regionAvg && w.avg26){
+      const diffPct = (w.avg26 - regionAvg) / regionAvg * 100;
+      lines.push({ who:'ai', text: diffPct < 0
+        ? `${w.region} 지역 평균 월매출(${fmt(regionAvg)})과 비교하면 이 매장은 ${fmtPct(diffPct)} 낮아요.`
+        : `${w.region} 지역 평균 월매출(${fmt(regionAvg)})보다는 ${fmtPct(diffPct)} 높은 편이라, 하락은 있어도 지역 내에서 유독 부진한 매장은 아니에요.` });
+    }
 
-      // 2) 물류 매입률 확인
-      const logi = monthsArr ? computeLogisticsRatio(w.name, monthsArr) : null;
-      if(logi){
-        lines.push({ who:'ai', text: logi.normal
-          ? `물류 매입률은 ${logi.ratio.toFixed(1)}%로 정상 범위예요. 물류 쪽 문제는 아닌 것 같아요.`
-          : `물류 매입률이 ${logi.ratio.toFixed(1)}%로 정상 범위(32~36%)를 벗어나 있어요 — "${logi.guide}"가 필요해 보여요.` });
-      } else {
-        lines.push({ who:'ai', text: `물류 데이터가 없어서 매입률은 확인이 어려웠어요.` });
-      }
+    // 4-1) 전체 매장 평균 대비 매출 수준
+    const overallAvg = computeOverallAvgSales();
+    if(overallAvg && w.avg26){
+      const diffPctAll = (w.avg26 - overallAvg) / overallAvg * 100;
+      lines.push({ who:'ai', text: diffPctAll < 0
+        ? `전체 매장 평균 월매출(${fmt(overallAvg)})과 비교해도 ${fmtPct(diffPctAll)} 낮은 편이에요.`
+        : `다만 전체 매장 평균 월매출(${fmt(overallAvg)})보다는 ${fmtPct(diffPctAll)} 높아서, 전사 기준으로는 하위권은 아니에요.` });
+    }
 
-      // 3) 마케팅 채널 미실시 확인
-      const gap = (typeof getMarketingGapsForStore==='function') ? getMarketingGapsForStore(w.name) : null;
-      if(gap && gap.missing.length){
-        lines.push({ who:'ai', text: `마케팅은 ${gap.missing.join(', ')}을(를) 전혀 진행하지 않았어요.` });
-        gap.missing.forEach(m=>{ const a = channelAdvice(m); if(a) adviceSet.add(a); });
-      } else if(gap){
-        lines.push({ who:'ai', text: `마케팅 채널(블로그체험단·네이버 플레이스 광고·메타광고·배너)은 모두 한 번 이상 진행했었네요.` });
-      }
-
-      // 4) 지역 평균 대비 매출 수준
-      const regionAvg = w.region ? computeRegionAvgSales(w.region) : null;
-      if(regionAvg && w.avg26){
-        const diffPct = (w.avg26 - regionAvg) / regionAvg * 100;
-        lines.push({ who:'ai', text: diffPct < 0
-          ? `${w.region} 지역 평균 월매출(${fmt(regionAvg)})과 비교하면 이 매장은 ${fmtPct(diffPct)} 낮아요.`
-          : `${w.region} 지역 평균 월매출(${fmt(regionAvg)})보다는 ${fmtPct(diffPct)} 높은 편이라, 하락은 있어도 지역 내에서 유독 부진한 매장은 아니에요.` });
-      }
-
-      // 4-1) 전체 매장 평균 대비 매출 수준 (지역 평균과 별개로 전사 기준으로도 확인)
-      const overallAvg = computeOverallAvgSales();
-      if(overallAvg && w.avg26){
-        const diffPctAll = (w.avg26 - overallAvg) / overallAvg * 100;
-        lines.push({ who:'ai', text: diffPctAll < 0
-          ? `전체 매장 평균 월매출(${fmt(overallAvg)})과 비교해도 ${fmtPct(diffPctAll)} 낮은 편이에요.`
-          : `다만 전체 매장 평균 월매출(${fmt(overallAvg)})보다는 ${fmtPct(diffPctAll)} 높아서, 전사 기준으로는 하위권은 아니에요.` });
-      }
-
-      // 5) 로열티 입금 여부
-      lines.push({ who:'ai', text: isRoyaltyUnpaid(w.name)
-        ? `로열티도 아직 미입금 상태예요. 이 부분은 먼저 확인 부탁드려요.`
-        : `로열티는 정상적으로 입금됐어요.` });
-    });
+    // 5) 로열티 입금 여부
+    lines.push({ who:'ai', text: isRoyaltyUnpaid(w.name)
+      ? `로열티도 아직 미입금 상태예요. 이 부분은 먼저 확인 부탁드려요.`
+      : `로열티는 정상적으로 입금됐어요.` });
 
     // 종합 조언 (일정 잡기 X, 채널별 실행 조언)
     const adviceText = adviceSet.size
-      ? `공통적으로 ${Array.from(adviceSet).join(', ')}을 검토해보시면 좋겠어요.`
-      : `마케팅은 이미 다 진행했던 매장들이라, 상권 자체나 경쟁 매장 변화를 먼저 살펴보시는 게 나을 것 같아요.`;
-    lines.push({ who:'ai', text: `${adviceText} 담당자님이 보시기엔 어떤 매장부터 먼저 챙기는 게 나을까요?` });
-
-    lines.push({ who:'mgr', text: `네, 짚어주신 부분부터 매장별로 하나씩 확인해서 다시 말씀드릴게요.` });
+      ? `${Array.from(adviceSet).join(', ')}을 검토해보시면 좋겠어요.`
+      : `마케팅은 이미 다 진행했던 매장이라, 상권 자체나 경쟁 매장 변화를 먼저 살펴보시는 게 나을 것 같아요.`;
+    lines.push({ who:'ai', text: `${adviceText} 확인해보고 다시 말씀해주시겠어요?` });
+    lines.push({ who:'mgr', text: `네, 짚어주신 부분부터 확인해서 다시 말씀드릴게요.` });
 
     return lines;
   }
 
-  async function buildDiscussionScriptAsync(mgrChar, issue){
-    if(!issue) return null;
-    if(issue.type==='royalty'){
+  // 담당자 캐릭터가 AI 담당자에게 찾아가 나눌 "매장 1곳" 분량 대화 대본을 만듦.
+  // problem은 computeManagerBriefings()가 만든 problems 배열의 원소 하나(royalty/decline/contract, 매장 1곳 단위)임.
+  async function buildDiscussionScriptAsync(mgrChar, problem){
+    if(!problem) return null;
+    if(problem.type==='royalty'){
       return [
-        {who:'ai', text:`${issue.store} 로열티가 아직 입금되지 않았어요. 매장에 자금 문제가 있을까요, 아니면 단순 누락일까요?`},
+        {who:'ai', text:`${problem.store} 로열티가 아직 입금되지 않았어요. 매장에 자금 문제가 있을까요, 아니면 단순 누락일까요?`},
         {who:'mgr', text:`확인해보니 자금 문제라기보다는 담당자 실수로 이체가 누락됐을 가능성이 커 보여요.`},
         {who:'ai', text:`그렇다면 빠르게 안내 문자를 보내는 게 좋겠어요. 혹시 반복되는 매장인가요?`},
         {who:'mgr', text:`아니요, 이번이 처음이에요. 바로 연락드릴게요.`}
       ];
     }
-    if(issue.type==='decline'){
-      // 매출·마케팅 참여·실제 강수량 데이터를 자동으로 분석해서 대본을 만듦
-      return await buildDeclineDiscussionAsync(issue);
+    if(problem.type==='decline'){
+      // 매출·마케팅 참여·물류·지역/전사 평균 데이터를 자동으로 분석해서 이 매장 1곳에 대한 대본을 만듦
+      return await buildDeclineDiscussionAsync(problem.data);
     }
-    if(issue.type==='contract'){
+    if(problem.type==='contract'){
       return [
-        {who:'ai', text:`${issue.store} 계약 종료까지 ${issue.days}일 남았어요. 재계약 협상은 어떻게 진행하면 좋을까요?`},
+        {who:'ai', text:`${problem.store} 계약 종료까지 ${problem.days}일 남았어요. 재계약 협상은 어떻게 진행하면 좋을까요?`},
         {who:'mgr', text:`매장 사장님과 통화해봤는데 조건 조정을 원하시더라고요.`},
         {who:'ai', text:`경쟁사 조건을 비교해서 제안서를 준비해드릴까요?`},
         {who:'mgr', text:`네, 이번 주 안에 자료 부탁드려요.`}
@@ -11089,7 +11082,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         hair: HAIR_COLORS[i % HAIR_COLORS.length],
         status: briefing.status, headlines: briefing.texts, headline: briefing.texts[0],
         msgs: briefing.msgs,
-        issue: briefing.issue,
+        problems: briefing.problems, problemIdx: -1,
         x: rand(PAD, OFFICE_W-PAD), y: rand(PAD+40, OFFICE_H-PAD),
         tx: rand(PAD, OFFICE_W-PAD), ty: rand(PAD+40, OFFICE_H-PAD),
         dir: 1, phase: 'walking', waitUntil: 0
@@ -11103,7 +11096,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     officeChars.forEach(c=>{
       if(c.isAI) return;
       const b = computeManagerBriefings(c.label);
-      c.status = b.status; c.headlines = b.texts; c.headline = b.texts[0]; c.issue = b.issue; c.msgs = b.msgs;
+      c.status = b.status; c.headlines = b.texts; c.headline = b.texts[0]; c.problems = b.problems; c.msgs = b.msgs;
+      if(!c.problems || !c.problems.length) c.problemIdx = -1;
     });
     renderOfficeChips();
     officeAiCycleList = null; officeAiCycleIdx = -1; // 새 데이터 기준으로 매장 분석 순서 재계산
@@ -11225,7 +11219,13 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     const c = (officeChars||[]).find(x=>x.id===id);
     if(!c) return;
 
-    // 클릭한 담당자가 지금 자동 앰비언트 말풍선을 띄우고 있었다면 먼저 정리
+    // 클릭 시점에 이 담당자가 앰비언트 말풍선으로 보여주고 있던 "특정 매장"을 먼저 기억해둠
+    // (말풍선을 정리하기 전에 확인해야 어떤 매장을 보고 클릭했는지 알 수 있음)
+    let ambientTargetStore = null;
+    if(officeAmbientId===id && c.msgs && c.msgs.length){
+      const shownMsg = c.msgs[officeAmbientMsgIdx % c.msgs.length];
+      if(shownMsg && shownMsg.store) ambientTargetStore = shownMsg.store;
+    }
     if(officeAmbientId===id) officeStopAmbientBubble();
 
     // AI 담당자 본인을 클릭한 경우: 클릭할 때마다 다른 매장을 하나씩 순서대로 분석함
@@ -11242,10 +11242,22 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     // 이미 AI와 토론 중인 매니저를 다시 클릭 → 토론 종료
     if(officeDiscussion && officeDiscussion.managerId===id){ officeEndDiscussion(); return; }
 
-    if(!c.isAI && c.issue){
-      // 이슈가 있는 매니저를 클릭하면 AI 담당자에게 찾아가 원인을 함께 논의함
-      // issue.store(단일 매장, 로열티/계약)와 issue.stores(하락 매장 여러 곳)를 모두 안전하게 라벨링
-      const issueLabel = c.issue.store ? c.issue.store : (c.issue.stores ? `하락 매장 ${c.issue.stores.length}곳` : '매장');
+    if(!c.isAI && c.problems && c.problems.length){
+      // 매장 1곳만 골라 AI 담당자에게 찾아가 논의함.
+      // 1) 방금 "‼️" 빨간 말풍선으로 보고 있던 매장이 있으면 그 매장을 그대로 분석
+      // 2) 없으면 클릭할 때마다 다음 문제 매장으로 순환
+      let target = null;
+      if(ambientTargetStore){
+        target = c.problems.find(p=>p.store===ambientTargetStore) || null;
+        if(target) c.problemIdx = c.problems.indexOf(target);
+      }
+      if(!target){
+        c.problemIdx = ((c.problemIdx==null || c.problemIdx<0) ? -1 : c.problemIdx);
+        c.problemIdx = (c.problemIdx + 1) % c.problems.length;
+        target = c.problems[c.problemIdx];
+      }
+      const issueLabel = target.store;
+
       officeStopTalking();
       if(officeDiscussion) officeEndDiscussion();
       officeDiscussion = { managerId:id, script:null, idx:0, started:false, speakerId:null };
@@ -11263,7 +11275,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       renderOfficeChars();
 
       // 담당자가 걸어가는 동안 백그라운드에서 실제 매출/마케팅 데이터를 분석해 대본 생성
-      buildDiscussionScriptAsync(c, c.issue).then(script=>{
+      buildDiscussionScriptAsync(c, target).then(script=>{
         if(!officeDiscussion || officeDiscussion.managerId!==id) return; // 그 사이 취소/전환된 경우 무시
         officeDiscussion.script = script || [{who:'ai', text:`${issueLabel} 관련 특이사항을 다시 확인했는데 뚜렷한 원인은 못 찾았어요. 함께 살펴봐 주시겠어요?`}];
         const spot2 = document.getElementById('officeAiSpot');
@@ -11279,7 +11291,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       return;
     }
 
-    // 기본: 특이사항 없는 매니저를 클릭한 경우 - 혼자 말하기
+    // 기본: 특이사항 없는 매니저를 클릭한 경우 - 혼자 말하기 (한 바퀴 말하고 나면 자동으로 다른 곳으로 이동함)
     if(officeDiscussion) officeEndDiscussion();
     if(officeTypeTimer) clearInterval(officeTypeTimer);
     if(officeMsgTimer) clearTimeout(officeMsgTimer);
@@ -11316,7 +11328,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   }
 
   // 말풍선이 한 마디로 끝나지 않고, 담당 매장의 여러 데이터(이슈/매출 요약 등)를
-  // 순서대로 계속 타이핑해서 보여줌. 사용자가 캐릭터를 다시 클릭할 때까지 반복됨.
+  // 순서대로 계속 타이핑해서 보여줌. 담당자(AI 제외)는 한 바퀴 다 마치면 자동으로
+  // 말을 멈추고 다른 곳으로 이동하며, AI 담당자는 다음 클릭이 있을 때까지 반복함.
   function startOfficeTyping(c){
     const bubble = document.getElementById('officeBubble-'+c.id);
     if(!bubble) return;
@@ -11333,7 +11346,17 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         clearInterval(officeTypeTimer);
         officeMsgTimer = setTimeout(()=>{
           if(officeTalkingId !== c.id) return; // 그 사이 다른 캐릭터로 전환/종료된 경우 중단
-          officeMsgIndex = (officeMsgIndex+1) % messages.length;
+          const nextIndex = officeMsgIndex + 1;
+          // 담당자(AI 제외)는 자기 할 말을 한 바퀴 다 마치면 자동으로 말을 멈추고 다른 곳으로 이동함
+          if(!c.isAI && nextIndex >= messages.length){
+            officeStopTalking();
+            c.waitUntil = 0;
+            c.tx = rand(PAD, OFFICE_W-PAD);
+            c.ty = rand(PAD+40, OFFICE_H-PAD);
+            renderOfficeChars();
+            return;
+          }
+          officeMsgIndex = nextIndex % messages.length;
           startOfficeTyping(c);
         }, 2400);
       }
@@ -11367,19 +11390,17 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     renderOfficeLog();
   }
 
-  // AI 담당자와 이슈 매니저가 번갈아 말하는 토론 진행. 대본을 끝까지 마치면
-  // 처음부터 다시 반복하며, 매니저를 다시 클릭하면 종료됨.
+  // AI 담당자와 이슈 매니저가 번갈아 말하는 토론 진행. 매장 1곳 분량 대본을 한 번 끝까지
+  // 마치면 자동으로 대화를 종료하고 매니저는 다른 곳으로 이동함. (다음 매장을 보려면 담당자를 다시 클릭)
   function startDiscussionTyping(){
     if(!officeDiscussion) return;
-    const line = officeDiscussion.script[officeDiscussion.idx % officeDiscussion.script.length];
+    const line = officeDiscussion.script[officeDiscussion.idx];
+    if(!line){ officeEndDiscussion(); return; }
     officeDiscussion.speakerId = line.who==='ai' ? 'ai' : officeDiscussion.managerId;
-    // 대본을 처음 순회할 때만 대화 기록에 남김 (반복 재생 시 중복 기록 방지)
-    if(officeDiscussion.idx < officeDiscussion.script.length){
-      const mgrChar = officeChars.find(x=>x.id===officeDiscussion.managerId);
-      const speakerName = line.who==='ai' ? 'AI 담당자' : (mgrChar ? mgrChar.shortName : '담당자');
-      const speakerColor = line.who==='ai' ? '#38bdf8' : (mgrChar ? mgrChar.color : '#7eb8e8');
-      pushOfficeLog(officeDiscussion.speakerId, speakerName, speakerColor, line.text);
-    }
+    const mgrChar = officeChars.find(x=>x.id===officeDiscussion.managerId);
+    const speakerName = line.who==='ai' ? 'AI 담당자' : (mgrChar ? mgrChar.shortName : '담당자');
+    const speakerColor = line.who==='ai' ? '#38bdf8' : (mgrChar ? mgrChar.color : '#7eb8e8');
+    pushOfficeLog(officeDiscussion.speakerId, speakerName, speakerColor, line.text);
     renderOfficeChars();
     const bubble = document.getElementById('officeBubble-'+officeDiscussion.speakerId);
     if(!bubble) return;
@@ -11394,7 +11415,13 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         clearInterval(officeTypeTimer);
         officeMsgTimer = setTimeout(()=>{
           if(!officeDiscussion) return; // 그 사이 종료된 경우 중단
-          officeDiscussion.idx++;
+          const nextIdx = officeDiscussion.idx + 1;
+          if(nextIdx >= officeDiscussion.script.length){
+            // 이 매장 분량 대화를 다 마쳤으면 자동으로 종료하고 담당자는 다른 곳으로 이동함
+            officeEndDiscussion();
+            return;
+          }
+          officeDiscussion.idx = nextIdx;
           startDiscussionTyping();
         }, 2200);
       }
