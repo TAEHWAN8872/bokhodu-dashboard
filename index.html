@@ -115,7 +115,7 @@ body.hide-names .store-name:hover{
 .office-table-label.logistics{color:#166534;}
 .office-table-label.contract{color:#9a3412;}
 .office-table-label.meeting{color:#1e293b;}
-.office-chair{position:absolute;transform:translate(-50%,-50%);width:26px;height:28px;pointer-events:none;z-index:1;}
+.office-chair{position:absolute;transform:translate(-50%,-50%);width:26px;height:28px;pointer-events:none;z-index:0;}
 .office-chair-back{position:absolute;top:0;left:4px;width:18px;height:14px;background:#9a6b3f;border:1px solid #7c552f;border-radius:4px 4px 2px 2px;}
 .office-chair-seat{position:absolute;bottom:2px;left:1px;width:24px;height:11px;background:#c98a53;border:1px solid #a86c3f;border-radius:4px;box-shadow:0 2px 4px rgba(0,0,0,.18);}
 .office-chair-leg{position:absolute;bottom:-3px;width:3px;height:6px;background:#7c552f;border-radius:1px;}
@@ -147,10 +147,10 @@ body.hide-names .store-name:hover{
 @keyframes officeWalkBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}
 @keyframes officeRunBob{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-5px) rotate(2deg)}}
 @keyframes officeIdleBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
-@keyframes officeLegL{0%,100%{transform:rotate(22deg)}50%{transform:rotate(-22deg)}}
-@keyframes officeLegR{0%,100%{transform:rotate(-22deg)}50%{transform:rotate(22deg)}}
-@keyframes officeArmL{0%,100%{transform:rotate(-24deg)}50%{transform:rotate(24deg)}}
-@keyframes officeArmR{0%,100%{transform:rotate(24deg)}50%{transform:rotate(-24deg)}}
+@keyframes officeHipSwing{0%{transform:rotate(-24deg)}15%{transform:rotate(-9deg)}40%{transform:rotate(17deg)}55%{transform:rotate(24deg)}100%{transform:rotate(-24deg)}}
+@keyframes officeKneeBend{0%{transform:rotate(0deg)}18%{transform:rotate(-40deg)}42%{transform:rotate(-6deg)}55%{transform:rotate(0deg)}100%{transform:rotate(0deg)}}
+@keyframes officeArmL{0%{transform:rotate(-26deg)}15%{transform:rotate(-11deg)}40%{transform:rotate(15deg)}55%{transform:rotate(26deg)}100%{transform:rotate(-26deg)}}
+@keyframes officeArmR{0%{transform:rotate(26deg)}15%{transform:rotate(11deg)}40%{transform:rotate(-15deg)}55%{transform:rotate(-26deg)}100%{transform:rotate(26deg)}}
 @keyframes officeWave{0%,100%{transform:rotate(0deg)}25%{transform:rotate(-26deg)}50%{transform:rotate(0deg)}75%{transform:rotate(-16deg)}}
 
 /* KPI */
@@ -10533,13 +10533,14 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   // 담당자들이 평소 모여 있는 회의 테이블 + 주제별로 찾아가 앉아서 이야기하는 4개의 테이블.
   // w/h는 테이블 사각형의 실제 크기이고, seats는 테이블 가장자리에서 충분히 떨어진(의자/이름표와 겹치지 않는) 좌석 좌표.
   const OFFICE_TABLES = {
-    meeting:   { key:'meeting',   label:'회의',   icon:'🗂️', x:550, y:330, w:240, h:100, seats:[[-90,-70],[0,-70],[90,-70],[-90,70],[0,70],[90,70]] },
-    sales:     { key:'sales',     label:'매출',   icon:'💰', x:190, y:195, w:150, h:80,  seats:[[-45,-56],[45,-56]] },
-    royalty:   { key:'royalty',   label:'로열티', icon:'🧾', x:910, y:195, w:150, h:80,  seats:[[-45,-56],[45,-56]] },
-    marketing: { key:'marketing', label:'마케팅', icon:'📣', x:190, y:460, w:150, h:80,  seats:[[-45,-56],[45,-56]] },
-    logistics: { key:'logistics', label:'물류',   icon:'🚚', x:910, y:460, w:150, h:80,  seats:[[-45,-56],[45,-56]] },
-    contract:  { key:'contract',  label:'재계약', icon:'📑', x:550, y:510, w:150, h:70,  seats:[[-45,-56],[45,-56]] }
+    meeting:   { key:'meeting',   label:'회의',   icon:'🗂️', x:550, y:330, w:240, h:100, seats:[[-90,-60],[0,-60],[90,-60],[-90,60],[0,60],[90,60]] },
+    sales:     { key:'sales',     label:'매출',   icon:'💰', x:190, y:195, w:150, h:80,  seats:[[-45,-50],[45,-50]] },
+    royalty:   { key:'royalty',   label:'로열티', icon:'🧾', x:910, y:195, w:150, h:80,  seats:[[-45,-50],[45,-50]] },
+    marketing: { key:'marketing', label:'마케팅', icon:'📣', x:190, y:460, w:150, h:80,  seats:[[-45,-50],[45,-50]] },
+    logistics: { key:'logistics', label:'물류',   icon:'🚚', x:910, y:460, w:150, h:80,  seats:[[-45,-50],[45,-50]] },
+    contract:  { key:'contract',  label:'재계약', icon:'📑', x:550, y:510, w:150, h:70,  seats:[[-45,-45],[45,-45]] }
   };
+
 
   // 담당자(매니저) 캐릭터가 특정 테이블에서 앉을 자리를 계산 (인덱스 기반, 항상 같은 자리)
   function officeSeatFor(tableKey, id){
@@ -11177,9 +11178,9 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         setTimeout(()=>{
           if(!c.ambientActive || officeTalkingId===c.id) return; // 그 사이 다른 상태로 전환된 경우 중단
           officeFinishAmbientSpeak(c);
-        }, 2400);
+        }, 4200);
       }
-    }, 26);
+    }, 55);
   }
 
   // 말풍선을 다 보여준 뒤 테이블을 반납하고 회의 테이블로 복귀, 잠시 후 다음 이야기 기회를 다시 시도함
@@ -11275,8 +11276,10 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
           const chair = document.createElement('div');
           chair.id = chairId;
           chair.className = 'office-chair';
+          // 좌석이 테이블 위쪽에 있으면 아래로, 아래쪽에 있으면 위로 당겨서 테이블 안쪽으로 들어가 보이게 함
+          const pullDir = seat[1] < 0 ? 1 : -1;
           chair.style.left = (t.x+seat[0])+'px';
-          chair.style.top = (t.y+seat[1]+6)+'px';
+          chair.style.top = (t.y+seat[1]+pullDir*14)+'px';
           chair.innerHTML = '<div class="office-chair-back"></div><div class="office-chair-seat"></div><div class="office-chair-leg l"></div><div class="office-chair-leg r"></div>';
           stage.appendChild(chair);
         });
@@ -11290,7 +11293,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
           hair: '#334155',
           status: 'ai', headlines: AI_IDLE_LINES, headline: AI_IDLE_LINES[0],
           x: AI_DESK.x, y: AI_DESK.y, tx: AI_DESK.x, ty: AI_DESK.y,
-          dir: -1, phase: 'idle', waitUntil: Infinity, issue: null, homeTable: null, headingToTable: null
+          dir: -1, phase: 'idle', facing: 'front', waitUntil: Infinity, issue: null, homeTable: null, headingToTable: null
         });
       }
       // 담당자들의 기본 위치는 회의 테이블의 각자 지정된 자리 (평소엔 여기 모여 있음)
@@ -11306,7 +11309,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         homeTable: 'meeting', headingToTable: null,
         x: baseX+rand(-8,8), y: baseY+rand(-6,6),
         tx: baseX, ty: baseY,
-        dir: 1, phase: 'walking', waitUntil: 0,
+        dir: 1, phase: 'walking', facing: 'front', waitUntil: 0,
         // 앰비언트(자동 발화) 관련 개별 상태 — 담당자마다 독립적으로 동작해서 동시에 여러 명이 이야기할 수 있음
         ambientActive: false, ambientTable: null, ambientMsg: null,
         ambientTypeTimer: null, ambientScheduleTimer: null, lastAmbientTopic: null
@@ -11337,49 +11340,77 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     const isTalking = c.phase==='talking';
     // 걷기/뛰기가 아니면(대기·대화 중) 이제 항상 테이블이나 데스크 앞 의자에 앉아있는 것으로 표현함
     const seated = !isMoving;
-    const legDur = isRunning ? '0.16s' : '0.32s';
-    const legAnim = isMoving ? `officeLegL ${legDur} linear infinite` : 'none';
-    const legAnimR = isMoving ? `officeLegR ${legDur} linear infinite` : 'none';
-    const armAnimL = isMoving ? `officeArmL ${legDur} linear infinite` : (isTalking ? 'officeWave 1.5s ease-in-out infinite' : 'none');
-    const armAnimR = isMoving ? `officeArmR ${legDur} linear infinite` : 'none';
-    const headPart = c.isAI ? `
-        <rect x="33" y="2" width="4" height="6" fill="#64748b"/>
-        <circle cx="35" cy="3" r="3" fill="${isTalking?'#7dd3fc':'#38bdf8'}"/>
-        <rect x="20" y="8" width="30" height="24" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.4"/>
-        <circle cx="29" cy="20" r="3.2" fill="${isTalking?'#7dd3fc':'#38bdf8'}"/>
-        <circle cx="41" cy="20" r="3.2" fill="${isTalking?'#7dd3fc':'#38bdf8'}"/>
-        <rect x="29" y="26" width="12" height="${isTalking?3.2:2}" rx="1.4" fill="#7dd3fc"/>
+    const legDurNum = isRunning ? 0.16 : 0.32;
+    const legDur = legDurNum + 's';
+    const legDelayNeg = '-' + (legDurNum/2) + 's';
+    const hipAnimL = isMoving ? `officeHipSwing ${legDur} ease-in-out infinite` : 'none';
+    const hipAnimR = isMoving ? `officeHipSwing ${legDur} ease-in-out infinite ${legDelayNeg}` : 'none';
+    const kneeAnimL = isMoving ? `officeKneeBend ${legDur} ease-in-out infinite` : 'none';
+    const kneeAnimR = isMoving ? `officeKneeBend ${legDur} ease-in-out infinite ${legDelayNeg}` : 'none';
+    const armAnimL = isMoving ? `officeArmL ${legDur} ease-in-out infinite` : (isTalking ? 'officeWave 1.5s ease-in-out infinite' : 'none');
+    const armAnimR = isMoving ? `officeArmR ${legDur} ease-in-out infinite` : 'none';
+    const isBack = isMoving && c.facing === 'back'; // 위쪽(테이블 안쪽)으로 걸어갈 때는 뒷모습으로 표시
+    // 마인크래프트 스타일 블록형 캐릭터: 모든 파츠를 각진 사각형(rx 없음)으로 구성
+    const headPart = c.isAI ? (isBack ? `
+        <rect x="30" y="0" width="10" height="4" fill="#334155"/>
+        <rect x="33" y="4" width="4" height="4" fill="#475569"/>
+        <rect x="20" y="8" width="30" height="26" fill="#0f172a" stroke="#1e3347" stroke-width="1.4"/>
+        <rect x="24" y="12" width="22" height="4" fill="#1e3347"/>
+        <rect x="24" y="20" width="22" height="4" fill="#1e3347"/>
       ` : `
-        <circle cx="35" cy="20" r="14" fill="#f0b98d"/>
-        <path d="M21 18 Q21 4 35 4 Q49 4 49 18 Q49 10 35 10 Q21 10 21 18Z" fill="${c.hair}"/>
-        <circle cx="30" cy="20" r="1.6" fill="#1e293b"/>
-        <circle cx="40" cy="20" r="1.6" fill="#1e293b"/>
-        <ellipse cx="35" cy="26" rx="4.5" ry="${isTalking?3.2:1.1}" fill="#c2664a"/>
-      `;
+        <rect x="30" y="0" width="10" height="4" fill="${isTalking?'#7dd3fc':'#38bdf8'}"/>
+        <rect x="33" y="4" width="4" height="4" fill="#64748b"/>
+        <rect x="20" y="8" width="30" height="26" fill="#1e293b" stroke="#38bdf8" stroke-width="1.4"/>
+        <rect x="27" y="18" width="5" height="5" fill="${isTalking?'#7dd3fc':'#38bdf8'}"/>
+        <rect x="38" y="18" width="5" height="5" fill="${isTalking?'#7dd3fc':'#38bdf8'}"/>
+        <rect x="29" y="27" width="12" height="${isTalking?4:2}" fill="#7dd3fc"/>
+      `) : (isBack ? `
+        <rect x="20" y="4" width="30" height="28" fill="${c.hair}"/>
+        <rect x="20" y="4" width="30" height="4" fill="#000000" opacity="0.15"/>
+      ` : `
+        <rect x="20" y="4" width="30" height="28" fill="#f0b98d"/>
+        <rect x="20" y="4" width="30" height="9" fill="${c.hair}"/>
+        <rect x="18" y="4" width="4" height="15" fill="${c.hair}"/>
+        <rect x="48" y="4" width="4" height="15" fill="${c.hair}"/>
+        <rect x="27" y="17" width="5" height="5" fill="#1e293b"/>
+        <rect x="38" y="17" width="5" height="5" fill="#1e293b"/>
+        <rect x="30" y="25" width="10" height="${isTalking?5:2}" fill="#c2664a"/>
+      `);
     const handFill = c.isAI ? '#94a3b8' : '#f0b98d';
     const neckFill = c.isAI ? '#1e293b' : '#f0b98d';
-    const legsSVG = seated ? `
-      <rect x="20" y="76" width="14" height="9" rx="3" fill="#334155"/>
-      <rect x="22" y="83" width="8" height="18" rx="3" fill="#334155"/>
-      <rect x="36" y="76" width="14" height="9" rx="3" fill="#475569"/>
-      <rect x="40" y="83" width="8" height="18" rx="3" fill="#475569"/>
-      <ellipse cx="26" cy="101" rx="6" ry="3" fill="#1e293b"/>
-      <ellipse cx="44" cy="101" rx="6" ry="3" fill="#1e293b"/>
-    ` : `
-      <g style="transform-origin:30px 78px;animation:${legAnim}"><rect x="26" y="76" width="8" height="28" rx="3.5" fill="#334155"/></g>
-      <g style="transform-origin:40px 78px;animation:${legAnimR}"><rect x="36" y="76" width="8" height="28" rx="3.5" fill="#475569"/></g>
-      <ellipse cx="30" cy="105" rx="6" ry="3" fill="#1e293b"/>
-      <ellipse cx="40" cy="105" rx="6" ry="3" fill="#1e293b"/>
+    // 앉아 있을 때는(의자가 테이블 안쪽으로 들어간 만큼) 다리를 그리지 않아 테이블 아래로 숨겨진 것처럼 보이게 함
+    const legsSVG = seated ? '' : `
+      <g style="transform-origin:26px 76px;animation:${hipAnimL}">
+        <rect x="20" y="76" width="12" height="14" fill="#334155"/>
+        <g style="transform-origin:26px 90px;animation:${kneeAnimL}">
+          <rect x="20" y="90" width="12" height="10" fill="#334155"/>
+          <rect x="19" y="100" width="14" height="6" fill="#1e293b"/>
+        </g>
+      </g>
+      <g style="transform-origin:44px 76px;animation:${hipAnimR}">
+        <rect x="38" y="76" width="12" height="14" fill="#475569"/>
+        <g style="transform-origin:44px 90px;animation:${kneeAnimR}">
+          <rect x="38" y="90" width="12" height="10" fill="#475569"/>
+          <rect x="37" y="100" width="14" height="6" fill="#1e293b"/>
+        </g>
+      </g>
     `;
     return `<svg viewBox="0 0 70 110" width="38" height="60" style="display:block;">
       ${legsSVG}
-      <g style="transform-origin:20px 48px;animation:${armAnimL}"><rect x="14" y="45" width="8" height="26" rx="4" fill="${c.color}"/><circle cx="18" cy="72" r="4.2" fill="${handFill}"/></g>
-      <g style="transform-origin:50px 48px;animation:${armAnimR}"><rect x="48" y="45" width="8" height="26" rx="4" fill="${c.color}"/><circle cx="52" cy="72" r="4.2" fill="${handFill}"/></g>
-      <path d="M22 40 Q35 32 48 40 L50 78 Q35 84 20 78 Z" fill="${c.color}"/>
-      <path d="M31 40 L35 47 L39 40 Z" fill="#ffffff" opacity="0.85"/>
-      <rect x="30" y="27" width="10" height="10" fill="${neckFill}"/>
+      <g style="transform-origin:12px 40px;animation:${armAnimL}">
+        <rect x="6" y="38" width="12" height="26" fill="${c.color}"/>
+        <rect x="6" y="62" width="12" height="8" fill="${handFill}"/>
+      </g>
+      <g style="transform-origin:58px 40px;animation:${armAnimR}">
+        <rect x="52" y="38" width="12" height="26" fill="${c.color}"/>
+        <rect x="52" y="62" width="12" height="8" fill="${handFill}"/>
+      </g>
+      <rect x="18" y="34" width="34" height="34" fill="${c.color}"/>
+      <rect x="18" y="34" width="34" height="6" fill="#ffffff" opacity="0.18"/>
+      <rect x="18" y="62" width="34" height="6" fill="#000000" opacity="0.15"/>
+      <rect x="30" y="28" width="10" height="8" fill="${neckFill}"/>
       ${headPart}
-      <circle cx="49" cy="7" r="5.5" fill="${STATUS_COLOR[c.status]}" stroke="#ffffff" stroke-width="2"/>
+      <rect x="55" y="1" width="9" height="9" fill="${STATUS_COLOR[c.status]}" stroke="#ffffff" stroke-width="2"/>
     </svg>`;
   }
 
@@ -11422,7 +11453,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         el.dataset.renderKey = renderKey;
         el.innerHTML = `
           ${talking ? `<div class="office-bubble${isAmbientAlert?' office-bubble-alert':''}" id="officeBubble-${c.id}"></div>` : ''}
-          <div class="office-char-figure ${c.phase}" style="transform:scaleX(${c.dir});">${personSVG(c)}</div>
+          <div class="office-char-figure ${c.phase}"><div style="transform:scaleX(${c.dir});">${personSVG(c)}</div></div>
           <div class="office-char-name ${talking?'talking':''}">${c.shortName}</div>
         `;
         if(talking && officeTalkingId===c.id){ startOfficeTyping(c); }
@@ -11630,9 +11661,9 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
           }
           officeMsgIndex = nextIndex % messages.length;
           startOfficeTyping(c);
-        }, 2400);
+        }, 4200);
       }
-    }, 26);
+    }, 55);
   }
 
   // 대화 기록 패널을 officeLog 배열 내용으로 다시 그림
@@ -11695,11 +11726,16 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
           }
           officeDiscussion.idx = nextIdx;
           startDiscussionTyping();
-        }, 2200);
+        }, 4200);
       }
-    }, 26);
+    }, 55);
   }
 
+  // 이동 벡터(dx,dy)를 보고 실제로 그 방향을 바라보게 함: 위로 갈수록 뒷모습, 아래로 갈수록 앞모습, 좌우 위주면 옆모습(기존 좌우 반전)
+  function officeFacingFor(dx,dy){
+    if(Math.abs(dy) > Math.abs(dx)*1.15) return dy<0 ? 'back' : 'front';
+    return 'side';
+  }
   function officeTick(){
     if(!officeChars) return;
     const now = Date.now();
@@ -11717,7 +11753,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
             return;
           }
           c.x += (dx/dist)*rushSpeed; c.y += (dy/dist)*rushSpeed;
-          c.dir = dx>=0?1:-1; c.phase = 'running';
+          c.dir = dx>=0?1:-1; c.phase = 'running'; c.facing = officeFacingFor(dx,dy);
           return;
         }
         if(officeDiscussion && officeDiscussion.headingTable && officeDiscussion.aiArrived){
@@ -11729,7 +11765,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
           const dx = AI_DESK.x-c.x, dy = AI_DESK.y-c.y, dist = Math.hypot(dx,dy);
           if(dist<4){ c.headingHome=false; c.x=AI_DESK.x; c.y=AI_DESK.y; c.phase='idle'; return; }
           c.x += (dx/dist)*rushSpeed; c.y += (dy/dist)*rushSpeed;
-          c.dir = dx>=0?1:-1; c.phase='running';
+          c.dir = dx>=0?1:-1; c.phase='running'; c.facing = officeFacingFor(dx,dy);
           return;
         }
         // 평소엔 데스크에 고정. 매장별 분석(클릭) 중일 때만 talking으로 표시
@@ -11748,7 +11784,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
             return;
           }
           c.x += (dx/dist)*rushSpeed; c.y += (dy/dist)*rushSpeed;
-          c.dir = dx>=0?1:-1; c.phase = 'running';
+          c.dir = dx>=0?1:-1; c.phase = 'running'; c.facing = officeFacingFor(dx,dy);
           return;
         }
         c.phase = officeDiscussion.scriptStarted ? 'talking' : 'idle';
@@ -11768,7 +11804,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
             return;
           }
           c.x += (dx/dist)*rushSpeed; c.y += (dy/dist)*rushSpeed;
-          c.dir = dx>=0?1:-1; c.phase = 'running';
+          c.dir = dx>=0?1:-1; c.phase = 'running'; c.facing = officeFacingFor(dx,dy);
           return;
         }
         c.phase='talking';
@@ -11788,7 +11824,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       const dist = Math.hypot(dx,dy);
       if(dist<4){ c.phase='idle'; c.waitUntil = now+rand(1600,4200); return; }
       c.x += (dx/dist)*speed; c.y += (dy/dist)*speed;
-      c.dir = dx>=0?1:-1; c.phase='walking';
+      c.dir = dx>=0?1:-1; c.phase='walking'; c.facing = officeFacingFor(dx,dy);
     });
     renderOfficeChars();
   }
