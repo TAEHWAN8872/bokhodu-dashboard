@@ -3638,7 +3638,9 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   render();
   setAnalysisTab('cumul');
   const LAST_EDITED = '2026-07-03';
-  document.getElementById('lastUpdate').textContent='26년(1~6월) + 25년 연간 데이터 · '+ALL.length+'개 매장 · '+LAST_EDITED+' 수정';
+  const __curLastIdx = getLastMonthIdx(ALL);
+  const __curMonthLabel = __curLastIdx>=0 ? `1~${__curLastIdx+1}월` : '1~6월';
+  document.getElementById('lastUpdate').textContent='26년('+__curMonthLabel+') + 25년 연간 데이터 · '+ALL.length+'개 매장 · '+LAST_EDITED+' 수정';
 })();
 
 // ===== 카카오톡 공유 딥링크: ?store=매장명 파라미터로 들어오면 해당 매장 상세 자동 오픈 =====
@@ -4415,16 +4417,20 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
 
   window.checkContractAlert = checkContractAlert;
 
-  // ── 매출 급락(25년 1~6월 평균 대비 26년 1~6월 평균 10%↑ 하락) 점검 필요 알림 ──
-  function avgFirstHalf(monthsArr){
-    const vals = (monthsArr||[]).slice(0,6).filter(v=>v>0);
+  // ── 매출 급락(작년 1~N월 평균 대비 올해 1~N월 평균 10%↑ 하락) 점검 필요 알림 ──
+  // N(비교 개월 수)은 고정 6개월이 아니라, 26년 데이터 중 실제로 값이 입력된 가장 마지막 달까지 자동으로 늘어남
+  function avgFirstHalf(monthsArr, monthCount){
+    const n = monthCount || 6;
+    const vals = (monthsArr||[]).slice(0,n).filter(v=>v>0);
     return vals.length ? vals.reduce((s,v)=>s+v,0)/vals.length : 0;
   }
 
   function getDeclineBranches(){
+    const monthCount = getLastMonthIdx(ALL) + 1 || 6; // 최신 데이터가 있는 달까지(예: 7월 데이터가 있으면 7)
+    window.__declineMonthCount = monthCount;
     const list = ALL.map(b=>{
-      const avg26 = avgFirstHalf(b.months);
-      const avg25 = avgFirstHalf(ALL25[b.name]);
+      const avg26 = avgFirstHalf(b.months, monthCount);
+      const avg25 = avgFirstHalf(ALL25[b.name], monthCount);
       if(avg26<=0 || avg25<=0) return null; // 비교 불가(신규/폐점/25년 데이터 없음) 매장 제외
       const rate = (avg26-avg25)/avg25*100;
       return {name:b.name, manager:b.manager, region:b.region, avg26, avg25, rate};
@@ -4437,14 +4443,15 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   function checkDeclineAlert(){
     const {list} = getDeclineBranches();
     if(list.length===0) return;
-    const ymKey = 'decline_alert_dismissed_2025H1_vs_2026H1';
+    const monthCount = window.__declineMonthCount || 6;
+    const ymKey = 'decline_alert_dismissed_2025_vs_2026_1to'+monthCount;
     let dismissed = false;
     try{ dismissed = localStorage.getItem(ymKey)==='1'; }catch(e){}
     if(dismissed) return;
 
     document.getElementById('declineAlertTitle').textContent = '점검 필요';
     document.getElementById('declineAlertSub').textContent =
-      `25년 1~6월 평균 대비 26년 1~6월 평균 매출이 10% 이상 하락한 매장이 ${list.length}곳 있습니다.`;
+      `25년 1~${monthCount}월 평균 대비 26년 1~${monthCount}월 평균 매출이 10% 이상 하락한 매장이 ${list.length}곳 있습니다.`;
     document.getElementById('declineAlertList').innerHTML = list.map(r=>
       `<li><span style="display:flex;align-items:baseline;gap:6px;min-width:0;"><span class="rc-alert-name store-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.name}</span><span style="font-size:11px;color:#6b8fa8;white-space:nowrap;">${r.manager||'-'}</span></span><span class="rc-alert-date">${r.rate.toFixed(1)}%</span></li>`
     ).join('');
@@ -10855,7 +10862,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       const gapText = (gap && gap.missing.length)
         ? ` 마케팅은 ${gap.missing.join(', ')}을(를) 전혀 진행하지 않았어요.`
         : (gap ? ` 마케팅 채널(블로그체험단·네이버 플레이스 광고·메타광고·배너)은 모두 한 번 이상 진행했었어요.` : '');
-      msgs.push({ status:'warn', text: `${w.name} 매출이 작년 상반기 평균 대비 ${fmtPct(w.rate)} 하락했어요.${gapText}`, store: w.name, topic:'sales' });
+      msgs.push({ status:'warn', text: `${w.name} 매출이 작년 1~${window.__declineMonthCount||6}월 평균 대비 ${fmtPct(w.rate)} 하락했어요.${gapText}`, store: w.name, topic:'sales' });
       problems.push({ type:'decline', store: w.name, data: w, topic:'sales' });
     });
 
@@ -11075,7 +11082,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     const lines = [];
 
     // 1) 매출 하락폭
-    lines.push({ who:'ai', text: `${w.name} — 작년 상반기 평균 대비 ${fmtPct(w.rate)} 하락했어요 (작년 평균 ${fmt(w.avg25)} → 올해 평균 ${fmt(w.avg26)}). 원인을 같이 짚어볼게요.` });
+    lines.push({ who:'ai', text: `${w.name} — 작년 1~${window.__declineMonthCount||6}월 평균 대비 ${fmtPct(w.rate)} 하락했어요 (작년 평균 ${fmt(w.avg25)} → 올해 평균 ${fmt(w.avg26)}). 원인을 같이 짚어볼게요.` });
 
     // 2) 물류 매입률 확인
     const logi = monthsArr ? computeLogisticsRatio(w.name, monthsArr) : null;
