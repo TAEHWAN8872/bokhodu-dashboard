@@ -10678,7 +10678,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     {id:"pyt", label:"박영태 대리", shortName:"박영태", color:"#3b82f6"},
     {id:"kdw", label:"강동우 사원", shortName:"강동우", color:"#a855f7"},
     {id:"lhm", label:"이현민 사원", shortName:"이현민", color:"#f472b6"},
-    {id:"ai", label:"AI 담당자", shortName:"AI", color:"#38bdf8", isAI:true}
+    {id:"ai", label:"이대호 부장님", shortName:"이대호 부장님", color:"#38bdf8", isAI:true}
   ];
   const STATUS_COLOR = { good:'#16a34a', warn:'#d97706', bad:'#dc2626', ai:'#38bdf8' };
   const AI_DESK = { x: OFFICE_W/2, y: 128 };
@@ -10735,7 +10735,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     officeTableOwner[tableKey] = id;
   }
   const AI_IDLE_LINES = [
-    '안녕하세요! 저는 매출 데이터를 분석하는 AI 담당자예요.',
+    '안녕하세요! 저는 매출 데이터를 분석하는 이대호 부장님이에요.',
     '이슈가 있는 담당자를 클릭하면 저를 찾아와서 원인을 함께 이야기해요.',
     '매출·마케팅 참여·실제 날씨 데이터까지 자동으로 확인해서 말씀드릴게요!'
   ];
@@ -11265,8 +11265,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     if(!aiChar) return;
 
     const lines = buildStoreDeepDiveLines(storeName);
-    aiChar.headlines = lines;
-    aiChar.headline = lines[0];
+    aiChar.headlines = ['에헴~', ...lines];
+    aiChar.headline = aiChar.headlines[0];
 
     if(officeTypeTimer) clearInterval(officeTypeTimer);
     if(officeMsgTimer) clearTimeout(officeMsgTimer);
@@ -11675,7 +11675,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       officeClaimTableForce(topic, id);
       officeLog = [];
       renderOfficeLog();
-      pushOfficeLog('ai', 'AI 담당자', '#38bdf8', `${c.shortName} 담당자님, ${tableInfo.label}에서 ${issueLabel} 관련 데이터를 자동으로 분석하고 있어요. 잠시만요...`);
+      pushOfficeLog('ai', '이대호 부장님', '#38bdf8', `${c.shortName} 담당자님, ${tableInfo.label}에서 ${issueLabel} 관련 데이터를 자동으로 분석하고 있어요. 잠시만요...`);
       const spot = document.getElementById('officeAiSpot');
       if(spot) spot.textContent = `🔎 ${tableInfo.label}에서 분석 중...`;
 
@@ -11695,13 +11695,14 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       // 담당자와 AI 담당자가 테이블로 걸어가는 동안 백그라운드에서 실제 매출/마케팅/물류 데이터를 분석해 대본 생성
       buildDiscussionScriptAsync(c, target).then(script=>{
         if(!officeDiscussion || officeDiscussion.managerId!==id) return; // 그 사이 취소/전환된 경우 무시
-        officeDiscussion.script = script || [{who:'ai', text:`${issueLabel} 관련 특이사항을 다시 확인했는데 뚜렷한 원인은 못 찾았어요. 함께 살펴봐 주시겠어요?`}];
+        const baseScript = script || [{who:'ai', text:`${issueLabel} 관련 특이사항을 다시 확인했는데 뚜렷한 원인은 못 찾았어요. 함께 살펴봐 주시겠어요?`}];
+        officeDiscussion.script = [{who:'ai', text:'에헴~'}, ...baseScript];
         const spot2 = document.getElementById('officeAiSpot');
         if(spot2) spot2.textContent = 'AI 상담 데스크';
         officeMaybeStartDiscussion();
       }).catch(()=>{
         if(!officeDiscussion || officeDiscussion.managerId!==id) return;
-        officeDiscussion.script = [{who:'ai', text:`${issueLabel} 데이터를 분석하는 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.`}];
+        officeDiscussion.script = [{who:'ai', text:'에헴~'}, {who:'ai', text:`${issueLabel} 데이터를 분석하는 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.`}];
         const spot2 = document.getElementById('officeAiSpot');
         if(spot2) spot2.textContent = 'AI 상담 데스크';
         officeMaybeStartDiscussion();
@@ -11824,7 +11825,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     const el = document.getElementById('officeLog');
     if(!el) return;
     if(!officeLog.length){
-      el.innerHTML = '<div class="office-log-empty">이슈가 있는 담당자를 클릭하면<br>AI 담당자와의 대화 내용이 여기에 기록돼요.</div>';
+      el.innerHTML = '<div class="office-log-empty">이슈가 있는 담당자를 클릭하면<br>이대호 부장님과의 대화 내용이 여기에 기록돼요.</div>';
       return;
     }
     el.innerHTML = officeLog.map(m=>`
@@ -11854,7 +11855,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     if(!line){ officeEndDiscussion(); return; }
     officeDiscussion.speakerId = line.who==='ai' ? 'ai' : officeDiscussion.managerId;
     const mgrChar = officeChars.find(x=>x.id===officeDiscussion.managerId);
-    const speakerName = line.who==='ai' ? 'AI 담당자' : (mgrChar ? mgrChar.shortName : '담당자');
+    const speakerName = line.who==='ai' ? '이대호 부장님' : (mgrChar ? mgrChar.shortName : '담당자');
     const speakerColor = line.who==='ai' ? '#38bdf8' : (mgrChar ? mgrChar.color : '#7eb8e8');
     pushOfficeLog(officeDiscussion.speakerId, speakerName, speakerColor, line.text);
     renderOfficeChars();
