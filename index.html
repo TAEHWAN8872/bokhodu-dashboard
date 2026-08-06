@@ -4922,9 +4922,11 @@ let MENU_DATA_BY_MONTH = {};
 let __menuDataPromise = null;
 function ensureMenuDataLoaded() {
   if (__menuDataPromise) return __menuDataPromise;
-  const files = { 1:'data/menu-01.json', 2:'data/menu-02.json', 3:'data/menu-03.json', 4:'data/menu-04.json', 5:'data/menu-05.json', 6:'data/menu-06.json', 7:'data/menu-07.json' };
+  const files = { 1:'data/menu-01.json', 2:'data/menu-02.json', 3:'data/menu-03.json', 4:'data/menu-04.json', 5:'data/menu-05.json', 6:'data/menu-06.json', 7:'data/menu-07.json', 8:'data/menu-08.json', 9:'data/menu-09.json', 10:'data/menu-10.json', 11:'data/menu-11.json', 12:'data/menu-12.json' };
   __menuDataPromise = Promise.all(Object.entries(files).map(([m, url]) =>
-    fetch(url).then(r => r.json()).then(data => { MENU_DATA_BY_MONTH[m] = data; })
+    fetch(url).then(r => { if (!r.ok) throw new Error('not found'); return r.json(); })
+      .then(data => { MENU_DATA_BY_MONTH[m] = data; })
+      .catch(() => { /* 아직 해당 월 파일이 없으면 조용히 건너뜀 (정상 동작) */ })
   )).then(() => {
     // 전체(0) = 모든 월 데이터를 상품분류+상품명+매장 기준으로 합산
     const map = {};
