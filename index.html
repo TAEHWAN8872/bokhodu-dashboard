@@ -187,7 +187,7 @@ body.hide-names .store-name:hover{
 /* KPI */
 .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px;}
 @media (min-width:1100px){
-  .kpi-row{grid-template-columns:repeat(8,1fr);}
+  .kpi-row{grid-template-columns:repeat(9,1fr);}
 }
 .kpi{background:#111e2e;border-radius:10px;padding:12px 16px;border:0.5px solid #1e3347;}
 .kl{font-size:11px;color:#6b8fa8;margin-bottom:5px;}
@@ -1167,6 +1167,7 @@ body.hide-names .store-name:hover{
     <div class="kpi kpi-click" id="kpi3" onclick="openKpiModal('over')" title="클릭하여 달성 매장 보기"><div class="kl" id="k3l">전년 동월 대비 5%↑ 목표 달성</div><div class="kv" id="k3">-</div><div class="ks" id="k3s">-</div></div>
     <div class="kpi kpi-click" id="kpi6" onclick="openKpiModal('stable')" title="클릭하여 매장 보기"><div class="kl" id="k6l">전년비 ±2% 유지 매장</div><div class="kv" id="k6">-</div><div class="ks" id="k6s">-</div></div>
     <div class="kpi"><div class="kl" id="k7l">전년 대비 성장</div><div class="kv" id="k7">-</div><div class="ks" id="k7s">-</div></div>
+    <div class="kpi"><div class="kl" id="k8l">전년 대비 매장별성장</div><div class="kv" id="k8">-</div><div class="ks" id="k8s">-</div></div>
     <div class="kpi"><div class="kl">전월 대비 성장</div><div class="kv" id="k4">-</div><div class="ks" id="k4s">-</div></div>
     <div class="kpi"><div class="kl">최고 매출 매장</div><div class="kv" id="k5" style="font-size:16px;">-</div><div class="ks" id="k5s" style="color:#6b8fa8;">-</div></div>
     <div class="kpi" style="border-color:#38bdf8;display:flex;flex-direction:column;">
@@ -2240,6 +2241,15 @@ function render(){
     yoyGrowStr=(gy>0?'+':'')+gy+'%';
   }
 
+  // 전년 대비 매장별성장: 작년 총매출 ÷ 매장수(유효 매장) = 작년 매장당 평균과, 올해 매장당 평균(avgVal) 비교
+  let yoyStoreGrowStr='-';
+  const prevVals=data.map(b=>get25Val(b.name,lastIdx)).filter(v=>v>0);
+  const avgPrevStore=prevVals.length ? prevVals.reduce((s,v)=>s+v,0)/prevVals.length : 0;
+  if(avgPrevStore>0){
+    const gys=((avgVal-avgPrevStore)/avgPrevStore*100).toFixed(1);
+    yoyStoreGrowStr=(gys>0?'+':'')+gys+'%';
+  }
+
   // 최고 매출 매장: 26년 전체 기간 중 가장 높은 단일 월 실매출
   let topBranch=null, topVal=0, topMonthLabel='';
   ALL.forEach(b=>{
@@ -2268,7 +2278,11 @@ function render(){
   document.getElementById('k7l').textContent=(monthLabel==='평균'?'전년 대비 성장':monthLabel+' 전년 대비 성장');
   document.getElementById('k7').textContent=yoyGrowStr;
   document.getElementById('k7').className='kv '+(yoyGrowStr.startsWith('+')?'pos':yoyGrowStr==='-'?'':'neg');
-  document.getElementById('k7s').textContent=sumPrevYoy>0?(monthLabel==='평균'?'작년 평균 대비':'작년 '+monthLabel+' 대비'):'';
+  document.getElementById('k7s').textContent=sumPrevYoy>0?(monthLabel==='평균'?'작년 평균 대비 총매출':'작년 '+monthLabel+' 대비 총매출'):'';
+  document.getElementById('k8l').textContent=(monthLabel==='평균'?'전년 대비 매장별성장':monthLabel+' 전년 대비 매장별성장');
+  document.getElementById('k8').textContent=yoyStoreGrowStr;
+  document.getElementById('k8').className='kv '+(yoyStoreGrowStr.startsWith('+')?'pos':yoyStoreGrowStr==='-'?'':'neg');
+  document.getElementById('k8s').textContent=avgPrevStore>0?(monthLabel==='평균'?'작년 평균 대비 매장당':'작년 '+monthLabel+' 대비 매장당'):'';
   document.getElementById('k4').textContent=growStr;
   document.getElementById('k4').className='kv '+(growStr.startsWith('+')?'pos':growStr==='-'?'':'neg');
   document.getElementById('k4s').textContent=prevIdx>=0?MONTHS[prevIdx]+'→'+monthLabel:'';
