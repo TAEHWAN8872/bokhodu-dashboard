@@ -1145,7 +1145,53 @@ body.hide-names .store-name:hover{
           </div>
         </div>
 
-        <!-- 9~10번 탭: 준비중 -->
+        <!-- 9번 탭: 지역별 신메뉴 마케팅 분석 -->
+        <div id="maTab-9" class="ma-tab-panel" style="display:none;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
+            <div style="font-size:12px;color:#7eb8e8;font-weight:700;">🎯 지역별 신메뉴 마케팅 분석</div>
+            <div id="nm9MetricToggle" style="display:flex;gap:4px;"></div>
+          </div>
+          <div style="font-size:10.5px;color:#5f7d95;margin-bottom:12px;">지역을 선택하면 그 지역 매장별로 신메뉴(레드벨벳·쑥·청사과) 판매 비중과 마케팅 참여율을 함께 비교하고, 둘 사이의 상관관계를 확인할 수 있습니다.</div>
+
+          <!-- 지역 탭 -->
+          <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;align-items:center;" id="nm9RegionTabs"></div>
+
+          <!-- 지역 요약 카드 -->
+          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:20px;">
+            <div style="flex:1;min-width:130px;background:#132537;border:0.5px solid #1e3347;border-radius:10px;padding:14px 16px;">
+              <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">대상 매장 수</div>
+              <div id="nm9StoreCount" style="font-size:17px;font-weight:700;color:#e0f0ff;">-</div>
+            </div>
+            <div style="flex:1;min-width:130px;background:#132537;border:0.5px solid #1e3347;border-radius:10px;padding:14px 16px;">
+              <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">지역 평균 신메뉴 비중</div>
+              <div id="nm9AvgPct" style="font-size:17px;font-weight:700;color:#a78bfa;">-</div>
+            </div>
+            <div style="flex:1;min-width:130px;background:#132537;border:0.5px solid #1e3347;border-radius:10px;padding:14px 16px;">
+              <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">지역 평균 마케팅 참여율</div>
+              <div id="nm9AvgRate" style="font-size:17px;font-weight:700;color:#38bdf8;">-</div>
+            </div>
+            <div style="flex:1;min-width:170px;background:#132537;border:0.5px solid #1e3347;border-radius:10px;padding:14px 16px;">
+              <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">신메뉴 비중 ↔ 마케팅 참여율 상관관계</div>
+              <div id="nm9RegionR" style="font-size:15px;font-weight:700;color:#facc15;">-</div>
+            </div>
+          </div>
+
+          <!-- 매장별 비교 차트 -->
+          <div style="margin-bottom:22px;">
+            <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:10px;">📊 매장별 신메뉴 비중(%) vs 마케팅 참여율(%)</div>
+            <div style="position:relative;height:280px;">
+              <canvas id="nm9CompareChart"></canvas>
+            </div>
+          </div>
+
+          <!-- 매장별 상세 표(펼치기 가능) -->
+          <div style="padding-top:16px;border-top:0.5px solid #1e3347;">
+            <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:6px;">📋 매장별 상세 — 행을 클릭하면 월별(2~7월) 신메뉴 비중·마케팅 참여 내역을 볼 수 있어요</div>
+            <div id="nm9Table" style="overflow-x:auto;"></div>
+          </div>
+        </div>
+
+        <!-- 10번 탭: 준비중 -->
         <div id="maTab-placeholder" class="ma-tab-panel" style="display:none;">
           <div style="text-align:center;color:#4a6070;font-size:13px;padding:60px 0;">🚧 준비 중인 분석 탭입니다.</div>
         </div>
@@ -6948,6 +6994,282 @@ function renderNewMenuRegionTab() {
   }
 }
 
+// ── 9번 탭: 지역별 신메뉴 마케팅 분석 ──
+let nm9Metric = 'qty'; // 'qty'(수량) | 'amt'(금액) — 독립 토글
+let nm9Region = null;
+const NM9_MK_MONTHS = [2, 3, 4, 5, 6, 7]; // 마케팅 데이터가 존재하는 월(2~7월)에 맞춰 비교
+
+function renderNm9MetricToggle() {
+  const el = document.getElementById('nm9MetricToggle');
+  if (!el) return;
+  const opts = [{ v: 'qty', l: '수량 기준' }, { v: 'amt', l: '금액 기준' }];
+  el.innerHTML = opts.map(o =>
+    `<div class="analysis-tab${nm9Metric === o.v ? ' active' : ''}" onclick="setNm9Metric('${o.v}')">${o.l}</div>`
+  ).join('');
+}
+function setNm9Metric(mode) {
+  nm9Metric = mode;
+  renderNm9MetricToggle();
+  renderNewMenuMarketingTab();
+}
+
+function renderNm9RegionTabs() {
+  const el = document.getElementById('nm9RegionTabs');
+  if (!el) return;
+  const regions = (window.__regionList || []).filter(r => r && r !== 'all');
+  if (!nm9Region) nm9Region = regions.includes('충북') ? '충북' : (regions[0] || null);
+  el.innerHTML = regions.map(r =>
+    `<div class="tab${r === nm9Region ? ' active' : ''}" data-region="${r}" onclick="setNm9Region('${r}')">${r}</div>`
+  ).join('');
+}
+function setNm9Region(r) {
+  nm9Region = r;
+  renderNewMenuMarketingTab();
+}
+
+// 월별(1~7) × 매장별 {total, newSum} 인덱스를 한 번에 구축(반복 스캔 방지)
+function nm9BuildMonthlyIndex(metric) {
+  const idx = {};
+  for (let m = 1; m <= 7; m++) {
+    const rows = MENU_DATA_BY_MONTH[m] || [];
+    const map = {};
+    rows.forEach(r => {
+      const qty = r['수량'] || 0;
+      if (qty <= 0) return;
+      const store = r['매장'];
+      if (!store) return;
+      const name = r['상품명'] || '';
+      const val = metric === 'amt' ? qty * (PRICE_MAP[name] || 0) : qty;
+      if (!map[store]) map[store] = { total: 0, newSum: 0 };
+      map[store].total += val;
+      if (NEW_MENU_KEYWORDS.some(k => name.includes(k))) map[store].newSum += val;
+    });
+    idx[m] = map;
+  }
+  return idx;
+}
+
+// 마케팅 데이터의 매장명과 매출/메뉴 데이터의 매장명 표기 차이를 흡수하기 위한 정규화
+function nm9NormName(name) {
+  if (!name) return '';
+  return String(name).replace(/^\(폐점\)/, '').replace(/복호두\s*/g, '').replace(/\s+/g, '').trim();
+}
+function nm9GetMkEntry(storeName) {
+  if (!window.__nm9MkMap) {
+    window.__nm9MkMap = {};
+    (window.MARKETING_DATA || []).forEach(s => { window.__nm9MkMap[nm9NormName(s[0])] = s; });
+  }
+  return window.__nm9MkMap[nm9NormName(storeName)] || null;
+}
+// entry: [매장명, 담당자, 지역, {월:{캠페인명: true/false/null}}]. monthLabel 없으면 전체 기간 참여율.
+function nm9MkRate(entry, monthLabel) {
+  if (!entry) return null;
+  const monthsObj = entry[3] || {};
+  const keys = monthLabel ? [monthLabel] : Object.keys(monthsObj);
+  let yes = 0, no = 0;
+  keys.forEach(mk => {
+    const camp = monthsObj[mk] || {};
+    Object.values(camp).forEach(v => { if (v === true) yes++; else if (v === false) no++; });
+  });
+  const total = yes + no;
+  return total > 0 ? Math.round(yes / total * 100) : null;
+}
+
+function nm9Pearson(xs, ys) {
+  const n = xs.length;
+  if (n < 3) return null;
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = ys.reduce((a, b) => a + b, 0) / n;
+  let num = 0, dx2 = 0, dy2 = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = xs[i] - mx, dy = ys[i] - my;
+    num += dx * dy; dx2 += dx * dx; dy2 += dy * dy;
+  }
+  if (dx2 === 0 || dy2 === 0) return null;
+  return num / Math.sqrt(dx2 * dy2);
+}
+function nm9RLabel(r) {
+  if (r === null) return { text: '데이터 부족', color: '#4a6070' };
+  if (r >= 0.5) return { text: `+${r.toFixed(2)} · 강한 양의 상관`, color: '#3db87a' };
+  if (r >= 0.2) return { text: `+${r.toFixed(2)} · 약한 양의 상관`, color: '#8fe0ac' };
+  if (r > -0.2) return { text: `${r.toFixed(2)} · 상관 거의 없음`, color: '#9fc1de' };
+  if (r > -0.5) return { text: `${r.toFixed(2)} · 약한 음의 상관`, color: '#f0a04a' };
+  return { text: `${r.toFixed(2)} · 강한 음의 상관`, color: '#e05555' };
+}
+function nm9Diagnosis(pct, rate, avgPct, avgRate) {
+  if (pct === null) return { text: '신메뉴 판매 없음', color: '#4a6070' };
+  const highPct = avgPct !== null && pct >= avgPct;
+  const highRate = rate !== null && avgRate !== null && rate >= avgRate;
+  if (rate === null) return { text: '마케팅 데이터 없음', color: '#4a6070' };
+  if (highPct && highRate) return { text: '🟢 시너지 우수', color: '#3db87a' };
+  if (highPct && !highRate) return { text: '🟡 마케팅 강화 여지', color: '#facc15' };
+  if (!highPct && highRate) return { text: '🟠 참여 대비 효과 저조', color: '#f0a04a' };
+  return { text: '🔴 관리 필요', color: '#e05555' };
+}
+
+let nm9CompareChartInst = null;
+function renderNewMenuMarketingTab() {
+  renderNm9RegionTabs();
+  const region = nm9Region;
+  const metric = nm9Metric;
+  const unit = metric === 'amt' ? '원' : '개';
+  const idx = nm9BuildMonthlyIndex(metric);
+  const storesInRegion = (window.ALL || (typeof ALL !== 'undefined' ? ALL : []))
+    .filter(b => b.region === region).map(b => b.name);
+
+  const storeData = storesInRegion.map(name => {
+    let total = 0, newSum = 0;
+    for (let m = 1; m <= 7; m++) {
+      const d = idx[m][name];
+      if (d) { total += d.total; newSum += d.newSum; }
+    }
+    const overallPct = total ? (newSum / total * 100) : null;
+    const mkEntry = nm9GetMkEntry(name);
+    const overallMkRate = nm9MkRate(mkEntry);
+
+    const xs = [], ys = [];
+    const monthlyDetail = NM9_MK_MONTHS.map(m => {
+      const d = idx[m][name];
+      const pct = (d && d.total) ? (d.newSum / d.total * 100) : null;
+      const rate = nm9MkRate(mkEntry, m + '월');
+      if (pct !== null && rate !== null) { xs.push(pct); ys.push(rate); }
+      return { month: m, pct, rate, total: d ? d.total : 0, newSum: d ? d.newSum : 0 };
+    });
+    const r = nm9Pearson(xs, ys);
+    return { name, overallPct, overallMkRate, r, monthlyDetail };
+  }).sort((a, b) => (b.overallPct ?? -1) - (a.overallPct ?? -1));
+
+  // ── 지역 요약 ──
+  const validPct = storeData.filter(s => s.overallPct !== null).map(s => s.overallPct);
+  const validRate = storeData.filter(s => s.overallMkRate !== null).map(s => s.overallMkRate);
+  const avgPct = validPct.length ? validPct.reduce((a, b) => a + b, 0) / validPct.length : null;
+  const avgRate = validRate.length ? validRate.reduce((a, b) => a + b, 0) / validRate.length : null;
+  const regionXs = storeData.filter(s => s.overallPct !== null && s.overallMkRate !== null).map(s => s.overallPct);
+  const regionYs = storeData.filter(s => s.overallPct !== null && s.overallMkRate !== null).map(s => s.overallMkRate);
+  const regionR = nm9Pearson(regionXs, regionYs);
+
+  const elCount = document.getElementById('nm9StoreCount');
+  const elAvgPct = document.getElementById('nm9AvgPct');
+  const elAvgRate = document.getElementById('nm9AvgRate');
+  const elR = document.getElementById('nm9RegionR');
+  if (elCount) elCount.textContent = storeData.length + '개';
+  if (elAvgPct) elAvgPct.textContent = avgPct !== null ? avgPct.toFixed(2) + '%' : '-';
+  if (elAvgRate) elAvgRate.textContent = avgRate !== null ? avgRate + '%' : '-';
+  if (elR) {
+    const rl = nm9RLabel(regionR);
+    elR.textContent = rl.text;
+    elR.style.color = rl.color;
+  }
+
+  // ── 매장별 비교 차트 ──
+  const chartCanvas = document.getElementById('nm9CompareChart');
+  if (chartCanvas) {
+    if (nm9CompareChartInst) { try { nm9CompareChartInst.destroy(); } catch (e) {} }
+    const labels = storeData.map(s => s.name);
+    const pctData = storeData.map(s => s.overallPct !== null ? Math.round(s.overallPct * 100) / 100 : 0);
+    const rateData = storeData.map(s => s.overallMkRate !== null ? s.overallMkRate : 0);
+    const wrap = chartCanvas.parentElement;
+    if (wrap) wrap.style.height = Math.max(240, labels.length * 34) + 'px';
+    nm9CompareChartInst = new Chart(chartCanvas, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: '신메뉴 비중(%)', data: pctData, backgroundColor: '#a78bfaaa', borderRadius: 4 },
+          { label: '마케팅 참여율(%)', data: rateData, backgroundColor: '#38bdf8aa', borderRadius: 4 }
+        ]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { left: 4, right: 34 } },
+        plugins: {
+          legend: { position: 'top', labels: { color: '#c8dff0', font: { size: 10 }, boxWidth: 10 } },
+          tooltip: { callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.x}%` } },
+          datalabels: {
+            color: '#e0f0ff',
+            anchor: 'end',
+            align: 'right',
+            font: { size: 9, weight: 700 },
+            formatter: (v) => v > 0 ? v + '%' : ''
+          }
+        },
+        scales: {
+          x: { ticks: { color: '#9fc1de', font: { size: 9 }, callback: v => v + '%' }, grid: { color: '#1e3347' } },
+          y: { ticks: { color: '#e0f0ff', font: { size: 11, weight: '600' }, autoSkip: false }, grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  // ── 매장별 상세 표(펼치기) ──
+  const tableEl = document.getElementById('nm9Table');
+  if (tableEl) {
+    if (!storeData.length) {
+      tableEl.innerHTML = '<div style="text-align:center;color:#4a6070;font-size:12px;padding:30px 0;">해당 지역에 매장 데이터가 없습니다.</div>';
+      return;
+    }
+    let html = `<table style="width:100%;border-collapse:collapse;font-size:11.5px;">
+      <thead><tr style="border-bottom:1px solid #1e3347;">
+        <th style="text-align:left;padding:6px 8px;color:#6b8fa8;font-weight:600;">매장</th>
+        <th style="text-align:right;padding:6px 8px;color:#a78bfa;font-weight:600;">신메뉴 비중</th>
+        <th style="text-align:right;padding:6px 8px;color:#38bdf8;font-weight:600;">마케팅 참여율</th>
+        <th style="text-align:left;padding:6px 8px;color:#6b8fa8;font-weight:600;">상관관계(월별)</th>
+        <th style="text-align:left;padding:6px 8px;color:#6b8fa8;font-weight:600;">진단</th>
+      </tr></thead><tbody>`;
+    storeData.forEach((s, i) => {
+      const rl = nm9RLabel(s.r);
+      const dg = nm9Diagnosis(s.overallPct, s.overallMkRate, avgPct, avgRate);
+      const pctBar = s.overallPct !== null ? Math.min(100, s.overallPct * 4) : 0; // 시각화용 스케일(0~25%를 꽉 채움)
+      const rateBar = s.overallMkRate !== null ? s.overallMkRate : 0;
+      html += `<tr style="border-bottom:1px solid #16283b;cursor:pointer;" onclick="nm9ToggleDetail(${i})">
+        <td style="padding:6px 8px;color:#e0f0ff;font-weight:700;">▸ ${s.name}</td>
+        <td style="text-align:right;padding:6px 8px;color:#c8dff0;">
+          <div>${s.overallPct !== null ? s.overallPct.toFixed(2) + '%' : '-'}</div>
+          <div style="height:5px;background:#1e3347;border-radius:3px;margin-top:3px;overflow:hidden;"><div style="height:100%;width:${pctBar}%;background:#a78bfa;"></div></div>
+        </td>
+        <td style="text-align:right;padding:6px 8px;color:#c8dff0;">
+          <div>${s.overallMkRate !== null ? s.overallMkRate + '%' : '-'}</div>
+          <div style="height:5px;background:#1e3347;border-radius:3px;margin-top:3px;overflow:hidden;"><div style="height:100%;width:${rateBar}%;background:#38bdf8;"></div></div>
+        </td>
+        <td style="padding:6px 8px;color:${rl.color};font-weight:700;">${rl.text}</td>
+        <td style="padding:6px 8px;color:${dg.color};font-weight:700;">${dg.text}</td>
+      </tr>
+      <tr id="nm9Detail-${i}" style="display:none;background:#0f2133;">
+        <td colspan="5" style="padding:10px 14px;">
+          <table style="width:100%;border-collapse:collapse;font-size:10.5px;">
+            <thead><tr style="color:#6b8fa8;">
+              <th style="text-align:left;padding:4px 6px;">월</th>
+              <th style="text-align:right;padding:4px 6px;">신메뉴 비중</th>
+              <th style="text-align:right;padding:4px 6px;">신메뉴(${unit})</th>
+              <th style="text-align:right;padding:4px 6px;">전체(${unit})</th>
+              <th style="text-align:right;padding:4px 6px;">마케팅 참여율</th>
+            </tr></thead>
+            <tbody>
+              ${s.monthlyDetail.map(d => `<tr style="border-top:1px solid #16283b;">
+                <td style="padding:4px 6px;color:#c8dff0;">${d.month}월</td>
+                <td style="text-align:right;padding:4px 6px;color:#a78bfa;">${d.pct !== null ? d.pct.toFixed(2) + '%' : '-'}</td>
+                <td style="text-align:right;padding:4px 6px;color:#c8dff0;">${Math.round(d.newSum).toLocaleString()}</td>
+                <td style="text-align:right;padding:4px 6px;color:#6b8fa8;">${Math.round(d.total).toLocaleString()}</td>
+                <td style="text-align:right;padding:4px 6px;color:#38bdf8;">${d.rate !== null ? d.rate + '%' : '-'}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    tableEl.innerHTML = html;
+  }
+}
+
+window.nm9ToggleDetail = function (i) {
+  const row = document.getElementById('nm9Detail-' + i);
+  if (!row) return;
+  row.style.display = row.style.display === 'none' ? '' : 'none';
+};
+
 // ── 쑥 주차별 추이 (3월~5월, 사용자 제공 수량 데이터) ──
 const MUGWORT_WEEKLY_DATA = [
   { label: '3월 1주', qty: { '쑥 호두과자': 1038, '쑥&앙버터 호두과자': 1857, '복호두 선물세트(쑥)': 136, '답례품(쑥 호두과자)': 76, '답례품(쑥&앙버터 호두과자)': 350 } },
@@ -7643,6 +7965,7 @@ const MENU_ANALYSIS_TAB_LABELS = {
   6: '신메뉴 포지션',
   7: '기본+신메뉴 카니발리즘',
   8: '지역별 신메뉴',
+  9: '지역별 신메뉴 마케팅 분석',
   11: '카테고리 비중'
 };
 let currentMenuAnalysisTab = 1;
@@ -7671,8 +7994,9 @@ function switchMenuAnalysisSubtab(n) {
   document.getElementById('maTab-6').style.display = n === 6 ? '' : 'none';
   document.getElementById('maTab-7').style.display = n === 7 ? '' : 'none';
   document.getElementById('maTab-8').style.display = n === 8 ? '' : 'none';
+  document.getElementById('maTab-9').style.display = n === 9 ? '' : 'none';
   document.getElementById('maTab-11').style.display = n === 11 ? '' : 'none';
-  document.getElementById('maTab-placeholder').style.display = (n !== 1 && n !== 2 && n !== 3 && n !== 4 && n !== 5 && n !== 6 && n !== 7 && n !== 8 && n !== 11) ? '' : 'none';
+  document.getElementById('maTab-placeholder').style.display = (n !== 1 && n !== 2 && n !== 3 && n !== 4 && n !== 5 && n !== 6 && n !== 7 && n !== 8 && n !== 9 && n !== 11) ? '' : 'none';
 
   if (n === 1) {
     renderMenuAnalysisTotalChart();
@@ -7699,6 +8023,9 @@ function switchMenuAnalysisSubtab(n) {
   } else if (n === 8) {
     renderNewMenuRegionMetricToggle();
     renderNewMenuRegionTab();
+  } else if (n === 9) {
+    renderNm9MetricToggle();
+    renderNewMenuMarketingTab();
   } else if (n === 11) {
     renderMenuAnalysisChart();
     renderMenuAnalysisBarChart();
