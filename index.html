@@ -7165,6 +7165,8 @@ function nm9RLabel(res) {
 // "신메뉴 비중이 높다" = 10% 이상, "마케팅 참여가 활발하다" = 80% 이상 — 지역 평균과 무관하게 실제 의미 있는 절대 기준
 const NM9_PCT_THRESHOLD = 10;
 const NM9_RATE_THRESHOLD = 80;
+const NM9_RATE_LOW_THRESHOLD = 20;   // 마케팅 참여율이 이 밑이면 신메뉴 비중과 무관하게 "마케팅 없이도 매출 상승"으로 판정
+const NM9_RATE_POOR_THRESHOLD = 70;  // 마케팅 참여율이 이 이상인데 매출이 빠지면 신메뉴 비중과 무관하게 "참여 대비 성과 미흡"으로 판정
 function nm9Diagnosis(pct, rate, avgPct, avgRate, yoy) {
   if (pct === null) return { text: '신메뉴 판매 없음', color: '#4a6070' };
   if (rate === null) return { text: '마케팅 데이터 없음', color: '#4a6070' };
@@ -7174,6 +7176,10 @@ function nm9Diagnosis(pct, rate, avgPct, avgRate, yoy) {
   const hasYoy = yoy !== undefined && yoy !== null;
   const salesUp = hasYoy && yoy > 0;
   const salesDown = hasYoy && yoy < 0;
+
+  // 마케팅 참여율 기준 우선 판정 (신메뉴 비중이 높아도 마케팅을 거의 안 했거나, 반대로 마케팅을 많이 했으면 이 기준을 우선 적용)
+  if (rate < NM9_RATE_LOW_THRESHOLD && salesUp) return { text: '🔵 마케팅 없이도 매출 상승', color: '#38bdf8' };
+  if (rate >= NM9_RATE_POOR_THRESHOLD && salesDown) return { text: '🟠 참여 대비 매출 성과 미흡', color: '#f0a04a' };
 
   if (highPct && highRate) {
     if (salesUp) return { text: '🟢 시너지 우수 (매출도 상승)', color: '#3db87a' };
