@@ -7191,7 +7191,9 @@ function nm9Diagnosis(pct, rate, avgPct, avgRate, yoy) {
     if (salesDown) return { text: '🟠 참여 대비 매출 성과 미흡', color: '#f0a04a' };
     return highPct ? { text: '🟡 마케팅 강화 여지', color: '#facc15' } : { text: '🟠 참여 대비 효과 저조', color: '#f0a04a' };
   }
-  if (salesUp) return { text: '🔵 마케팅 없이도 매출 상승', color: '#38bdf8' };
+  // 여기 도달했다는 건 highPct(10%↑) 아니고 highRate(80%↑)도 아니라는 뜻.
+  // salesUp인 경우 rate<20%는 위 우선 판정에서 이미 걸러졌으므로, 남은 건 20~80% 구간(애매하게 병행한 경우) 뿐.
+  if (salesUp) return { text: '🟣 마케팅 병행 중 매출 상승', color: '#a78bfa' };
   if (salesDown) return { text: '🔴 관리 필요 (매출도 하락)', color: '#e05555' };
   return { text: '🔴 관리 필요', color: '#e05555' };
 }
