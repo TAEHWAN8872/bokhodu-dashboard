@@ -1179,7 +1179,7 @@ body.hide-names .store-name:hover{
               <div id="nm9AvgRate" style="font-size:17px;font-weight:700;color:#38bdf8;">-</div>
             </div>
             <div style="flex:1;min-width:130px;background:#132537;border:0.5px solid #1e3347;border-radius:10px;padding:14px 16px;">
-              <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">지역 평균 매출 YoY(2~7월)</div>
+              <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">지역 평균 매출 전년대비 증감(2~7월)</div>
               <div id="nm9AvgYoY" style="font-size:17px;font-weight:700;color:#f0a04a;">-</div>
             </div>
           </div>
@@ -1189,15 +1189,15 @@ body.hide-names .store-name:hover{
               <div id="nm9RegionR" style="font-size:15px;font-weight:700;color:#facc15;">-</div>
             </div>
             <div style="flex:1;min-width:170px;background:#132537;border:0.5px solid #1e3347;border-radius:10px;padding:14px 16px;">
-              <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">신메뉴 비중 ↔ 매출 YoY 상관관계</div>
+              <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">신메뉴 비중 ↔ 매출 전년대비 증감 상관관계</div>
               <div id="nm9RegionR2" style="font-size:15px;font-weight:700;color:#a78bfa;">-</div>
             </div>
             <div style="flex:1;min-width:170px;background:#132537;border:0.5px solid #1e3347;border-radius:10px;padding:14px 16px;">
-              <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">마케팅 참여율 ↔ 매출 YoY 상관관계</div>
+              <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">마케팅 참여율 ↔ 매출 전년대비 증감 상관관계</div>
               <div id="nm9RegionR3" style="font-size:15px;font-weight:700;color:#38bdf8;">-</div>
             </div>
           </div>
-          <div style="font-size:10.5px;color:#5f7d95;margin-bottom:16px;">💡 신메뉴 비중·마케팅 참여율이 높아도 실제 매출(전년 대비)이 오르지 않았다면 캠페인 효과를 다시 봐야 합니다. 매출 YoY는 2~7월 합산 매출을 25년 동일 기간과 비교한 값이며, 25년 매출 데이터가 없는 신규 매장은 제외됩니다.</div>
+          <div style="font-size:10.5px;color:#5f7d95;margin-bottom:16px;">💡 신메뉴 비중·마케팅 참여율이 높아도 실제 매출(전년 대비)이 오르지 않았다면 캠페인 효과를 다시 봐야 합니다. 매출 전년대비 증감률은 2~7월 합산 매출을 25년 동일 기간과 비교한 값이며, 25년 매출 데이터가 없는 신규 매장은 제외됩니다.</div>
 
           <!-- 지역 내 캠페인별 진행 현황 -->
           <div style="margin-bottom:22px;">
@@ -7259,7 +7259,7 @@ function renderNewMenuMarketingTab() {
   const regionXs = storeData.filter(s => s.overallPct !== null && s.overallMkRate !== null).map(s => s.overallPct);
   const regionYs = storeData.filter(s => s.overallPct !== null && s.overallMkRate !== null).map(s => s.overallMkRate);
   const regionR = nm9Pearson(regionXs, regionYs);
-  // 신메뉴 비중 ↔ 매출 YoY, 마케팅 참여율 ↔ 매출 YoY 상관관계 — "신메뉴/마케팅을 열심히 한 게 실제 매출로 이어졌는가"를 보기 위한 지표
+  // 신메뉴 비중 ↔ 매출 전년대비 증감, 마케팅 참여율 ↔ 매출 전년대비 증감 상관관계 — "신메뉴/마케팅을 열심히 한 게 실제 매출로 이어졌는가"를 보기 위한 지표
   const pctYoyXs = storeData.filter(s => s.overallPct !== null && s.overallYoY !== null).map(s => s.overallPct);
   const pctYoyYs = storeData.filter(s => s.overallPct !== null && s.overallYoY !== null).map(s => s.overallYoY);
   const rateYoyXs = storeData.filter(s => s.overallMkRate !== null && s.overallYoY !== null).map(s => s.overallMkRate);
@@ -7347,7 +7347,7 @@ function renderNewMenuMarketingTab() {
         datasets: [
           { label: '신메뉴 비중(%)', data: pctData, backgroundColor: '#a78bfaaa', borderRadius: 4 },
           { label: '마케팅 참여율(%)', data: rateData, backgroundColor: '#38bdf8aa', borderRadius: 4 },
-          { label: '매출 YoY(%)', data: yoyData, backgroundColor: '#f0a04aaa', borderRadius: 4 }
+          { label: '매출 전년대비(%)', data: yoyData, backgroundColor: '#f0a04aaa', borderRadius: 4 }
         ]
       },
       options: {
@@ -7357,13 +7357,13 @@ function renderNewMenuMarketingTab() {
         layout: { padding: { left: 4, right: 34 } },
         plugins: {
           legend: { position: 'top', labels: { color: '#c8dff0', font: { size: 10 }, boxWidth: 10 } },
-          tooltip: { callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.x > 0 && ctx.dataset.label.includes('YoY') ? '+' : ''}${ctx.parsed.x}%` } },
+          tooltip: { callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.x > 0 && ctx.dataset.label.includes('전년대비') ? '+' : ''}${ctx.parsed.x}%` } },
           datalabels: {
             color: '#e0f0ff',
             anchor: 'end',
             align: 'right',
             font: { size: 9, weight: 700 },
-            formatter: (v, ctx) => v === 0 ? '' : (v > 0 && ctx.dataset.label.includes('YoY') ? '+' : '') + v + '%'
+            formatter: (v, ctx) => v === 0 ? '' : (v > 0 && ctx.dataset.label.includes('전년대비') ? '+' : '') + v + '%'
           }
         },
         scales: {
@@ -7386,7 +7386,7 @@ function renderNewMenuMarketingTab() {
         <th style="text-align:left;padding:6px 8px;color:#6b8fa8;font-weight:600;">매장</th>
         <th style="text-align:right;padding:6px 8px;color:#a78bfa;font-weight:600;">신메뉴 비중</th>
         <th style="text-align:right;padding:6px 8px;color:#38bdf8;font-weight:600;">마케팅 참여율</th>
-        <th style="text-align:right;padding:6px 8px;color:#f0a04a;font-weight:600;">매출 YoY(2~7월)</th>
+        <th style="text-align:right;padding:6px 8px;color:#f0a04a;font-weight:600;">매출 전년대비(2~7월)</th>
         <th style="text-align:left;padding:6px 8px;color:#6b8fa8;font-weight:600;">상관관계(월별)</th>
         <th style="text-align:left;padding:6px 8px;color:#6b8fa8;font-weight:600;">진단</th>
       </tr></thead><tbody>`;
@@ -7421,7 +7421,7 @@ function renderNewMenuMarketingTab() {
               <th style="text-align:right;padding:4px 6px;">마케팅 참여율</th>
               <th style="text-align:right;padding:4px 6px;">매출(26년)</th>
               <th style="text-align:right;padding:4px 6px;">매출(25년)</th>
-              <th style="text-align:right;padding:4px 6px;">YoY</th>
+              <th style="text-align:right;padding:4px 6px;">전년대비</th>
               <th style="text-align:left;padding:4px 6px;">진행한 마케팅</th>
             </tr></thead>
             <tbody>
@@ -8144,7 +8144,7 @@ async function onMenuAnalysisClick() {
   document.getElementById('menuAnalysisView').style.display = '';
 
   renderMenuAnalysisSubtabs();
-  switchMenuAnalysisSubtab(currentMenuAnalysisTab || 1);
+  switchMenuAnalysisSubtab(1);
 }
 
 // ── 메뉴 분석 세부 탭 (1~11번) ──
