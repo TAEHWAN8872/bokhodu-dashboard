@@ -1197,7 +1197,7 @@ body.hide-names .store-name:hover{
               <div id="nm9RegionR3" style="font-size:15px;font-weight:700;color:#38bdf8;">-</div>
             </div>
           </div>
-          <div style="font-size:10.5px;color:#5f7d95;margin-bottom:16px;">💡 신메뉴 비중·마케팅 참여율이 높아도 실제 매출(전년 대비)이 오르지 않았다면 캠페인 효과를 다시 봐야 합니다. 매출 전년대비 증감률은 2~7월 합산 매출을 25년 동일 기간과 비교한 값이며, 25년 매출 데이터가 없는 신규 매장은 제외됩니다.</div>
+          <div style="font-size:10.5px;color:#5f7d95;margin-bottom:16px;">💡 신메뉴 비중·마케팅 참여율이 높아도 실제 매출(전년 대비)이 오르지 않았다면 캠페인 효과를 다시 봐야 합니다. 매출 전년대비 증감률은 2~7월 합산 매출을 25년 동일 기간과 비교한 값이며, 25년 매출 데이터가 없는 신규 매장은 제외됩니다. 진단은 신메뉴 비중 10% 이상, 마케팅 참여율 80% 이상을 "활발함"의 기준으로 판단합니다.</div>
 
           <!-- 지역 내 캠페인별 진행 현황 -->
           <div style="margin-bottom:22px;">
@@ -7162,12 +7162,15 @@ function nm9RLabel(res) {
   if (r > -0.5) return { text: `${r.toFixed(2)} · 약한 음의 상관`, color: '#f0a04a' };
   return { text: `${r.toFixed(2)} · 강한 음의 상관`, color: '#e05555' };
 }
+// "신메뉴 비중이 높다" = 10% 이상, "마케팅 참여가 활발하다" = 80% 이상 — 지역 평균과 무관하게 실제 의미 있는 절대 기준
+const NM9_PCT_THRESHOLD = 10;
+const NM9_RATE_THRESHOLD = 80;
 function nm9Diagnosis(pct, rate, avgPct, avgRate, yoy) {
   if (pct === null) return { text: '신메뉴 판매 없음', color: '#4a6070' };
   if (rate === null) return { text: '마케팅 데이터 없음', color: '#4a6070' };
-  const highPct = avgPct !== null && pct >= avgPct;
-  const highRate = avgRate !== null && rate >= avgRate;
-  const active = highPct || highRate; // 신메뉴 비중, 마케팅 참여율 중 하나라도 평균 이상
+  const highPct = pct >= NM9_PCT_THRESHOLD;
+  const highRate = rate >= NM9_RATE_THRESHOLD;
+  const active = highPct || highRate; // 신메뉴 비중, 마케팅 참여율 중 하나라도 기준치 이상
   const hasYoy = yoy !== undefined && yoy !== null;
   const salesUp = hasYoy && yoy > 0;
   const salesDown = hasYoy && yoy < 0;
