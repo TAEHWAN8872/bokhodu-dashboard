@@ -6381,27 +6381,93 @@ function computeNewMenuMonthly(matchFn) {
   return { monthly, pct };
 }
 
-// 메뉴 데이터의 매장명(예: "부산명지점") → ALL 매출데이터 기준 지역(region) 조회
-// ALL 쪽 매장명은 "복호두 부산 명지점"처럼 표기가 달라 공백/접두어를 제거하고 매칭한다.
-function __normalizeStoreNameForRegionMatch(name){
-  if(!name) return '';
-  return String(name)
-    .replace(/^\(폐점\)/, '')
-    .replace(/복호두\s*/g, '')
-    .replace(/\s+/g, '')
-    .trim();
+// 아래는 사용자가 제공한 원본 파일에서 그대로 가져온 실제 단가/분류/지역/담당자 조회 로직입니다.
+const PRICE_MAP = {
+  '레드벨벳 호두과자': 13000,
+  '복호두 선물세트(레드벨벳)': 25900,
+  '앙버터/레드벨벳(20개)': 12000,
+  '팥 20개': 8000,
+  '앙버터 20개': 10000,
+  '팥/앙버터(20개)': 9500,
+  '레몬버터 20개': 11000,
+  '팥/레몬버터(20개)': 10000,
+  '앙버터/레몬버터(20개)': 11000,
+  '딸기버터 호두과자': 13000,
+  '팥앙금/딸기버터 호두과자': 11000,
+  '앙버터/딸기버터 호두과자': 12000,
+  '레몬버터/딸기버터 호두과자': 12500,
+  '청사과 호두과자': 13000,
+  '팥/청사과 호두과자': 11000,
+  '앙버터/청사과 호두과자': 12000,
+  '레몬버터/청사과 호두과자': 12500,  
+  '넛티 요거트 볼': 7900,
+  '복호두 선물세트(앙버터)': 23900,
+  '복호두 선물세트(딸기버터)': 25900,
+  '복호두 선물세트(쑥)': 25900,
+  '(신)선물세트(호두정과)': 24900,
+  '(신)선물세트(그래놀라)': 24700,
+  '(신)딸기 선물세트(그래놀라)': 24700,
+  '(신)앙버터 선물세트(그래놀라)': 23700,
+  '(신)청사과 선물세트(그래놀라)': 24700,
+  '(신)청사과 선물세트(호두정과)': 24900,  
+  '쑥 호두과자': 13000,
+  '쑥&앙버터 호두과자': 12000,
+  '호두육포': 6000,
+  '행복식혜': 3000,
+  '호두강정': 5500,
+  '(신)복 호두정과': 5000,
+  '(신)복 호두육포': 6000,
+  '(신)복 그래놀라': 4800,
+  '(신) 행복식혜': 1800,
+  '치즈육포': 7000,
+  '답례품(딸기)': 6500,
+  '답례품(레몬/딸기)': 6100,
+  '답례품(앙버터/딸기)': 5800,
+  '답례품(팥/딸기)': 5300,
+  '답례품(팥앙금)': 4000,
+  '답례품(팥/앙버터)': 4500,
+  '답례품(앙버터)': 5000,
+  '답례품(팥/레몬)': 4800,
+  '답례품(앙버터/레몬)': 5300,
+  '답례품(레몬)': 5500,
+  '답례품(쑥 호두과자)': 6500,
+  '답례품(쑥&앙버터 호두과자)': 5800,
+  '답례품(청사과)': 6500,
+  '답례품(팥/청사과)': 5300,
+  '답례품(앙버터/청사과)': 5800,
+  '답례품(레몬/청사과)': 6100,
+  '콜드브루 아메리카노(ICE)': 3000,
+  '콜드브루 라떼(ICE)': 4000,
+  '팥 밀크티(ICE)': 3500,
+  '팥 간식용 11개': 4000,
+  '복호두 선물세트(앙버터)  ': 23900,
+  '복호두 선물세트(딸기버터) ': 25900,
+  '답례품(레드벨벳)': 6000,
+  '답례품(앙버터/레드벨벳)': 5500,
+  '(신) 앙버터 선물세트(호두정과)': 23900,
+};
+
+// 상품분류 판별
+function getCategory(상품명) {
+  if (['행복식혜','호두강정','호두육포','치즈육포','(신) 행복식혜','넛티 요거트 볼','콜드브루 아메리카노(ICE)','콜드브루 라떼(ICE)','(신)복 호두정과','(신)복 호두육포','(신)복 그래놀라','팥 밀크티(ICE)'].includes(상품명)) return '사이드';
+  if (상품명.includes('답례품')) return '답례품';
+  return '호두과자';
 }
-function getRegionForStore(storeName){
-  if(!window.__menuRegionMap){
-    window.__menuRegionMap = {};
-    (window.ALL || (typeof ALL !== 'undefined' ? ALL : [])).forEach(b=>{
-      window.__menuRegionMap[__normalizeStoreNameForRegionMatch(b.name)] = b.region || null;
-    });
-  }
-  const key = __normalizeStoreNameForRegionMatch(storeName);
-  return window.__menuRegionMap.hasOwnProperty(key) ? window.__menuRegionMap[key] : null;
+
+// 매장의 지역 찾기
+const STORE_REGION_OVERRIDE = {
+  '파주운정점': '경기',
+  '잠실석촌고분역점': '서울',
+};
+function getRegionForStore(storeName) {
+  if (STORE_REGION_OVERRIDE[storeName]) return STORE_REGION_OVERRIDE[storeName];
+  const found = ALL.find(b => b.name === storeName);
+  return found ? found.region : null;
 }
-window.getRegionForStore = getRegionForStore;
+function getManagerForStore(storeName) {
+  const found = ALL.find(b => b.name === storeName);
+  return found ? found.manager : '-';
+}
 
 function computeNewMenuRegional(matchFn, monthFilter) {
   const rows = monthFilter ? (MENU_DATA_BY_MONTH[monthFilter] || []) : (MENU_DATA_BY_MONTH[0] || []);
