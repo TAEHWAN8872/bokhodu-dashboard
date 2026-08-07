@@ -1153,6 +1153,14 @@ body.hide-names .store-name:hover{
           </div>
           <div style="font-size:10.5px;color:#5f7d95;margin-bottom:12px;">지역을 선택하면 그 지역 매장별로 신메뉴(레드벨벳·쑥·청사과) 판매 비중과 마케팅 참여율을 함께 비교하고, 둘 사이의 상관관계를 확인할 수 있습니다.</div>
 
+          <!-- 잠금 화면 -->
+          <div id="nm9LockScreen" style="display:none;text-align:center;padding:70px 0;color:#4a6070;">
+            <div style="font-size:32px;margin-bottom:10px;">🔒</div>
+            <div style="font-size:13px;color:#9fc1de;font-weight:700;margin-bottom:4px;">비밀번호가 필요한 탭입니다</div>
+            <div style="font-size:11.5px;color:#4a6070;">다시 클릭해서 비밀번호를 입력해주세요.</div>
+          </div>
+
+          <div id="nm9Content" style="display:none;">
           <!-- 지역 탭 -->
           <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;align-items:center;" id="nm9RegionTabs"></div>
 
@@ -1194,6 +1202,7 @@ body.hide-names .store-name:hover{
           <div style="padding-top:16px;border-top:0.5px solid #1e3347;">
             <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:6px;">📋 매장별 상세 — 행을 클릭하면 월별(2~7월) 신메뉴 비중·마케팅 참여 내역을 볼 수 있어요</div>
             <div id="nm9Table" style="overflow-x:auto;"></div>
+          </div>
           </div>
         </div>
 
@@ -7126,6 +7135,26 @@ function nm9Diagnosis(pct, rate, avgPct, avgRate) {
 }
 
 let nm9CompareChartInst = null;
+// 9번 탭(지역별 신메뉴 마케팅 분석) 비밀번호 잠금 — 탭 클릭할 때마다 매번 확인
+const NM9_PASSWORD = '01064824872';
+function checkNm9AccessAndRender() {
+  const lockEl = document.getElementById('nm9LockScreen');
+  const contentEl = document.getElementById('nm9Content');
+  const toggleEl = document.getElementById('nm9MetricToggle');
+  const input = window.prompt('🔒 비밀번호를 입력하세요');
+  if (input === NM9_PASSWORD) {
+    if (lockEl) lockEl.style.display = 'none';
+    if (contentEl) contentEl.style.display = '';
+    if (toggleEl) toggleEl.style.display = '';
+    renderNm9MetricToggle();
+    renderNewMenuMarketingTab();
+  } else {
+    if (input !== null) window.alert('비밀번호가 올바르지 않습니다.');
+    if (lockEl) lockEl.style.display = '';
+    if (contentEl) contentEl.style.display = 'none';
+    if (toggleEl) toggleEl.style.display = 'none';
+  }
+}
 function renderNewMenuMarketingTab() {
   renderNm9RegionTabs();
   const region = nm9Region;
@@ -8088,8 +8117,7 @@ function switchMenuAnalysisSubtab(n) {
     renderNewMenuRegionMetricToggle();
     renderNewMenuRegionTab();
   } else if (n === 9) {
-    renderNm9MetricToggle();
-    renderNewMenuMarketingTab();
+    checkNm9AccessAndRender();
   } else if (n === 11) {
     renderMenuAnalysisChart();
     renderMenuAnalysisBarChart();
