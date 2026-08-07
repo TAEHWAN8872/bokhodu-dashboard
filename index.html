@@ -1094,7 +1094,58 @@ body.hide-names .store-name:hover{
           </div>
         </div>
 
-        <!-- 8~10번 탭: 준비중 -->
+        <!-- 8번 탭: 지역별 신메뉴(레드벨벳/쑥/청사과) 비중 -->
+        <div id="maTab-8" class="ma-tab-panel" style="display:none;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
+            <div style="font-size:12px;color:#7eb8e8;font-weight:700;">🗺️ 지역별 신메뉴 — 레드벨벳 · 쑥 · 청사과</div>
+            <div id="nmRegionMetricToggle" style="display:flex;gap:4px;"></div>
+          </div>
+          <div style="font-size:10.5px;color:#5f7d95;margin-bottom:16px;">신메뉴 3종(레드벨벳·쑥·청사과)의 판매수량·매출액이 지역별 전체 매출에서 차지하는 비중을 한눈에 확인합니다.</div>
+
+          <!-- 요약 카드 + 전국 신메뉴 구성비 -->
+          <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch;margin-bottom:20px;">
+            <div style="flex:1;min-width:140px;background:#132537;border:0.5px solid #1e3347;border-radius:10px;padding:14px 16px;">
+              <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">전체 매출(전사)</div>
+              <div id="nmRegionTotalAll" style="font-size:17px;font-weight:700;color:#e0f0ff;">-</div>
+            </div>
+            <div style="flex:1;min-width:140px;background:#132537;border:0.5px solid #1e3347;border-radius:10px;padding:14px 16px;">
+              <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">신메뉴 매출(전사)</div>
+              <div id="nmRegionTotalNew" style="font-size:17px;font-weight:700;color:#a78bfa;">-</div>
+            </div>
+            <div style="flex:1;min-width:140px;background:#132537;border:0.5px solid #1e3347;border-radius:10px;padding:14px 16px;">
+              <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">전사 신메뉴 비중</div>
+              <div id="nmRegionTotalPct" style="font-size:17px;font-weight:700;color:#facc15;">-</div>
+            </div>
+            <div style="flex:0 0 220px;min-width:200px;background:#132537;border:0.5px solid #1e3347;border-radius:10px;padding:12px 14px;display:flex;gap:10px;align-items:center;">
+              <div style="position:relative;width:78px;height:78px;flex-shrink:0;"><canvas id="nmRegionFlavorDonut"></canvas></div>
+              <div id="nmRegionFlavorDonutLegend" style="font-size:10.5px;color:#c8dff0;line-height:1.9;"></div>
+            </div>
+          </div>
+
+          <!-- 지역별 신메뉴 비중(%) 막대 -->
+          <div style="margin-bottom:22px;">
+            <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:10px;">📊 지역별 매출 대비 신메뉴 비중(%) — 그 지역 전체 매출 중 신메뉴가 차지하는 비율</div>
+            <div style="position:relative;height:280px;">
+              <canvas id="nmRegionShareChart"></canvas>
+            </div>
+          </div>
+
+          <!-- 지역별 신메뉴 구성(레드벨벳/쑥/청사과) 스택 막대 -->
+          <div style="margin-bottom:22px;padding-top:16px;border-top:0.5px solid #1e3347;">
+            <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:10px;">🧩 지역별 신메뉴 구성 — 레드벨벳 · 쑥 · 청사과</div>
+            <div style="position:relative;height:280px;">
+              <canvas id="nmRegionStackChart"></canvas>
+            </div>
+          </div>
+
+          <!-- 지역별 상세 수치 표 -->
+          <div style="padding-top:16px;border-top:0.5px solid #1e3347;">
+            <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:12px;">📋 지역별 상세 수치</div>
+            <div id="nmRegionTable" style="overflow-x:auto;"></div>
+          </div>
+        </div>
+
+        <!-- 9~10번 탭: 준비중 -->
         <div id="maTab-placeholder" class="ma-tab-panel" style="display:none;">
           <div style="text-align:center;color:#4a6070;font-size:13px;padding:60px 0;">🚧 준비 중인 분석 탭입니다.</div>
         </div>
@@ -6649,6 +6700,254 @@ function renderNewMenuRegionChart(canvasId, color, matchFn, monthFilter) {
   });
 }
 
+// ── 8번 탭: 지역별 신메뉴(레드벨벳/쑥/청사과) 비중 ──
+let nmRegionMetric = 'qty'; // 'qty'(수량) | 'amt'(금액) — 6번 탭 토글과 별개로 독립 운영
+
+function renderNewMenuRegionMetricToggle() {
+  const el = document.getElementById('nmRegionMetricToggle');
+  if (!el) return;
+  const opts = [{ v: 'qty', l: '수량 기준' }, { v: 'amt', l: '금액 기준' }];
+  el.innerHTML = opts.map(o =>
+    `<div class="analysis-tab${nmRegionMetric === o.v ? ' active' : ''}" onclick="setNewMenuRegionMetric('${o.v}')">${o.l}</div>`
+  ).join('');
+}
+
+function setNewMenuRegionMetric(mode) {
+  nmRegionMetric = mode;
+  renderNewMenuRegionMetricToggle();
+  renderNewMenuRegionTab();
+}
+
+// 상품명이 신메뉴 3종 중 어떤 것에 해당하는지 판별(콤보 상품명 포함, 전량 귀속)
+function nmRegionSubKeyFor(name) {
+  const subs = Object.keys(NEW_MENU_SUB_KEYWORDS);
+  return subs.find(s => NEW_MENU_SUB_KEYWORDS[s].some(kw => name.includes(kw))) || null;
+}
+
+// 지역별: 전체 매출(선택 지표 기준), 신메뉴 합계, 신메뉴 3종 세부값을 한 번에 집계
+function computeRegionalNewMenuData() {
+  const regions = (window.__regionList || []).filter(r => r && r !== 'all');
+  const data = {};
+  regions.forEach(r => { data[r] = { total: 0, newTotal: 0, sub: { '레드벨벳': 0, '쑥': 0, '청사과': 0 } }; });
+  const rows = MENU_DATA_BY_MONTH[0] || [];
+  rows.forEach(r => {
+    const qty = r['수량'] || 0;
+    if (qty <= 0) return;
+    const name = r['상품명'] || '';
+    const rg = getRegionForStore(r['매장']);
+    if (!rg || !data[rg]) return;
+    const val = nmRegionMetric === 'amt' ? qty * (PRICE_MAP[name] || 0) : qty;
+    data[rg].total += val;
+    const subKey = nmRegionSubKeyFor(name);
+    if (subKey) {
+      data[rg].newTotal += val;
+      data[rg].sub[subKey] += val;
+    }
+  });
+  return data;
+}
+
+let nmRegionShareChartInst = null;
+let nmRegionStackChartInst = null;
+let nmRegionFlavorDonutInst = null;
+
+function renderNewMenuRegionTab() {
+  const data = computeRegionalNewMenuData();
+  const unit = nmRegionMetric === 'amt' ? '원' : '개';
+
+  // ── 요약 카드 ──
+  let totalAll = 0, totalNew = 0;
+  const subTotals = { '레드벨벳': 0, '쑥': 0, '청사과': 0 };
+  Object.values(data).forEach(d => {
+    totalAll += d.total;
+    totalNew += d.newTotal;
+    Object.keys(subTotals).forEach(s => { subTotals[s] += d.sub[s]; });
+  });
+  const totalPct = totalAll ? (totalNew / totalAll * 100) : 0;
+  const elAll = document.getElementById('nmRegionTotalAll');
+  const elNew = document.getElementById('nmRegionTotalNew');
+  const elPct = document.getElementById('nmRegionTotalPct');
+  if (elAll) elAll.textContent = Math.round(totalAll).toLocaleString() + unit;
+  if (elNew) elNew.textContent = Math.round(totalNew).toLocaleString() + unit;
+  if (elPct) elPct.textContent = totalPct.toFixed(2) + '%';
+
+  // ── 전국 신메뉴 3종 구성비 도넛 ──
+  const donutCanvas = document.getElementById('nmRegionFlavorDonut');
+  if (donutCanvas) {
+    if (nmRegionFlavorDonutInst) { try { nmRegionFlavorDonutInst.destroy(); } catch (e) {} }
+    const subs = Object.keys(NEW_MENU_SUB_COLORS);
+    const subVals = subs.map(s => subTotals[s]);
+    nmRegionFlavorDonutInst = new Chart(donutCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: subs,
+        datasets: [{ data: subVals, backgroundColor: subs.map(s => NEW_MENU_SUB_COLORS[s]), borderColor: '#132537', borderWidth: 2 }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '62%',
+        plugins: {
+          legend: { display: false },
+          datalabels: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const v = ctx.parsed || 0;
+                const pct = totalNew ? (v / totalNew * 100) : 0;
+                return ` ${ctx.label}: ${Math.round(v).toLocaleString()}${unit} (${pct.toFixed(1)}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+    const legendEl = document.getElementById('nmRegionFlavorDonutLegend');
+    if (legendEl) {
+      legendEl.innerHTML = subs.map(s => {
+        const v = subTotals[s];
+        const pct = totalNew ? (v / totalNew * 100) : 0;
+        return `<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${NEW_MENU_SUB_COLORS[s]};margin-right:6px;"></span>${s} <b style="color:#e0f0ff;">${pct.toFixed(1)}%</b></div>`;
+      }).join('');
+    }
+  }
+
+  // ── 지역별 신메뉴 비중(%) 막대 ──
+  const shareCanvas = document.getElementById('nmRegionShareChart');
+  if (shareCanvas) {
+    if (nmRegionShareChartInst) { try { nmRegionShareChartInst.destroy(); } catch (e) {} }
+    const sorted = Object.entries(data)
+      .map(([region, d]) => [region, d.total, d.newTotal, d.total ? (d.newTotal / d.total * 100) : 0])
+      .sort((a, b) => b[3] - a[3]);
+    const labels = sorted.map(d => d[0]);
+    const pctValues = sorted.map(d => Math.round(d[3] * 100) / 100);
+    const wrap = shareCanvas.parentElement;
+    if (wrap) wrap.style.height = Math.max(240, labels.length * 26) + 'px';
+    nmRegionShareChartInst = new Chart(shareCanvas, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: '신메뉴 비중(%)', data: pctValues, backgroundColor: '#a78bfaaa', borderRadius: 4 }] },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { left: 4, right: 34 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const [, total, nw] = sorted[ctx.dataIndex];
+                return [
+                  ` 신메뉴 비중: ${ctx.parsed.x}%`,
+                  ` 신메뉴 ${Math.round(nw).toLocaleString()}${unit} / 전체 ${Math.round(total).toLocaleString()}${unit}`
+                ];
+              }
+            }
+          },
+          datalabels: {
+            color: '#e0f0ff',
+            anchor: 'end',
+            align: 'right',
+            font: { size: 10, weight: 700 },
+            formatter: (v) => v > 0 ? v + '%' : '0%'
+          }
+        },
+        scales: {
+          x: { ticks: { color: '#9fc1de', font: { size: 9 }, callback: v => v + '%' }, grid: { color: '#1e3347' } },
+          y: { ticks: { color: '#e0f0ff', font: { size: 12, weight: '600' }, autoSkip: false }, grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  // ── 지역별 신메뉴 구성(레드벨벳/쑥/청사과) 스택 막대 ──
+  const stackCanvas = document.getElementById('nmRegionStackChart');
+  if (stackCanvas) {
+    if (nmRegionStackChartInst) { try { nmRegionStackChartInst.destroy(); } catch (e) {} }
+    const sorted2 = Object.entries(data)
+      .map(([region, d]) => [region, d])
+      .sort((a, b) => b[1].newTotal - a[1].newTotal);
+    const labels2 = sorted2.map(d => d[0]);
+    const subs = Object.keys(NEW_MENU_SUB_COLORS);
+    const datasets = subs.map(s => ({
+      label: s,
+      data: sorted2.map(d => Math.round(d[1].sub[s])),
+      backgroundColor: NEW_MENU_SUB_COLORS[s],
+      borderRadius: 3
+    }));
+    const wrap2 = stackCanvas.parentElement;
+    if (wrap2) wrap2.style.height = Math.max(240, labels2.length * 30) + 'px';
+    nmRegionStackChartInst = new Chart(stackCanvas, {
+      type: 'bar',
+      data: { labels: labels2, datasets },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { left: 4, right: 20 } },
+        plugins: {
+          legend: { position: 'top', labels: { color: '#c8dff0', font: { size: 10 }, boxWidth: 10 } },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.x.toLocaleString()}${unit}`
+            }
+          },
+          datalabels: {
+            color: '#0a1628',
+            font: { size: 9, weight: 700 },
+            formatter: (v) => v > 0 ? v.toLocaleString() : ''
+          }
+        },
+        scales: {
+          x: { stacked: true, ticks: { color: '#9fc1de', font: { size: 9 }, callback: v => v.toLocaleString() }, grid: { color: '#1e3347' } },
+          y: { stacked: true, ticks: { color: '#e0f0ff', font: { size: 12, weight: '600' }, autoSkip: false }, grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  // ── 지역별 상세 수치 표 ──
+  const tableEl = document.getElementById('nmRegionTable');
+  if (tableEl) {
+    const rowsSorted = Object.entries(data)
+      .map(([region, d]) => [region, d])
+      .sort((a, b) => b[1].newTotal - a[1].newTotal);
+    let html = `<table style="width:100%;border-collapse:collapse;font-size:11.5px;">
+      <thead><tr style="border-bottom:1px solid #1e3347;">
+        <th style="text-align:left;padding:6px 8px;color:#6b8fa8;font-weight:600;">지역</th>
+        <th style="text-align:right;padding:6px 8px;color:#6b8fa8;font-weight:600;">전체 매출</th>
+        <th style="text-align:right;padding:6px 8px;color:#a78bfa;font-weight:600;">신메뉴 합계</th>
+        <th style="text-align:right;padding:6px 8px;color:#facc15;font-weight:600;">신메뉴 비중</th>
+        <th style="text-align:right;padding:6px 8px;color:${NEW_MENU_SUB_COLORS['레드벨벳']};font-weight:600;">레드벨벳</th>
+        <th style="text-align:right;padding:6px 8px;color:${NEW_MENU_SUB_COLORS['쑥']};font-weight:600;">쑥</th>
+        <th style="text-align:right;padding:6px 8px;color:${NEW_MENU_SUB_COLORS['청사과']};font-weight:600;">청사과</th>
+      </tr></thead><tbody>`;
+    rowsSorted.forEach(([region, d]) => {
+      const pct = d.total ? (d.newTotal / d.total * 100) : 0;
+      html += `<tr style="border-bottom:1px solid #16283b;">
+        <td style="padding:6px 8px;color:#e0f0ff;font-weight:700;">${region}</td>
+        <td style="text-align:right;padding:6px 8px;color:#c8dff0;">${Math.round(d.total).toLocaleString()}${unit}</td>
+        <td style="text-align:right;padding:6px 8px;color:#a78bfa;font-weight:700;">${Math.round(d.newTotal).toLocaleString()}${unit}</td>
+        <td style="text-align:right;padding:6px 8px;color:#facc15;font-weight:700;">${pct.toFixed(2)}%</td>
+        <td style="text-align:right;padding:6px 8px;color:${NEW_MENU_SUB_COLORS['레드벨벳']};">${Math.round(d.sub['레드벨벳']).toLocaleString()}${unit}</td>
+        <td style="text-align:right;padding:6px 8px;color:${NEW_MENU_SUB_COLORS['쑥']};">${Math.round(d.sub['쑥']).toLocaleString()}${unit}</td>
+        <td style="text-align:right;padding:6px 8px;color:${NEW_MENU_SUB_COLORS['청사과']};">${Math.round(d.sub['청사과']).toLocaleString()}${unit}</td>
+      </tr>`;
+    });
+    const totalRowPct = totalAll ? (totalNew / totalAll * 100) : 0;
+    html += `<tr style="border-top:2px solid #2a5a8a;">
+        <td style="padding:7px 8px;color:#ffd166;font-weight:800;">전체</td>
+        <td style="text-align:right;padding:7px 8px;color:#ffd166;font-weight:800;">${Math.round(totalAll).toLocaleString()}${unit}</td>
+        <td style="text-align:right;padding:7px 8px;color:#a78bfa;font-weight:800;">${Math.round(totalNew).toLocaleString()}${unit}</td>
+        <td style="text-align:right;padding:7px 8px;color:#facc15;font-weight:800;">${totalRowPct.toFixed(2)}%</td>
+        <td style="text-align:right;padding:7px 8px;color:${NEW_MENU_SUB_COLORS['레드벨벳']};font-weight:800;">${Math.round(subTotals['레드벨벳']).toLocaleString()}${unit}</td>
+        <td style="text-align:right;padding:7px 8px;color:${NEW_MENU_SUB_COLORS['쑥']};font-weight:800;">${Math.round(subTotals['쑥']).toLocaleString()}${unit}</td>
+        <td style="text-align:right;padding:7px 8px;color:${NEW_MENU_SUB_COLORS['청사과']};font-weight:800;">${Math.round(subTotals['청사과']).toLocaleString()}${unit}</td>
+      </tr></tbody></table>`;
+    tableEl.innerHTML = html;
+  }
+}
+
 // ── 쑥 주차별 추이 (3월~5월, 사용자 제공 수량 데이터) ──
 const MUGWORT_WEEKLY_DATA = [
   { label: '3월 1주', qty: { '쑥 호두과자': 1038, '쑥&앙버터 호두과자': 1857, '복호두 선물세트(쑥)': 136, '답례품(쑥 호두과자)': 76, '답례품(쑥&앙버터 호두과자)': 350 } },
@@ -7343,6 +7642,7 @@ const MENU_ANALYSIS_TAB_LABELS = {
   5: '답례품(맛별 판매비중)',
   6: '신메뉴 포지션',
   7: '기본+신메뉴 카니발리즘',
+  8: '지역별 신메뉴',
   11: '카테고리 비중'
 };
 let currentMenuAnalysisTab = 1;
@@ -7370,8 +7670,9 @@ function switchMenuAnalysisSubtab(n) {
   document.getElementById('maTab-5').style.display = n === 5 ? '' : 'none';
   document.getElementById('maTab-6').style.display = n === 6 ? '' : 'none';
   document.getElementById('maTab-7').style.display = n === 7 ? '' : 'none';
+  document.getElementById('maTab-8').style.display = n === 8 ? '' : 'none';
   document.getElementById('maTab-11').style.display = n === 11 ? '' : 'none';
-  document.getElementById('maTab-placeholder').style.display = (n !== 1 && n !== 2 && n !== 3 && n !== 4 && n !== 5 && n !== 6 && n !== 7 && n !== 11) ? '' : 'none';
+  document.getElementById('maTab-placeholder').style.display = (n !== 1 && n !== 2 && n !== 3 && n !== 4 && n !== 5 && n !== 6 && n !== 7 && n !== 8 && n !== 11) ? '' : 'none';
 
   if (n === 1) {
     renderMenuAnalysisTotalChart();
@@ -7395,6 +7696,9 @@ function switchMenuAnalysisSubtab(n) {
     renderCannibalStackedBarChart();
     renderCannibalPeriodTable();
     renderCannibalNewMenuBreakdownChart();
+  } else if (n === 8) {
+    renderNewMenuRegionMetricToggle();
+    renderNewMenuRegionTab();
   } else if (n === 11) {
     renderMenuAnalysisChart();
     renderMenuAnalysisBarChart();
