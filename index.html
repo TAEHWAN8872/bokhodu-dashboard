@@ -1176,6 +1176,12 @@ body.hide-names .store-name:hover{
             </div>
           </div>
 
+          <!-- 지역 내 캠페인별 진행 현황 -->
+          <div style="margin-bottom:22px;">
+            <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:10px;">📣 이 지역에서 진행한 마케팅 캠페인 (2~7월 합산)</div>
+            <div id="nm9CampaignSummary"></div>
+          </div>
+
           <!-- 매장별 비교 차트 -->
           <div style="margin-bottom:22px;">
             <div style="font-size:12px;color:#7eb8e8;font-weight:700;margin-bottom:10px;">📊 매장별 신메뉴 비중(%) vs 마케팅 참여율(%)</div>
@@ -7133,7 +7139,10 @@ function renderNewMenuMarketingTab() {
       const pct = (d && d.total) ? (d.newSum / d.total * 100) : null;
       const rate = nm9MkRate(mkEntry, m + '월');
       if (pct !== null && rate !== null) { xs.push(pct); ys.push(rate); }
-      return { month: m, pct, rate, total: d ? d.total : 0, newSum: d ? d.newSum : 0 };
+      const camp = (mkEntry && mkEntry[3] && mkEntry[3][m + '월']) || {};
+      const done = Object.keys(camp).filter(k => camp[k] === true);
+      const notDone = Object.keys(camp).filter(k => camp[k] === false);
+      return { month: m, pct, rate, total: d ? d.total : 0, newSum: d ? d.newSum : 0, done, notDone };
     });
     const r = nm9Pearson(xs, ys);
     return { name, overallPct, overallMkRate, r, monthlyDetail };
@@ -7159,6 +7168,38 @@ function renderNewMenuMarketingTab() {
     const rl = nm9RLabel(regionR);
     elR.textContent = rl.text;
     elR.style.color = rl.color;
+  }
+
+  // ── 지역 내 캠페인별 진행 현황 ──
+  const campCounts = {};
+  storesInRegion.forEach(name => {
+    const entry = nm9GetMkEntry(name);
+    if (!entry) return;
+    NM9_MK_MONTHS.forEach(m => {
+      const camp = (entry[3] && entry[3][m + '월']) || {};
+      Object.keys(camp).forEach(k => {
+        if (!campCounts[k]) campCounts[k] = { yes: 0, no: 0 };
+        if (camp[k] === true) campCounts[k].yes++;
+        else if (camp[k] === false) campCounts[k].no++;
+      });
+    });
+  });
+  const campEl = document.getElementById('nm9CampaignSummary');
+  if (campEl) {
+    const campList = Object.entries(campCounts)
+      .map(([name, c]) => [name, c.yes, c.no, (c.yes + c.no) ? Math.round(c.yes / (c.yes + c.no) * 100) : 0])
+      .sort((a, b) => b[1] - a[1]);
+    if (!campList.length) {
+      campEl.innerHTML = '<div style="color:#4a6070;font-size:12px;padding:12px 0;">이 지역은 마케팅 참여 데이터가 없습니다.</div>';
+    } else {
+      campEl.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap;">` + campList.map(([name, yes, no, rate]) => `
+        <div style="flex:1;min-width:150px;background:#132537;border:0.5px solid #1e3347;border-radius:10px;padding:12px 14px;">
+          <div style="font-size:11.5px;color:#e0f0ff;font-weight:700;margin-bottom:6px;">${name}</div>
+          <div style="font-size:10px;color:#6b8fa8;margin-bottom:6px;">진행 ${yes}건 · 미진행 ${no}건 (매장×월 기준)</div>
+          <div style="height:6px;background:#1e3347;border-radius:3px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${rate}%;background:#3db87a;"></div></div>
+          <div style="font-size:12px;font-weight:700;color:${rate >= 70 ? '#3db87a' : rate >= 40 ? '#f0a04a' : '#e05555'};">진행률 ${rate}%</div>
+        </div>`).join('') + `</div>`;
+    }
   }
 
   // ── 매장별 비교 차트 ──
@@ -7245,15 +7286,26 @@ function renderNewMenuMarketingTab() {
               <th style="text-align:right;padding:4px 6px;">신메뉴(${unit})</th>
               <th style="text-align:right;padding:4px 6px;">전체(${unit})</th>
               <th style="text-align:right;padding:4px 6px;">마케팅 참여율</th>
+              <th style="text-align:left;padding:4px 6px;">진행한 마케팅</th>
             </tr></thead>
             <tbody>
-              ${s.monthlyDetail.map(d => `<tr style="border-top:1px solid #16283b;">
-                <td style="padding:4px 6px;color:#c8dff0;">${d.month}월</td>
-                <td style="text-align:right;padding:4px 6px;color:#a78bfa;">${d.pct !== null ? d.pct.toFixed(2) + '%' : '-'}</td>
-                <td style="text-align:right;padding:4px 6px;color:#c8dff0;">${Math.round(d.newSum).toLocaleString()}</td>
-                <td style="text-align:right;padding:4px 6px;color:#6b8fa8;">${Math.round(d.total).toLocaleString()}</td>
-                <td style="text-align:right;padding:4px 6px;color:#38bdf8;">${d.rate !== null ? d.rate + '%' : '-'}</td>
-              </tr>`).join('')}
+              ${s.monthlyDetail.map(d => {
+                const doneChips = d.done.length
+                  ? d.done.map(c => `<span style="display:inline-block;background:rgba(61,184,122,0.15);color:#3db87a;border:1px solid rgba(61,184,122,0.4);border-radius:10px;padding:1px 7px;margin:1px 3px 1px 0;font-size:10px;">✅ ${c}</span>`).join('')
+                  : '';
+                const notDoneChips = d.notDone.length
+                  ? d.notDone.map(c => `<span style="display:inline-block;background:rgba(224,85,85,0.1);color:#e07a7a;border:1px solid rgba(224,85,85,0.3);border-radius:10px;padding:1px 7px;margin:1px 3px 1px 0;font-size:10px;">❌ ${c}</span>`).join('')
+                  : '';
+                const campHtml = (doneChips || notDoneChips) ? (doneChips + notDoneChips) : '<span style="color:#4a6070;">데이터 없음</span>';
+                return `<tr style="border-top:1px solid #16283b;">
+                <td style="padding:4px 6px;color:#c8dff0;vertical-align:top;">${d.month}월</td>
+                <td style="text-align:right;padding:4px 6px;color:#a78bfa;vertical-align:top;">${d.pct !== null ? d.pct.toFixed(2) + '%' : '-'}</td>
+                <td style="text-align:right;padding:4px 6px;color:#c8dff0;vertical-align:top;">${Math.round(d.newSum).toLocaleString()}</td>
+                <td style="text-align:right;padding:4px 6px;color:#6b8fa8;vertical-align:top;">${Math.round(d.total).toLocaleString()}</td>
+                <td style="text-align:right;padding:4px 6px;color:#38bdf8;vertical-align:top;">${d.rate !== null ? d.rate + '%' : '-'}</td>
+                <td style="padding:4px 6px;line-height:1.9;">${campHtml}</td>
+              </tr>`;
+              }).join('')}
             </tbody>
           </table>
         </td>
