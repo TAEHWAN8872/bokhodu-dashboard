@@ -4206,7 +4206,8 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   }
 
   // 매출구간 선택 시 지역별 참여율 + 전체 평균을 한눈에 보여주는 요약
-  function renderMkSalesSummary(salesVal){
+  // (지역/검색/담당자 등 현재 함께 적용된 다른 필터도 반영된 목록을 받아서 집계함)
+  function renderMkSalesSummary(salesVal, filteredStores){
     const el = document.getElementById('mkSalesSummary');
     if(!el) return;
     if(salesVal === 'all'){
@@ -4215,14 +4216,13 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       return;
     }
     const salesLabels = {lt1000:'1000만원 미만', '1000to1500':'1000~1500만원', '1500to2000':'1500~2000만원', '2000to3000':'2000~3000만원', '3000to4000':'3000~4000만원', gte4000:'4000만원 이상', nodata:'매출데이터 없음', gte1000:'1000만원 이상', gte2000:'2000만원 이상', gte3000:'3000만원 이상', gte5000:'5000만원 이상'};
-    // 지역/검색/담당자 필터와 무관하게, 해당 매출구간 전체 매장 기준으로 집계
-    const bucketStores = MARKETING_DATA_RAW.filter(s => mkSalesMatchesFilter(salesVal, mkStoreAvgSales(s[0])));
-    el.innerHTML = mkBuildRegionSummaryHtml(bucketStores, `${salesLabels[salesVal]} 구간`, '📊');
+    el.innerHTML = mkBuildRegionSummaryHtml(filteredStores, `${salesLabels[salesVal]} 구간`, '📊');
     el.style.display = 'block';
   }
 
   // 담당자 선택 시 지역별 참여율 + 전체 평균을 한눈에 보여주는 요약
-  function renderMkManagerSummary(managerVal){
+  // (지역/검색/매출구간 등 현재 함께 적용된 다른 필터도 반영된 목록을 받아서 집계함)
+  function renderMkManagerSummary(managerVal, filteredStores){
     const el = document.getElementById('mkManagerSummary');
     if(!el) return;
     if(managerVal === 'all'){
@@ -4230,9 +4230,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       el.innerHTML = '';
       return;
     }
-    // 지역/검색/매출구간 필터와 무관하게, 해당 담당자 전체 매장 기준으로 집계
-    const mgrStores = MARKETING_DATA_RAW.filter(s => mkStoreManager(s[0]) === managerVal);
-    el.innerHTML = mkBuildRegionSummaryHtml(mgrStores, `${managerVal}`, '👤');
+    el.innerHTML = mkBuildRegionSummaryHtml(filteredStores, `${managerVal}`, '👤');
     el.style.display = 'block';
   }
 
@@ -4256,8 +4254,8 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     if(managerVal !== 'all'){
       rows = rows.filter(x => mkStoreManager(x.s[0]) === managerVal);
     }
-    renderMkSalesSummary(salesVal);
-    renderMkManagerSummary(managerVal);
+    renderMkSalesSummary(salesVal, rows.map(x => x.s));
+    renderMkManagerSummary(managerVal, rows.map(x => x.s));
     const sortFn = (a,b)=>{
       if(sortVal==='rate_asc') return (a.r.rate===null?101:a.r.rate) - (b.r.rate===null?101:b.r.rate);
       if(sortVal==='rate_desc') return (b.r.rate===null?-1:b.r.rate) - (a.r.rate===null?-1:a.r.rate);
