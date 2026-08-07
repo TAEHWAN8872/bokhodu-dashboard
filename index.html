@@ -1166,6 +1166,7 @@ body.hide-names .store-name:hover{
     <div class="kpi"><div class="kl" id="k2l">최근월 평균 매출</div><div class="kv" id="k2">-</div><div class="ks" id="k2s">-</div></div>
     <div class="kpi kpi-click" id="kpi3" onclick="openKpiModal('over')" title="클릭하여 달성 매장 보기"><div class="kl" id="k3l">전년 동월 대비 5%↑ 목표 달성</div><div class="kv" id="k3">-</div><div class="ks" id="k3s">-</div></div>
     <div class="kpi kpi-click" id="kpi6" onclick="openKpiModal('stable')" title="클릭하여 매장 보기"><div class="kl" id="k6l">전년비 ±2% 유지 매장</div><div class="kv" id="k6">-</div><div class="ks" id="k6s">-</div></div>
+    <div class="kpi"><div class="kl" id="k7l">전년 대비 성장</div><div class="kv" id="k7">-</div><div class="ks" id="k7s">-</div></div>
     <div class="kpi"><div class="kl">전월 대비 성장</div><div class="kv" id="k4">-</div><div class="ks" id="k4s">-</div></div>
     <div class="kpi"><div class="kl">최고 매출 매장</div><div class="kv" id="k5" style="font-size:16px;">-</div><div class="ks" id="k5s" style="color:#6b8fa8;">-</div></div>
     <div class="kpi" style="border-color:#38bdf8;display:flex;flex-direction:column;">
@@ -2230,6 +2231,15 @@ function render(){
     }
   }
 
+  // 전년 동월 대비 성장 (선택한 월 탭 기준, 평균 탭이면 유효월 평균끼리 비교)
+  let yoyGrowStr='-';
+  const sumCurYoy=data.reduce((s,b)=>s+getBranchVal(b,lastIdx),0);
+  const sumPrevYoy=data.reduce((s,b)=>s+get25Val(b.name,lastIdx),0);
+  if(sumPrevYoy>0){
+    const gy=((sumCurYoy-sumPrevYoy)/sumPrevYoy*100).toFixed(1);
+    yoyGrowStr=(gy>0?'+':'')+gy+'%';
+  }
+
   // 최고 매출 매장: 26년 전체 기간 중 가장 높은 단일 월 실매출
   let topBranch=null, topVal=0, topMonthLabel='';
   ALL.forEach(b=>{
@@ -2241,7 +2251,7 @@ function render(){
   const activeCount=data.filter(b=>getBranchVal(b,lastIdx)>0).length;
   document.getElementById('k1').textContent=activeCount+'개';
   document.getElementById('k1s').textContent='전체 '+ALL.filter(b=>(getBranchVal(b,lastIdx))>0).length+'개 중';
-  document.getElementById('k2l').textContent=monthLabel+' 평균 매출';
+  document.getElementById('k2l').textContent=(monthLabel==='평균'?'평균매출':monthLabel+' 평균 매출');
   document.getElementById('k2').textContent=fmt(avgVal);
   const avgGoal=data.reduce((s,b)=>s+getGoalVal(b.name,lastIdx),0)/data.length;
   const d2=avgGoal>0?((avgVal-avgGoal)/avgGoal*100).toFixed(1):null;
@@ -2255,6 +2265,10 @@ function render(){
   document.getElementById('k6').textContent=`${stableBranches.length}개`;
   document.getElementById('k6s').className='ks warn';
   document.getElementById('k6s').textContent=`전년 대비 -2%~+2% 이내`;
+  document.getElementById('k7l').textContent=(monthLabel==='평균'?'전년 대비 성장':monthLabel+' 전년 대비 성장');
+  document.getElementById('k7').textContent=yoyGrowStr;
+  document.getElementById('k7').className='kv '+(yoyGrowStr.startsWith('+')?'pos':yoyGrowStr==='-'?'':'neg');
+  document.getElementById('k7s').textContent=sumPrevYoy>0?(monthLabel==='평균'?'작년 평균 대비':'작년 '+monthLabel+' 대비'):'';
   document.getElementById('k4').textContent=growStr;
   document.getElementById('k4').className='kv '+(growStr.startsWith('+')?'pos':growStr==='-'?'':'neg');
   document.getElementById('k4s').textContent=prevIdx>=0?MONTHS[prevIdx]+'→'+monthLabel:'';
