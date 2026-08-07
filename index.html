@@ -7083,7 +7083,7 @@ function nm9MkRate(entry, monthLabel) {
 
 function nm9Pearson(xs, ys) {
   const n = xs.length;
-  if (n < 3) return null;
+  if (n < 3) return { r: null, reason: 'insufficient', n };
   const mx = xs.reduce((a, b) => a + b, 0) / n;
   const my = ys.reduce((a, b) => a + b, 0) / n;
   let num = 0, dx2 = 0, dy2 = 0;
@@ -7091,11 +7091,23 @@ function nm9Pearson(xs, ys) {
     const dx = xs[i] - mx, dy = ys[i] - my;
     num += dx * dy; dx2 += dx * dx; dy2 += dy * dy;
   }
-  if (dx2 === 0 || dy2 === 0) return null;
-  return num / Math.sqrt(dx2 * dy2);
+  // dx2/dy2가 0이라는 건 "데이터가 없다"가 아니라 "해당 값이 매달 똑같다"는 뜻(예: 마케팅 참여율이 항상 100%).
+  // 이 경우 상관계수는 수학적으로 정의되지 않으므로, 표본 부족과 구분해서 안내한다.
+  if (dx2 === 0 && dy2 === 0) return { r: null, reason: 'no_variance', n };
+  if (dy2 === 0) return { r: null, reason: 'no_y_variance', n };
+  if (dx2 === 0) return { r: null, reason: 'no_x_variance', n };
+  return { r: num / Math.sqrt(dx2 * dy2), reason: 'ok', n };
 }
-function nm9RLabel(r) {
-  if (r === null) return { text: '데이터 부족', color: '#4a6070' };
+function nm9RLabel(res) {
+  // 이전 형태(숫자 또는 null)로 호출되는 경우를 대비한 하위 호환 처리
+  if (res === null || typeof res === 'number') {
+    res = (res === null) ? { r: null, reason: 'insufficient' } : { r: res, reason: 'ok' };
+  }
+  const { r, reason } = res;
+  if (reason === 'insufficient') return { text: '데이터 부족', color: '#4a6070' };
+  if (reason === 'no_y_variance') return { text: '마케팅 참여율 변동없음(항상 동일)', color: '#8fa8bd' };
+  if (reason === 'no_x_variance') return { text: '신메뉴 비중 변동없음', color: '#8fa8bd' };
+  if (reason === 'no_variance') return { text: '두 지표 모두 변동없음', color: '#8fa8bd' };
   if (r >= 0.5) return { text: `+${r.toFixed(2)} · 강한 양의 상관`, color: '#3db87a' };
   if (r >= 0.2) return { text: `+${r.toFixed(2)} · 약한 양의 상관`, color: '#8fe0ac' };
   if (r > -0.2) return { text: `${r.toFixed(2)} · 상관 거의 없음`, color: '#9fc1de' };
