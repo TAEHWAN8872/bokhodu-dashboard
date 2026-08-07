@@ -574,13 +574,21 @@ body.hide-names .store-name:hover{
       </select>
       <select class="filter-sel" id="mkSalesSel" onchange="renderMarketingTable()">
         <option value="all">매출구간 전체</option>
-        <option value="lt1000">1000만원 미만</option>
-        <option value="1000to1500">1000~1500만원</option>
-        <option value="1500to2000">1500~2000만원</option>
-        <option value="2000to3000">2000~3000만원</option>
-        <option value="3000to4000">3000~4000만원</option>
-        <option value="gte4000">4000만원 이상</option>
-        <option value="nodata">매출데이터 없음</option>
+        <optgroup label="구간별">
+          <option value="lt1000">1000만원 미만</option>
+          <option value="1000to1500">1000~1500만원</option>
+          <option value="1500to2000">1500~2000만원</option>
+          <option value="2000to3000">2000~3000만원</option>
+          <option value="3000to4000">3000~4000만원</option>
+          <option value="nodata">매출데이터 없음</option>
+        </optgroup>
+        <optgroup label="이상 필터">
+          <option value="gte1000">1000만원 이상</option>
+          <option value="gte2000">2000만원 이상</option>
+          <option value="gte3000">3000만원 이상</option>
+          <option value="gte4000">4000만원 이상</option>
+          <option value="gte5000">5000만원 이상</option>
+        </optgroup>
       </select>
       <select class="filter-sel" id="mkManagerSel" onchange="renderMarketingTable()">
         <option value="all">담당자 전체</option>
@@ -4004,6 +4012,15 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     if(avg < 40000000) return '3000to4000';
     return 'gte4000';
   }
+  // "N만원 이상" 필터(1000/2000/3000/4000/5000만원 이상): 구간 필터와 달리 기준 금액 이상이면 모두 포함
+  const MK_GTE_THRESHOLDS = { gte1000:10000000, gte2000:20000000, gte3000:30000000, gte4000:40000000, gte5000:50000000 };
+  function mkSalesMatchesFilter(salesVal, avg){
+    if(salesVal === 'all') return true;
+    if(MK_GTE_THRESHOLDS.hasOwnProperty(salesVal)){
+      return avg!==null && avg!==undefined && avg > 0 && avg >= MK_GTE_THRESHOLDS[salesVal];
+    }
+    return mkSalesBucketOf(avg) === salesVal;
+  }
   // 매장명 표기 차이 흡수용 정규화: "복호두 " 접두어, 공백, (폐점) 표시 등을 제거하고 비교
   // 예) "복호두 광주 수완점" (STORE_INFO/로열티 입력용 이름) === "광주수완점" (ALL 매출데이터 이름)
   function normalizeStoreNameForManagerMatch(name){
@@ -4197,9 +4214,9 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       el.innerHTML = '';
       return;
     }
-    const salesLabels = {lt1000:'1000만원 미만', '1000to1500':'1000~1500만원', '1500to2000':'1500~2000만원', '2000to3000':'2000~3000만원', '3000to4000':'3000~4000만원', gte4000:'4000만원 이상', nodata:'매출데이터 없음'};
+    const salesLabels = {lt1000:'1000만원 미만', '1000to1500':'1000~1500만원', '1500to2000':'1500~2000만원', '2000to3000':'2000~3000만원', '3000to4000':'3000~4000만원', gte4000:'4000만원 이상', nodata:'매출데이터 없음', gte1000:'1000만원 이상', gte2000:'2000만원 이상', gte3000:'3000만원 이상', gte5000:'5000만원 이상'};
     // 지역/검색/담당자 필터와 무관하게, 해당 매출구간 전체 매장 기준으로 집계
-    const bucketStores = MARKETING_DATA_RAW.filter(s => mkSalesBucketOf(mkStoreAvgSales(s[0])) === salesVal);
+    const bucketStores = MARKETING_DATA_RAW.filter(s => mkSalesMatchesFilter(salesVal, mkStoreAvgSales(s[0])));
     el.innerHTML = mkBuildRegionSummaryHtml(bucketStores, `${salesLabels[salesVal]} 구간`, '📊');
     el.style.display = 'block';
   }
@@ -4234,7 +4251,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       rows = rows.filter(x => (x.s[0]||'').toLowerCase().includes(q) || mkMatchedMonths(x.s, q).length>0);
     }
     if(salesVal !== 'all'){
-      rows = rows.filter(x => mkSalesBucketOf(mkStoreAvgSales(x.s[0])) === salesVal);
+      rows = rows.filter(x => mkSalesMatchesFilter(salesVal, mkStoreAvgSales(x.s[0])));
     }
     if(managerVal !== 'all'){
       rows = rows.filter(x => mkStoreManager(x.s[0]) === managerVal);
@@ -4249,7 +4266,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     rows.sort(sortFn);
 
     const regionLabel = window.__mkRegion==='all' ? '' : ` · ${window.__mkRegion}`;
-    const salesLabels = {lt1000:'1000만원 미만', '1000to1500':'1000~1500만원', '1500to2000':'1500~2000만원', '2000to3000':'2000~3000만원', '3000to4000':'3000~4000만원', gte4000:'4000만원 이상', nodata:'매출데이터 없음'};
+    const salesLabels = {lt1000:'1000만원 미만', '1000to1500':'1000~1500만원', '1500to2000':'1500~2000만원', '2000to3000':'2000~3000만원', '3000to4000':'3000~4000만원', gte4000:'4000만원 이상', nodata:'매출데이터 없음', gte1000:'1000만원 이상', gte2000:'2000만원 이상', gte3000:'3000만원 이상', gte5000:'5000만원 이상'};
     const salesLabel = salesVal==='all' ? '' : ` · 평균매출 ${salesLabels[salesVal]}`;
     const managerLabel = managerVal==='all' ? '' : ` · ${managerVal}`;
     document.getElementById('mkTableTitle').textContent =
