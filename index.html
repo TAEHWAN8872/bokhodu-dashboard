@@ -4973,9 +4973,16 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
 // (이전에는 이 자리에 1.8MB 상당의 배열이 통째로 하드코딩되어 있었음)
 let MENU_DATA_BY_MONTH = {};
 let __menuDataPromise = null;
+// 실제로 data 폴더에 업로드되어 있는 월만 적어둡니다.
+// 나중에 8월 이후 데이터(menu-08.json 등)를 새로 올리면, 아래 배열에 그 달 숫자만 추가해 주세요.
+// (여기 적히지 않은 달은 아예 요청하지 않으므로 콘솔에 404가 뜨지 않습니다)
+const AVAILABLE_MENU_MONTHS = [1, 2, 3, 4, 5, 6, 7];
 function ensureMenuDataLoaded() {
   if (__menuDataPromise) return __menuDataPromise;
-  const files = { 1:'data/menu-01.json', 2:'data/menu-02.json', 3:'data/menu-03.json', 4:'data/menu-04.json', 5:'data/menu-05.json', 6:'data/menu-06.json', 7:'data/menu-07.json', 8:'data/menu-08.json', 9:'data/menu-09.json', 10:'data/menu-10.json', 11:'data/menu-11.json', 12:'data/menu-12.json' };
+  const files = {};
+  AVAILABLE_MENU_MONTHS.forEach(m => {
+    files[m] = `data/menu-${String(m).padStart(2, '0')}.json`;
+  });
   __menuDataPromise = Promise.all(Object.entries(files).map(([m, url]) =>
     fetch(url).then(r => { if (!r.ok) throw new Error('not found'); return r.json(); })
       .then(data => { MENU_DATA_BY_MONTH[m] = data; })
@@ -8796,6 +8803,11 @@ function fmtAmt2(v){
   const m = Math.round(v/10000);
   if(m>=10000){ const uk=Math.floor(m/10000),rem=m%10000; return rem>0?`${uk}억 ${rem.toLocaleString()}만`:`${uk}억`; }
   return m.toLocaleString()+'만원';
+}
+
+// 메뉴별 매출 화면 등에서 사용되는 금액 포맷 함수 (이전 수정 시 누락되어 있었음)
+function fmtAmt(v){
+  return fmtAmt2(v);
 }
 
 function getRegionStats(){
