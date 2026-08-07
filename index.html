@@ -7165,8 +7165,6 @@ function nm9RLabel(res) {
 // "신메뉴 비중이 높다" = 10% 이상, "마케팅 참여가 활발하다" = 80% 이상 — 지역 평균과 무관하게 실제 의미 있는 절대 기준
 const NM9_PCT_THRESHOLD = 10;
 const NM9_RATE_THRESHOLD = 80;
-const NM9_RATE_LOW_THRESHOLD = 20;   // 마케팅 참여율이 이 밑이면 신메뉴 비중과 무관하게 "마케팅 없이도 매출 상승"으로 판정
-const NM9_RATE_POOR_THRESHOLD = 70;  // 마케팅 참여율이 이 이상인데 매출이 빠지면 신메뉴 비중과 무관하게 "참여 대비 성과 미흡"으로 판정
 function nm9Diagnosis(pct, rate, avgPct, avgRate, yoy) {
   if (pct === null) return { text: '신메뉴 판매 없음', color: '#4a6070' };
   if (rate === null) return { text: '마케팅 데이터 없음', color: '#4a6070' };
@@ -7176,10 +7174,6 @@ function nm9Diagnosis(pct, rate, avgPct, avgRate, yoy) {
   const hasYoy = yoy !== undefined && yoy !== null;
   const salesUp = hasYoy && yoy > 0;
   const salesDown = hasYoy && yoy < 0;
-
-  // 마케팅 참여율 기준 우선 판정 (신메뉴 비중이 높아도 마케팅을 거의 안 했거나, 반대로 마케팅을 많이 했으면 이 기준을 우선 적용)
-  if (rate < NM9_RATE_LOW_THRESHOLD && salesUp) return { text: '🔵 마케팅 없이도 매출 상승', color: '#38bdf8' };
-  if (rate >= NM9_RATE_POOR_THRESHOLD && salesDown) return { text: '🟠 참여 대비 매출 성과 미흡', color: '#f0a04a' };
 
   if (highPct && highRate) {
     if (salesUp) return { text: '🟢 시너지 우수 (매출도 상승)', color: '#3db87a' };
@@ -7191,9 +7185,7 @@ function nm9Diagnosis(pct, rate, avgPct, avgRate, yoy) {
     if (salesDown) return { text: '🟠 참여 대비 매출 성과 미흡', color: '#f0a04a' };
     return highPct ? { text: '🟡 마케팅 강화 여지', color: '#facc15' } : { text: '🟠 참여 대비 효과 저조', color: '#f0a04a' };
   }
-  // 여기 도달했다는 건 highPct(10%↑) 아니고 highRate(80%↑)도 아니라는 뜻.
-  // salesUp인 경우 rate<20%는 위 우선 판정에서 이미 걸러졌으므로, 남은 건 20~80% 구간(애매하게 병행한 경우) 뿐.
-  if (salesUp) return { text: '🟣 마케팅 병행 중 매출 상승', color: '#a78bfa' };
+  if (salesUp) return { text: '🔵 마케팅 없이도 매출 상승', color: '#38bdf8' };
   if (salesDown) return { text: '🔴 관리 필요 (매출도 하락)', color: '#e05555' };
   return { text: '🔴 관리 필요', color: '#e05555' };
 }
@@ -13375,8 +13367,26 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
         <path d="M0,-6 L1.76,-1.85 L6.5,-1.85 L2.5,1.1 L4.7,6 L0,2.9 L-4.7,6 L-2.5,1.1 L-6.5,-1.85 L-1.76,-1.85 Z" fill="#fde047" stroke="#eab308" stroke-width="0.8"/>
       </g>
     ` : '';
-    // 별 머리띠는 머리 위쪽(y<0)까지 그려지므로, 그 캐릭터만 viewBox를 위로 넉넉히 확장해서 잘리지 않게 함
-    const vbY = c.isRabbit ? -30 : (c.hasStarHeadband ? -16 : 0);
+    // 이름 머리띠: 검은색 아치형 머리띠 + 그 위로 크고 두꺼운 컬러 글씨(예능 자막 스타일)로 이름을 크게 표시.
+    // hasNameHeadband에 표시할 이름 문자열을 넣으면 해당 이름이 적힌 머리띠가 그려짐 (예: 김소영 캐릭터에 '맹건주' 이름 머리띠)
+    const nameHeadbandColors = ['#fbbf24', '#f472b6', '#38bdf8', '#a3e635', '#fb923c'];
+    const nameHeadbandTspansSVG = c.hasNameHeadband ? [...c.hasNameHeadband].map((ch, i) =>
+      `<tspan fill="${nameHeadbandColors[i % nameHeadbandColors.length]}">${ch}</tspan>`
+    ).join('') : '';
+    // 아치 세로 반경(17→9)을 낮춰 머리띠가 머리 위에 붕 뜨지 않고 정수리에 밀착되도록 함
+    const nameHeadbandTextSVG = `<text x="35" y="-3" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="16"
+            stroke="#111827" stroke-width="3" stroke-linejoin="round" paint-order="stroke fill" style="letter-spacing:-0.5px;">${nameHeadbandTspansSVG}</text>`;
+    // 캐릭터 전체가 scaleX(dir)로 좌우 반전될 때 이름 글씨까지 거울상으로 뒤집히는 것을 상쇄하기 위해
+    // dir이 -1(왼쪽을 보고 있음)일 때만 텍스트를 한 번 더 반전시켜 항상 정방향으로 보이게 함
+    const nameHeadbandTextFinalSVG = (c.dir === -1)
+      ? `<g transform="translate(35,0) scale(-1,1) translate(-35,0)">${nameHeadbandTextSVG}</g>`
+      : nameHeadbandTextSVG;
+    const nameHeadbandSVG = c.hasNameHeadband ? `
+      <path d="M 18 7 A 17 9 0 0 1 52 7" fill="none" stroke="#111827" stroke-width="4" stroke-linecap="round"/>
+      ${nameHeadbandTextFinalSVG}
+    ` : '';
+    // 별 머리띠/이름 머리띠는 머리 위쪽(y<0)까지 그려지므로, 그 캐릭터만 viewBox를 위로 넉넉히 확장해서 잘리지 않게 함
+    const vbY = c.isRabbit ? -30 : (c.hasNameHeadband ? -30 : (c.hasStarHeadband ? -16 : 0));
     const vbH = 110 - vbY;
     const svgH = vbY < 0 ? Math.round(60*vbH/110) : 60;
     return `<svg viewBox="0 ${vbY} 70 ${vbH}" width="38" height="${svgH}" style="display:block;overflow:visible;">
@@ -13406,6 +13416,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       ${badgeExtra}
       ${headPart}
       ${headbandSVG}
+      ${nameHeadbandSVG}
       <rect x="55" y="1" width="9" height="9" fill="${STATUS_COLOR[c.status]}" stroke="#ffffff" stroke-width="2"/>
     </svg>`;
   }
@@ -14049,7 +14060,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   // ── 마스코트 캐릭터: 김소영(기본 크기) + 이은서(2/3 크기로 옆에 키링처럼 붙어 졸졸 따라다님) ──
   // 매출 데이터와 무관한 순수 장식용 캐릭터라서 담당자(officeChars) 시스템과는 완전히 분리해서 독립적으로 동작시킴.
   const MASCOT_DEFS = [
-    { id:'ksy', label:'김소영', shortName:'김소영', color:'#fb7185', hair:'#3f2e1e', isFemale:true, hasApron:true, neverSeated:true },
+    { id:'ksy', label:'김소영', shortName:'김소영', color:'#fb7185', hair:'#3f2e1e', isFemale:true, hasApron:true, neverSeated:true, hasNameHeadband:'맹건주' },
     { id:'leu', label:'이은서', shortName:'이은서', color:'#facc15', hair:'#4a3826', followId:'ksy', followDist:20, followDy:8, scale: 2/3, isFemale:true, neverSeated:true },
     { id:'kyj', label:'김윤진', shortName:'김윤진', color:'#f8fafc', hair:'#4a3826', followId:'leu', followDist:20, followDy:8, scale: 2/3, isFemale:true, neverSeated:true, isCleanroom:true,
       lines:[
