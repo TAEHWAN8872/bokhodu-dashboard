@@ -1167,7 +1167,7 @@ body.hide-names .store-name:hover{
     <div class="kpi kpi-click" id="kpi3" onclick="openKpiModal('over')" title="클릭하여 달성 매장 보기"><div class="kl" id="k3l">전년 동월 대비 5%↑ 목표 달성</div><div class="kv" id="k3">-</div><div class="ks" id="k3s">-</div></div>
     <div class="kpi kpi-click" id="kpi6" onclick="openKpiModal('stable')" title="클릭하여 매장 보기"><div class="kl" id="k6l">전년비 ±2% 유지 매장</div><div class="kv" id="k6">-</div><div class="ks" id="k6s">-</div></div>
     <div class="kpi"><div class="kl" id="k7l">전년 대비 성장</div><div class="kv" id="k7">-</div><div class="ks" id="k7s">-</div></div>
-    <div class="kpi"><div class="kl" id="k8l">전년 대비 매장별성장</div><div class="kv" id="k8">-</div><div class="ks" id="k8s">-</div></div>
+    <div class="kpi"><div class="kl" id="k8l">전년 대비 매장별성장</div><div class="kv" id="k8">-</div><div class="ks" id="k8s">-</div><div class="ks" id="k8note" style="color:#6b8fa8;margin-top:2px;"></div></div>
     <div class="kpi"><div class="kl">전월 대비 성장</div><div class="kv" id="k4">-</div><div class="ks" id="k4s">-</div></div>
     <div class="kpi"><div class="kl">최고 매출 매장</div><div class="kv" id="k5" style="font-size:16px;">-</div><div class="ks" id="k5s" style="color:#6b8fa8;">-</div></div>
     <div class="kpi" style="border-color:#38bdf8;display:flex;flex-direction:column;">
@@ -1480,6 +1480,24 @@ function getGoalVal(name, lastIdx){
     return v25 > 0 ? Math.round(v25 * (1 + GOAL_GROWTH)) : 0;
   }
   return getGoal(name, lastIdx);
+}
+// 매장의 26년 데이터 중 매출이 처음 찍힌 월 인덱스(0=1월)를 반환. 데이터가 아예 없으면 -1
+function getFirstDataMonthIdx(b){
+  const months = (b && b.months) || [];
+  for(let i=0;i<months.length;i++){
+    if((months[i]||0) > 0) return i;
+  }
+  return -1;
+}
+// 평균 탭용: 1월부터 데이터가 있지 않고(즉 연중에 데이터가 처음 찍힌) 매장이 있으면 true
+function isRecentlyOpenedStore26(b){
+  const first = getFirstDataMonthIdx(b);
+  return first > 0;
+}
+// 특정 월(monthIdx, 0=1월)에 매출 데이터가 처음 찍힌 매장 이름 목록
+function getStoresOpenedInMonth(storesList, monthIdx){
+  if(monthIdx==null || monthIdx<0) return [];
+  return storesList.filter(b=>getFirstDataMonthIdx(b)===monthIdx).map(b=>b.name);
 }
 // 현재 선택된 모드의 표시 라벨
 function getMonthLabel(lastIdx){
@@ -2283,6 +2301,13 @@ function render(){
   document.getElementById('k8').textContent=yoyStoreGrowStr;
   document.getElementById('k8').className='kv '+(yoyStoreGrowStr.startsWith('+')?'pos':yoyStoreGrowStr==='-'?'':'neg');
   document.getElementById('k8s').textContent=avgPrevStore>0?(monthLabel==='평균'?'작년 평균 대비 매장당':'작년 '+monthLabel+' 대비 매장당'):'';
+  const k8noteEl=document.getElementById('k8note');
+  if(lastIdx===-2){
+    k8noteEl.textContent = data.some(b=>isRecentlyOpenedStore26(b)) ? '최근 오픈한 매장 포함' : '';
+  } else {
+    const openedNames = getStoresOpenedInMonth(data, lastIdx);
+    k8noteEl.textContent = openedNames.length ? openedNames.join(', ')+' 오픈 매장 포함' : '';
+  }
   document.getElementById('k4').textContent=growStr;
   document.getElementById('k4').className='kv '+(growStr.startsWith('+')?'pos':growStr==='-'?'':'neg');
   document.getElementById('k4s').textContent=prevIdx>=0?MONTHS[prevIdx]+'→'+monthLabel:'';
