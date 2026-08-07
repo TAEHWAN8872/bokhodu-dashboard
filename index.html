@@ -6381,6 +6381,28 @@ function computeNewMenuMonthly(matchFn) {
   return { monthly, pct };
 }
 
+// 메뉴 데이터의 매장명(예: "부산명지점") → ALL 매출데이터 기준 지역(region) 조회
+// ALL 쪽 매장명은 "복호두 부산 명지점"처럼 표기가 달라 공백/접두어를 제거하고 매칭한다.
+function __normalizeStoreNameForRegionMatch(name){
+  if(!name) return '';
+  return String(name)
+    .replace(/^\(폐점\)/, '')
+    .replace(/복호두\s*/g, '')
+    .replace(/\s+/g, '')
+    .trim();
+}
+function getRegionForStore(storeName){
+  if(!window.__menuRegionMap){
+    window.__menuRegionMap = {};
+    (window.ALL || (typeof ALL !== 'undefined' ? ALL : [])).forEach(b=>{
+      window.__menuRegionMap[__normalizeStoreNameForRegionMatch(b.name)] = b.region || null;
+    });
+  }
+  const key = __normalizeStoreNameForRegionMatch(storeName);
+  return window.__menuRegionMap.hasOwnProperty(key) ? window.__menuRegionMap[key] : null;
+}
+window.getRegionForStore = getRegionForStore;
+
 function computeNewMenuRegional(matchFn, monthFilter) {
   const rows = monthFilter ? (MENU_DATA_BY_MONTH[monthFilter] || []) : (MENU_DATA_BY_MONTH[0] || []);
   const reg = {};
