@@ -1165,7 +1165,7 @@ body.hide-names .store-name:hover{
           <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;align-items:center;" id="nm9RegionTabs"></div>
 
           <!-- 지역 요약 카드 -->
-          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:20px;">
+          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;">
             <div style="flex:1;min-width:130px;background:#132537;border:0.5px solid #1e3347;border-radius:10px;padding:14px 16px;">
               <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">대상 매장 수</div>
               <div id="nm9StoreCount" style="font-size:17px;font-weight:700;color:#e0f0ff;">-</div>
@@ -1178,11 +1178,26 @@ body.hide-names .store-name:hover{
               <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">지역 평균 마케팅 참여율</div>
               <div id="nm9AvgRate" style="font-size:17px;font-weight:700;color:#38bdf8;">-</div>
             </div>
+            <div style="flex:1;min-width:130px;background:#132537;border:0.5px solid #1e3347;border-radius:10px;padding:14px 16px;">
+              <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">지역 평균 매출 YoY(2~7월)</div>
+              <div id="nm9AvgYoY" style="font-size:17px;font-weight:700;color:#f0a04a;">-</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:20px;">
             <div style="flex:1;min-width:170px;background:#132537;border:0.5px solid #1e3347;border-radius:10px;padding:14px 16px;">
               <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">신메뉴 비중 ↔ 마케팅 참여율 상관관계</div>
               <div id="nm9RegionR" style="font-size:15px;font-weight:700;color:#facc15;">-</div>
             </div>
+            <div style="flex:1;min-width:170px;background:#132537;border:0.5px solid #1e3347;border-radius:10px;padding:14px 16px;">
+              <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">신메뉴 비중 ↔ 매출 YoY 상관관계</div>
+              <div id="nm9RegionR2" style="font-size:15px;font-weight:700;color:#a78bfa;">-</div>
+            </div>
+            <div style="flex:1;min-width:170px;background:#132537;border:0.5px solid #1e3347;border-radius:10px;padding:14px 16px;">
+              <div style="font-size:11px;color:#6b8fa8;margin-bottom:4px;">마케팅 참여율 ↔ 매출 YoY 상관관계</div>
+              <div id="nm9RegionR3" style="font-size:15px;font-weight:700;color:#38bdf8;">-</div>
+            </div>
           </div>
+          <div style="font-size:10.5px;color:#5f7d95;margin-bottom:16px;">💡 신메뉴 비중·마케팅 참여율이 높아도 실제 매출(전년 대비)이 오르지 않았다면 캠페인 효과를 다시 봐야 합니다. 매출 YoY는 2~7월 합산 매출을 25년 동일 기간과 비교한 값이며, 25년 매출 데이터가 없는 신규 매장은 제외됩니다.</div>
 
           <!-- 지역 내 캠페인별 진행 현황 -->
           <div style="margin-bottom:22px;">
@@ -7090,7 +7105,31 @@ function nm9MkRate(entry, monthLabel) {
   return total > 0 ? Math.round(yes / total * 100) : null;
 }
 
+// 매장의 26년/25년 월별 총매출 조회 (ALL/ALL25 전역 데이터 기준 — 신메뉴 판매비중 계산에 쓰는 메뉴 매출과는 별개의 "매장 전체 매출" 지표)
+function nm9Sales26(name, m) {
+  const all = window.ALL || (typeof ALL !== 'undefined' ? ALL : []);
+  const b = all.find(x => x.name === name);
+  return (b && b.months[m - 1]) || 0;
+}
+function nm9Sales25(name, m) {
+  const all25 = window.ALL25 || (typeof ALL25 !== 'undefined' ? ALL25 : {});
+  const d = all25[name];
+  return (d && d[m - 1]) || 0;
+}
+// 전년 대비 증감률(%). 25년 데이터가 없거나 0이면 비교 불가(null)
+function nm9YoYPct(sum26, sum25) {
+  if (!sum25 || sum25 <= 0) return null;
+  return (sum26 - sum25) / sum25 * 100;
+}
+function nm9YoYLabel(yoy) {
+  if (yoy === null) return { text: '-', color: '#4a6070' };
+  const sign = yoy > 0 ? '+' : '';
+  const color = yoy > 0 ? '#3db87a' : (yoy < 0 ? '#e05555' : '#9fc1de');
+  return { text: `${sign}${yoy.toFixed(1)}%`, color };
+}
+
 function nm9Pearson(xs, ys) {
+
   const n = xs.length;
   if (n < 3) return { r: null, reason: 'insufficient', n };
   const mx = xs.reduce((a, b) => a + b, 0) / n;
@@ -7123,14 +7162,28 @@ function nm9RLabel(res) {
   if (r > -0.5) return { text: `${r.toFixed(2)} · 약한 음의 상관`, color: '#f0a04a' };
   return { text: `${r.toFixed(2)} · 강한 음의 상관`, color: '#e05555' };
 }
-function nm9Diagnosis(pct, rate, avgPct, avgRate) {
+function nm9Diagnosis(pct, rate, avgPct, avgRate, yoy) {
   if (pct === null) return { text: '신메뉴 판매 없음', color: '#4a6070' };
-  const highPct = avgPct !== null && pct >= avgPct;
-  const highRate = rate !== null && avgRate !== null && rate >= avgRate;
   if (rate === null) return { text: '마케팅 데이터 없음', color: '#4a6070' };
-  if (highPct && highRate) return { text: '🟢 시너지 우수', color: '#3db87a' };
-  if (highPct && !highRate) return { text: '🟡 마케팅 강화 여지', color: '#facc15' };
-  if (!highPct && highRate) return { text: '🟠 참여 대비 효과 저조', color: '#f0a04a' };
+  const highPct = avgPct !== null && pct >= avgPct;
+  const highRate = avgRate !== null && rate >= avgRate;
+  const active = highPct || highRate; // 신메뉴 비중, 마케팅 참여율 중 하나라도 평균 이상
+  const hasYoy = yoy !== undefined && yoy !== null;
+  const salesUp = hasYoy && yoy > 0;
+  const salesDown = hasYoy && yoy < 0;
+
+  if (highPct && highRate) {
+    if (salesUp) return { text: '🟢 시너지 우수 (매출도 상승)', color: '#3db87a' };
+    if (salesDown) return { text: '🟠 신메뉴·마케팅은 활발하나 매출 하락 — 원인 점검 필요', color: '#f0a04a' };
+    return { text: '🟢 시너지 우수', color: '#3db87a' };
+  }
+  if (active) {
+    if (salesUp) return { text: '🟢 효과 있음 (매출 상승)', color: '#3db87a' };
+    if (salesDown) return { text: '🟠 참여 대비 매출 성과 미흡', color: '#f0a04a' };
+    return highPct ? { text: '🟡 마케팅 강화 여지', color: '#facc15' } : { text: '🟠 참여 대비 효과 저조', color: '#f0a04a' };
+  }
+  if (salesUp) return { text: '🔵 마케팅 없이도 매출 상승', color: '#38bdf8' };
+  if (salesDown) return { text: '🔴 관리 필요 (매출도 하락)', color: '#e05555' };
   return { text: '🔴 관리 필요', color: '#e05555' };
 }
 
@@ -7175,6 +7228,7 @@ function renderNewMenuMarketingTab() {
     const overallMkRate = nm9MkRate(mkEntry);
 
     const xs = [], ys = [];
+    let sales26Sum = 0, sales25Sum = 0, sales25Any = false;
     const monthlyDetail = NM9_MK_MONTHS.map(m => {
       const d = idx[m][name];
       const pct = (d && d.total) ? (d.newSum / d.total * 100) : null;
@@ -7183,32 +7237,65 @@ function renderNewMenuMarketingTab() {
       const camp = (mkEntry && mkEntry[3] && mkEntry[3][m + '월']) || {};
       const done = Object.keys(camp).filter(k => camp[k] === true);
       const notDone = Object.keys(camp).filter(k => camp[k] === false);
-      return { month: m, pct, rate, total: d ? d.total : 0, newSum: d ? d.newSum : 0, done, notDone };
+      const sales26 = nm9Sales26(name, m);
+      const sales25 = nm9Sales25(name, m);
+      sales26Sum += sales26;
+      if (sales25 > 0) { sales25Sum += sales25; sales25Any = true; }
+      const yoy = nm9YoYPct(sales26, sales25);
+      return { month: m, pct, rate, total: d ? d.total : 0, newSum: d ? d.newSum : 0, done, notDone, sales26, sales25, yoy };
     });
     const r = nm9Pearson(xs, ys);
-    return { name, overallPct, overallMkRate, r, monthlyDetail };
+    const overallYoY = sales25Any ? nm9YoYPct(sales26Sum, sales25Sum) : null;
+    return { name, overallPct, overallMkRate, r, monthlyDetail, sales26Sum, sales25Sum, overallYoY };
   }).sort((a, b) => (b.overallPct ?? -1) - (a.overallPct ?? -1));
 
   // ── 지역 요약 ──
   const validPct = storeData.filter(s => s.overallPct !== null).map(s => s.overallPct);
   const validRate = storeData.filter(s => s.overallMkRate !== null).map(s => s.overallMkRate);
+  const validYoY = storeData.filter(s => s.overallYoY !== null).map(s => s.overallYoY);
   const avgPct = validPct.length ? validPct.reduce((a, b) => a + b, 0) / validPct.length : null;
   const avgRate = validRate.length ? validRate.reduce((a, b) => a + b, 0) / validRate.length : null;
+  const avgYoY = validYoY.length ? validYoY.reduce((a, b) => a + b, 0) / validYoY.length : null;
   const regionXs = storeData.filter(s => s.overallPct !== null && s.overallMkRate !== null).map(s => s.overallPct);
   const regionYs = storeData.filter(s => s.overallPct !== null && s.overallMkRate !== null).map(s => s.overallMkRate);
   const regionR = nm9Pearson(regionXs, regionYs);
+  // 신메뉴 비중 ↔ 매출 YoY, 마케팅 참여율 ↔ 매출 YoY 상관관계 — "신메뉴/마케팅을 열심히 한 게 실제 매출로 이어졌는가"를 보기 위한 지표
+  const pctYoyXs = storeData.filter(s => s.overallPct !== null && s.overallYoY !== null).map(s => s.overallPct);
+  const pctYoyYs = storeData.filter(s => s.overallPct !== null && s.overallYoY !== null).map(s => s.overallYoY);
+  const rateYoyXs = storeData.filter(s => s.overallMkRate !== null && s.overallYoY !== null).map(s => s.overallMkRate);
+  const rateYoyYs = storeData.filter(s => s.overallMkRate !== null && s.overallYoY !== null).map(s => s.overallYoY);
+  const pctYoyR = nm9Pearson(pctYoyXs, pctYoyYs);
+  const rateYoyR = nm9Pearson(rateYoyXs, rateYoyYs);
 
   const elCount = document.getElementById('nm9StoreCount');
   const elAvgPct = document.getElementById('nm9AvgPct');
   const elAvgRate = document.getElementById('nm9AvgRate');
+  const elAvgYoY = document.getElementById('nm9AvgYoY');
   const elR = document.getElementById('nm9RegionR');
+  const elR2 = document.getElementById('nm9RegionR2');
+  const elR3 = document.getElementById('nm9RegionR3');
   if (elCount) elCount.textContent = storeData.length + '개';
   if (elAvgPct) elAvgPct.textContent = avgPct !== null ? avgPct.toFixed(2) + '%' : '-';
   if (elAvgRate) elAvgRate.textContent = avgRate !== null ? avgRate + '%' : '-';
+  if (elAvgYoY) {
+    const yl = nm9YoYLabel(avgYoY);
+    elAvgYoY.textContent = yl.text;
+    elAvgYoY.style.color = yl.color;
+  }
   if (elR) {
     const rl = nm9RLabel(regionR);
     elR.textContent = rl.text;
     elR.style.color = rl.color;
+  }
+  if (elR2) {
+    const rl2 = nm9RLabel(pctYoyR);
+    elR2.textContent = rl2.text;
+    elR2.style.color = rl2.color;
+  }
+  if (elR3) {
+    const rl3 = nm9RLabel(rateYoyR);
+    elR3.textContent = rl3.text;
+    elR3.style.color = rl3.color;
   }
 
   // ── 지역 내 캠페인별 진행 현황 ──
@@ -7250,6 +7337,7 @@ function renderNewMenuMarketingTab() {
     const labels = storeData.map(s => s.name);
     const pctData = storeData.map(s => s.overallPct !== null ? Math.round(s.overallPct * 100) / 100 : 0);
     const rateData = storeData.map(s => s.overallMkRate !== null ? s.overallMkRate : 0);
+    const yoyData = storeData.map(s => s.overallYoY !== null ? Math.round(s.overallYoY * 10) / 10 : 0);
     const wrap = chartCanvas.parentElement;
     if (wrap) wrap.style.height = Math.max(240, labels.length * 34) + 'px';
     nm9CompareChartInst = new Chart(chartCanvas, {
@@ -7258,7 +7346,8 @@ function renderNewMenuMarketingTab() {
         labels,
         datasets: [
           { label: '신메뉴 비중(%)', data: pctData, backgroundColor: '#a78bfaaa', borderRadius: 4 },
-          { label: '마케팅 참여율(%)', data: rateData, backgroundColor: '#38bdf8aa', borderRadius: 4 }
+          { label: '마케팅 참여율(%)', data: rateData, backgroundColor: '#38bdf8aa', borderRadius: 4 },
+          { label: '매출 YoY(%)', data: yoyData, backgroundColor: '#f0a04aaa', borderRadius: 4 }
         ]
       },
       options: {
@@ -7268,13 +7357,13 @@ function renderNewMenuMarketingTab() {
         layout: { padding: { left: 4, right: 34 } },
         plugins: {
           legend: { position: 'top', labels: { color: '#c8dff0', font: { size: 10 }, boxWidth: 10 } },
-          tooltip: { callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.x}%` } },
+          tooltip: { callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.x > 0 && ctx.dataset.label.includes('YoY') ? '+' : ''}${ctx.parsed.x}%` } },
           datalabels: {
             color: '#e0f0ff',
             anchor: 'end',
             align: 'right',
             font: { size: 9, weight: 700 },
-            formatter: (v) => v > 0 ? v + '%' : ''
+            formatter: (v, ctx) => v === 0 ? '' : (v > 0 && ctx.dataset.label.includes('YoY') ? '+' : '') + v + '%'
           }
         },
         scales: {
@@ -7297,12 +7386,14 @@ function renderNewMenuMarketingTab() {
         <th style="text-align:left;padding:6px 8px;color:#6b8fa8;font-weight:600;">매장</th>
         <th style="text-align:right;padding:6px 8px;color:#a78bfa;font-weight:600;">신메뉴 비중</th>
         <th style="text-align:right;padding:6px 8px;color:#38bdf8;font-weight:600;">마케팅 참여율</th>
+        <th style="text-align:right;padding:6px 8px;color:#f0a04a;font-weight:600;">매출 YoY(2~7월)</th>
         <th style="text-align:left;padding:6px 8px;color:#6b8fa8;font-weight:600;">상관관계(월별)</th>
         <th style="text-align:left;padding:6px 8px;color:#6b8fa8;font-weight:600;">진단</th>
       </tr></thead><tbody>`;
     storeData.forEach((s, i) => {
       const rl = nm9RLabel(s.r);
-      const dg = nm9Diagnosis(s.overallPct, s.overallMkRate, avgPct, avgRate);
+      const dg = nm9Diagnosis(s.overallPct, s.overallMkRate, avgPct, avgRate, s.overallYoY);
+      const yl = nm9YoYLabel(s.overallYoY);
       const pctBar = s.overallPct !== null ? Math.min(100, s.overallPct * 4) : 0; // 시각화용 스케일(0~25%를 꽉 채움)
       const rateBar = s.overallMkRate !== null ? s.overallMkRate : 0;
       html += `<tr style="border-bottom:1px solid #16283b;cursor:pointer;" onclick="nm9ToggleDetail(${i})">
@@ -7315,11 +7406,12 @@ function renderNewMenuMarketingTab() {
           <div>${s.overallMkRate !== null ? s.overallMkRate + '%' : '-'}</div>
           <div style="height:5px;background:#1e3347;border-radius:3px;margin-top:3px;overflow:hidden;"><div style="height:100%;width:${rateBar}%;background:#38bdf8;"></div></div>
         </td>
+        <td style="text-align:right;padding:6px 8px;color:${yl.color};font-weight:700;">${yl.text}</td>
         <td style="padding:6px 8px;color:${rl.color};font-weight:700;">${rl.text}</td>
         <td style="padding:6px 8px;color:${dg.color};font-weight:700;">${dg.text}</td>
       </tr>
       <tr id="nm9Detail-${i}" style="display:none;background:#0f2133;">
-        <td colspan="5" style="padding:10px 14px;">
+        <td colspan="6" style="padding:10px 14px;">
           <table style="width:100%;border-collapse:collapse;font-size:10.5px;">
             <thead><tr style="color:#6b8fa8;">
               <th style="text-align:left;padding:4px 6px;">월</th>
@@ -7327,6 +7419,9 @@ function renderNewMenuMarketingTab() {
               <th style="text-align:right;padding:4px 6px;">신메뉴(${unit})</th>
               <th style="text-align:right;padding:4px 6px;">전체(${unit})</th>
               <th style="text-align:right;padding:4px 6px;">마케팅 참여율</th>
+              <th style="text-align:right;padding:4px 6px;">매출(26년)</th>
+              <th style="text-align:right;padding:4px 6px;">매출(25년)</th>
+              <th style="text-align:right;padding:4px 6px;">YoY</th>
               <th style="text-align:left;padding:4px 6px;">진행한 마케팅</th>
             </tr></thead>
             <tbody>
@@ -7338,12 +7433,16 @@ function renderNewMenuMarketingTab() {
                   ? d.notDone.map(c => `<span style="display:inline-block;background:rgba(224,85,85,0.1);color:#e07a7a;border:1px solid rgba(224,85,85,0.3);border-radius:10px;padding:1px 7px;margin:1px 3px 1px 0;font-size:10px;">❌ ${c}</span>`).join('')
                   : '';
                 const campHtml = (doneChips || notDoneChips) ? (doneChips + notDoneChips) : '<span style="color:#4a6070;">데이터 없음</span>';
+                const dyl = nm9YoYLabel(d.yoy);
                 return `<tr style="border-top:1px solid #16283b;">
                 <td style="padding:4px 6px;color:#c8dff0;vertical-align:top;">${d.month}월</td>
                 <td style="text-align:right;padding:4px 6px;color:#a78bfa;vertical-align:top;">${d.pct !== null ? d.pct.toFixed(2) + '%' : '-'}</td>
                 <td style="text-align:right;padding:4px 6px;color:#c8dff0;vertical-align:top;">${Math.round(d.newSum).toLocaleString()}</td>
                 <td style="text-align:right;padding:4px 6px;color:#6b8fa8;vertical-align:top;">${Math.round(d.total).toLocaleString()}</td>
                 <td style="text-align:right;padding:4px 6px;color:#38bdf8;vertical-align:top;">${d.rate !== null ? d.rate + '%' : '-'}</td>
+                <td style="text-align:right;padding:4px 6px;color:#c8dff0;vertical-align:top;">${d.sales26 ? Math.round(d.sales26).toLocaleString() : '-'}</td>
+                <td style="text-align:right;padding:4px 6px;color:#6b8fa8;vertical-align:top;">${d.sales25 ? Math.round(d.sales25).toLocaleString() : '-'}</td>
+                <td style="text-align:right;padding:4px 6px;color:${dyl.color};font-weight:700;vertical-align:top;">${dyl.text}</td>
                 <td style="padding:4px 6px;line-height:1.9;">${campHtml}</td>
               </tr>`;
               }).join('')}
