@@ -1,0 +1,64 @@
+name: tpay 매출 데이터 동기화
+
+on:
+  schedule:
+    # 30분마다 자동 실행 (UTC 기준, KST 상관없이 하루 종일)
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '실행 모드'
+        required: true
+        default: 'daily'
+        type: choice
+        options:
+          - daily
+          - backfill
+      rolling_days:
+        description: 'backfill 모드일 때 조회할 일수'
+        required: false
+        default: '90'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tpay-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 일일 갱신 실행 (스케줄 or 수동-daily)
+        if: github.event_name == 'schedule' || github.event.inputs.mode == 'daily'
+        env:
+          TPAY_TOKEN: ${{ secrets.TPAY_TOKEN }}
+        run: node scripts/daily-update.js
+
+      - name: 백필 실행 (수동-backfill)
+        if: github.event.inputs.mode == 'backfill'
+        env:
+          TPAY_TOKEN: ${{ secrets.TPAY_TOKEN }}
+          ROLLING_DAYS: ${{ github.event.inputs.rolling_days }}
+        run: node scripts/backfill.js
+
+      - name: 변경사항 커밋 & 푸시
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/live-daily.json
+          if git diff --cached --quiet; then
+            echo "변경 없음, 커밋 생략"
+          else
+            git commit -m "chore: tpay 매출 데이터 갱신 ($(date -u +'%Y-%m-%d %H:%M UTC'))"
+            git push
+          fi
