@@ -566,6 +566,10 @@ body.hide-names .store-name:hover{
       <button class="live-refresh-btn" onclick="window.loadLiveSales()">🔄 조회</button>
       <input id="liveSearch" type="text" placeholder="매장명 검색..." autocomplete="off" oninput="window.renderLiveTable()"
         class="live-input" style="min-width:180px;">
+      <label>담당자</label>
+      <select id="liveManagerSel" class="live-input" onchange="window.renderLiveTable()">
+        <option value="all">전체</option>
+      </select>
       <span id="liveUpdatedAt" class="live-updated-at"></span>
     </div>
     <div id="liveLoading" class="live-loading">
@@ -4866,6 +4870,17 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     }
   };
 
+  const LIVE_MANAGER_ORDER = ['김태환 과장','임도형 과장','이중섭 대리','박영태 대리','강동우 사원','이현민 사원'];
+  function livePopulateManagerSel(rows){
+    const sel = document.getElementById('liveManagerSel');
+    if(!sel) return;
+    const present = new Set(rows.map(r => r.manager).filter(Boolean));
+    const wanted = ['all', ...LIVE_MANAGER_ORDER.filter(m=>present.has(m)), ...[...present].filter(m=>!LIVE_MANAGER_ORDER.includes(m)).sort()];
+    const current = sel.value || 'all';
+    sel.innerHTML = wanted.map(m => `<option value="${m}">${m==='all' ? '전체' : m}</option>`).join('');
+    sel.value = wanted.includes(current) ? current : 'all';
+  }
+
   window.renderLiveTable = function(){
     const data = window.__liveData;
     const wrap = document.getElementById('liveTableWrap');
@@ -4881,8 +4896,16 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       dates.push({ ymd, wd: d.getDay() });
     }
 
+    let rows = Object.entries(data.STORES).map(([code, info]) => ({
+      code, ...info,
+      manager: (typeof mkStoreManager === 'function') ? mkStoreManager(info.name) : null
+    }));
+
+    livePopulateManagerSel(rows);
+    const managerVal = document.getElementById('liveManagerSel') ? document.getElementById('liveManagerSel').value : 'all';
+    if(managerVal !== 'all') rows = rows.filter(r => r.manager === managerVal);
+
     const q = (document.getElementById('liveSearch').value || '').trim();
-    let rows = Object.entries(data.STORES).map(([code, info]) => ({code, ...info}));
     if(q) rows = rows.filter(r => (r.name||'').includes(q));
     rows.sort((a,b) => (a.name||'').localeCompare(b.name||'', 'ko'));
 
@@ -4896,9 +4919,10 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     let errorCount = 0;
 
     const bodyRows = rows.map(r => {
+      const mgrCell = `<td style="text-align:left;color:#8fb8dd;">${r.manager || '-'}</td>`;
       if(r.error){
         errorCount++;
-        return `<tr class="err-row"><td>${r.name}</td><td colspan="${dates.length+1}" style="text-align:left;">⚠ 조회 실패 · ${r.error}</td></tr>`;
+        return `<tr class="err-row"><td>${r.name}</td>${mgrCell}<td colspan="${dates.length+1}" style="text-align:left;">⚠ 조회 실패 · ${r.error}</td></tr>`;
       }
       const byDate = {};
       (r.days||[]).forEach(day => { byDate[day.SDA_DT] = day.SA_AMT_TTL || 0; });
@@ -4911,12 +4935,13 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
         return `<td class="${cls}">${v.toLocaleString()}</td>`;
       }).join('');
       grandTotal += rowTotal;
-      return `<tr><td>${r.name}</td>${cells}<td class="grand-total">${rowTotal.toLocaleString()}</td></tr>`;
+      return `<tr><td>${r.name}</td>${mgrCell}${cells}<td class="grand-total">${rowTotal.toLocaleString()}</td></tr>`;
     }).join('');
 
     const headerCells = dates.map(d => `<th class="${(d.wd === 0 || d.wd === 6) ? 'wknd' : ''}">${d.ymd.slice(4,6)}/${d.ymd.slice(6,8)}<br><span style="font-weight:400;opacity:.75;">${WD[d.wd]}</span></th>`).join('');
     const totalRow = `<tr class="total-row">
         <td>전체 합계${errorCount ? ` <span style="font-weight:400;color:#e0895c;">(조회실패 ${errorCount}곳 제외)</span>` : ''}</td>
+        <td></td>
         ${dates.map(d => `<td>${totalByDate[d.ymd].toLocaleString()}</td>`).join('')}
         <td>${grandTotal.toLocaleString()}</td>
       </tr>`;
@@ -4926,7 +4951,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
         <div class="live-table-scroll">
           <table class="live-table">
             <thead><tr>
-              <th>매장명 (${rows.length}곳)</th>${headerCells}<th>합계</th>
+              <th>매장명 (${rows.length}곳)</th><th style="text-align:left;">담당자</th>${headerCells}<th>합계</th>
             </tr></thead>
             <tbody>${totalRow}${bodyRows}</tbody>
           </table>
