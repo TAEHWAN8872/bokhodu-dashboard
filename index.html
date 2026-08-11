@@ -515,6 +515,7 @@ body.hide-names .store-name:hover{
   <!-- 페이지 탭 -->
   <div class="page-tabs">
     <div class="page-tab active" id="pageTab-sales" onclick="switchPage('sales')">📊 매출 현황판</div>
+    <div class="page-tab" id="pageTab-live" onclick="switchPage('live')">🔴 LIVE 매출</div>
     <div class="page-tab" id="pageTab-realtime" onclick="switchPage('realtime')">⚡ 실시간매출</div>
     <div class="page-tab" id="pageTab-contract" onclick="switchPage('contract')">📋 재계약 안내<span class="pt-badge" id="rcUrgentBadge" style="display:none;"></span></div>
     <div class="page-tab" id="pageTab-marketing" onclick="switchPage('marketing')">📣 마케팅 참여현황</div>
@@ -522,6 +523,24 @@ body.hide-names .store-name:hover{
     <div class="page-tab" id="pageTab-office" onclick="switchPage('office')">🏢 AI 오피스</div>
     <div class="page-tab" id="pageTab-keyword" onclick="window.open('https://taehwan8872.github.io/bokhodu-keyword-tracker/', '_blank')" style="display:inline-flex;align-items:center;gap:4px;line-height:1;"><span style="display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:15px;height:15px;background:#03C75A;color:#fff;font-weight:800;font-size:10px;border-radius:3px;">N</span><span>키워드검색량</span></div>
     <div class="page-tab" id="pageTab-aichat" onclick="openAiChatWindow()" style="display:inline-flex;align-items:center;gap:4px;line-height:1;"><span>🤖</span><span>AI 챗봇</span></div>
+  </div>
+
+  <!-- LIVE 매출 페이지 (tpay POS API 실시간 연동) -->
+  <div id="livePage" style="display:none;">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+      <label style="font-size:12px;color:#6b8fa8;">시작일</label>
+      <input id="liveStartDate" type="date" style="padding:6px 8px;border:1px solid #cfe0ec;border-radius:6px;">
+      <label style="font-size:12px;color:#6b8fa8;">종료일</label>
+      <input id="liveEndDate" type="date" style="padding:6px 8px;border:1px solid #cfe0ec;border-radius:6px;">
+      <button class="upload-btn" onclick="window.loadLiveSales()">🔄 조회</button>
+      <input id="liveSearch" type="text" placeholder="매장명 검색..." autocomplete="off" oninput="window.renderLiveTable()"
+        style="padding:6px 8px;border:1px solid #cfe0ec;border-radius:6px;min-width:160px;">
+      <span id="liveUpdatedAt" style="font-size:11px;color:#94a8b6;margin-left:auto;"></span>
+    </div>
+    <div id="liveLoading" style="display:none;padding:20px;text-align:center;color:#6b8fa8;">
+      POS 서버에서 전체 매장 데이터를 가져오는 중입니다... (매장이 많아 10~20초 정도 걸릴 수 있어요)
+    </div>
+    <div id="liveTableWrap" style="overflow-x:auto;"></div>
   </div>
 
   <!-- 재계약 현황판 페이지 -->
@@ -4567,23 +4586,26 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
 
   window.switchPage = function(page){
     document.getElementById('salesPage').style.display = (page==='sales') ? '' : 'none';
+    document.getElementById('livePage').style.display = (page==='live') ? '' : 'none';
     document.getElementById('realtimePage').style.display = (page==='realtime') ? '' : 'none';
     document.getElementById('contractPage').style.display = (page==='contract') ? '' : 'none';
     document.getElementById('marketingPage').style.display = (page==='marketing') ? '' : 'none';
     document.getElementById('royaltyPage').style.display = (page==='royalty') ? '' : 'none';
     document.getElementById('officePage').style.display = (page==='office') ? '' : 'none';
     document.getElementById('pageTab-sales').classList.toggle('active', page==='sales');
+    document.getElementById('pageTab-live').classList.toggle('active', page==='live');
     document.getElementById('pageTab-realtime').classList.toggle('active', page==='realtime');
     document.getElementById('pageTab-contract').classList.toggle('active', page==='contract');
     document.getElementById('pageTab-marketing').classList.toggle('active', page==='marketing');
     document.getElementById('pageTab-royalty').classList.toggle('active', page==='royalty');
     document.getElementById('pageTab-office').classList.toggle('active', page==='office');
-    document.getElementById('brandTitle').textContent = (page==='sales') ? '복호두 매출 현황판' : (page==='realtime') ? '복호두 실시간 매출' : (page==='contract') ? '복호두 재계약 안내' : (page==='marketing') ? '복호두 마케팅 참여현황' : (page==='royalty') ? '복호두 로열티 미입금 관리' : '복호두 담당자 AI 오피스';
+    document.getElementById('brandTitle').textContent = (page==='sales') ? '복호두 매출 현황판' : (page==='live') ? '복호두 LIVE 매출' : (page==='realtime') ? '복호두 실시간 매출' : (page==='contract') ? '복호두 재계약 안내' : (page==='marketing') ? '복호두 마케팅 참여현황' : (page==='royalty') ? '복호두 로열티 미입금 관리' : '복호두 담당자 AI 오피스';
     if(page==='contract'){ renderContractKpis(); renderContractTable(); }
     if(page==='marketing'){ renderMarketingKpis(); renderMarketingRegionChips(); renderMarketingTable(); }
     if(page==='royalty'){ loadRoyaltyUnpaid(); }
     if(page==='realtime' && window.__RT_DATA){ window.renderRtTable(); }
     if(page==='office'){ window.initOfficePage && window.initOfficePage(); }
+    if(page==='live' && !window.__liveData){ window.loadLiveSales(); }
   };
 
   window.setRcFilter = function(status){
@@ -4756,6 +4778,118 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   const ROYALTY_API_URL = 'https://script.google.com/macros/s/AKfycbyiwLulo2K5i7iF5IAu3qn7BOzD6qLTACnrEs1LKYSULxHS9yMQAUmLcdMcrI8Z4rzr/exec';
 
   let ROYALTY_CACHE = [];
+
+  // ══════════════════════════════════════════════════════════
+  //  LIVE 매출 (tpay POS API 실시간 연동)
+  //  배포한 POS 프록시 Apps Script 웹앱의 /exec URL을 아래에 붙여넣으세요.
+  // ══════════════════════════════════════════════════════════
+  const POS_API_URL = 'https://script.google.com/macros/s/여기에_배포URL/exec';
+
+  function posApiConfigured(){
+    return POS_API_URL && POS_API_URL.indexOf('여기에_배포URL') === -1;
+  }
+
+  function todayYmd_(){
+    const d = new Date();
+    return d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+  }
+
+  // date input(yyyy-mm-dd)과 tpay 포맷(yyyymmdd) 상호 변환
+  function ymdToInputDate_(ymd){ return ymd ? `${ymd.slice(0,4)}-${ymd.slice(4,6)}-${ymd.slice(6,8)}` : ''; }
+  function inputDateToYmd_(v){ return v ? v.replace(/-/g,'') : ''; }
+
+  window.__liveData = null;
+
+  window.loadLiveSales = async function(){
+    const startInput = document.getElementById('liveStartDate');
+    const endInput = document.getElementById('liveEndDate');
+    if(!startInput.value) startInput.value = '2026-08-01';
+    if(!endInput.value) endInput.value = ymdToInputDate_(todayYmd_());
+
+    const start = inputDateToYmd_(startInput.value);
+    const end = inputDateToYmd_(endInput.value);
+
+    if(!posApiConfigured()){
+      document.getElementById('liveTableWrap').innerHTML =
+        '<div style="padding:20px;color:#e05555;">⚠ 아직 연동 설정 전이에요. (POS_API_URL을 Apps Script 웹앱 주소로 교체해주세요)</div>';
+      return;
+    }
+
+    document.getElementById('liveLoading').style.display = 'block';
+    document.getElementById('liveTableWrap').innerHTML = '';
+
+    try {
+      const res = await fetch(`${POS_API_URL}?action=liveDaily&start=${start}&end=${end}`);
+      const data = await res.json();
+      if(data.RESPONSE_CODE !== '0000'){
+        throw new Error(data.RESPONSE_MSG || data.RESPONSE_CODE || '알 수 없는 오류');
+      }
+      window.__liveData = data;
+      document.getElementById('liveUpdatedAt').textContent = '마지막 갱신: ' + new Date().toLocaleTimeString('ko-KR');
+      window.renderLiveTable();
+    } catch(err){
+      document.getElementById('liveTableWrap').innerHTML =
+        `<div style="padding:20px;color:#e05555;">불러오기 실패: ${err.message}</div>`;
+    } finally {
+      document.getElementById('liveLoading').style.display = 'none';
+    }
+  };
+
+  window.renderLiveTable = function(){
+    const data = window.__liveData;
+    const wrap = document.getElementById('liveTableWrap');
+    if(!data){ wrap.innerHTML = ''; return; }
+
+    // 날짜 목록 생성 (START ~ END, 하루 단위)
+    const dates = [];
+    const sD = new Date(+data.START.slice(0,4), +data.START.slice(4,6)-1, +data.START.slice(6,8));
+    const eD = new Date(+data.END.slice(0,4), +data.END.slice(4,6)-1, +data.END.slice(6,8));
+    for(let d = new Date(sD); d <= eD; d.setDate(d.getDate()+1)){
+      dates.push(`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`);
+    }
+
+    const q = (document.getElementById('liveSearch').value || '').trim();
+    let rows = Object.entries(data.STORES).map(([code, info]) => ({code, ...info}));
+    if(q) rows = rows.filter(r => (r.name||'').includes(q));
+    rows.sort((a,b) => (a.name||'').localeCompare(b.name||'', 'ko'));
+
+    const totalByDate = {}; dates.forEach(dt => totalByDate[dt] = 0);
+    let grandTotal = 0;
+    let errorCount = 0;
+
+    const bodyRows = rows.map(r => {
+      if(r.error){
+        errorCount++;
+        return `<tr><td style="padding:4px 8px;">${r.name}</td><td colspan="${dates.length+1}" style="color:#e05555;padding:4px 8px;">조회 실패 (${r.error})</td></tr>`;
+      }
+      const byDate = {};
+      (r.days||[]).forEach(day => { byDate[day.SDA_DT] = day.SA_AMT_TTL || 0; });
+      let rowTotal = 0;
+      const cells = dates.map(dt => {
+        const v = byDate[dt] || 0;
+        rowTotal += v;
+        totalByDate[dt] += v;
+        return `<td style="text-align:right;padding:4px 8px;">${v.toLocaleString()}</td>`;
+      }).join('');
+      grandTotal += rowTotal;
+      return `<tr><td style="padding:4px 8px;">${r.name}</td>${cells}<td style="text-align:right;font-weight:700;padding:4px 8px;">${rowTotal.toLocaleString()}</td></tr>`;
+    }).join('');
+
+    const headerCells = dates.map(dt => `<th style="padding:4px 8px;">${dt.slice(4,6)}/${dt.slice(6,8)}</th>`).join('');
+    const totalRow = `<tr style="font-weight:700;background:#f0f6fc;position:sticky;top:0;">
+        <td style="padding:4px 8px;">전체 합계${errorCount ? ` (조회실패 ${errorCount}곳 제외)` : ''}</td>
+        ${dates.map(dt => `<td style="text-align:right;padding:4px 8px;">${totalByDate[dt].toLocaleString()}</td>`).join('')}
+        <td style="text-align:right;padding:4px 8px;">${grandTotal.toLocaleString()}</td>
+      </tr>`;
+
+    wrap.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;">
+        <thead><tr style="background:#e8f2fa;">
+          <th style="text-align:left;padding:4px 8px;">매장명</th>${headerCells}<th style="padding:4px 8px;">합계</th>
+        </tr></thead>
+        <tbody>${totalRow}${bodyRows}</tbody>
+      </table>`;
+  };
 
   function royaltyApiConfigured(){
     return ROYALTY_API_URL && ROYALTY_API_URL.indexOf('PASTE_YOUR') === -1;
