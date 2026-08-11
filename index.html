@@ -4922,26 +4922,30 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       const mgrCell = `<td style="text-align:left;color:#8fb8dd;">${r.manager || '-'}</td>`;
       if(r.error){
         errorCount++;
-        return `<tr class="err-row"><td>${r.name}</td>${mgrCell}<td colspan="${dates.length+1}" style="text-align:left;">⚠ 조회 실패 · ${r.error}</td></tr>`;
+        return `<tr class="err-row"><td>${r.name}</td>${mgrCell}<td>-</td><td colspan="${dates.length+1}" style="text-align:left;">⚠ 조회 실패 · ${r.error}</td></tr>`;
       }
       const byDate = {};
       (r.days||[]).forEach(day => { byDate[day.SDA_DT] = day.SA_AMT_TTL || 0; });
       let rowTotal = 0;
+      let openDays = 0;
       const cells = dates.map(d => {
         const v = byDate[d.ymd] || 0;
+        if(v > 0) openDays++;
         rowTotal += v;
         totalByDate[d.ymd] += v;
         const cls = [v === 0 ? 'zero' : '', (d.wd === 0 || d.wd === 6) ? 'wknd' : ''].filter(Boolean).join(' ');
         return `<td class="${cls}">${v.toLocaleString()}</td>`;
       }).join('');
       grandTotal += rowTotal;
-      return `<tr><td>${r.name}</td>${mgrCell}${cells}<td class="grand-total">${rowTotal.toLocaleString()}</td></tr>`;
+      const openDaysCell = `<td style="color:#8fb8dd;">${openDays}일</td>`;
+      return `<tr><td>${r.name}</td>${mgrCell}${openDaysCell}${cells}<td class="grand-total">${rowTotal.toLocaleString()}</td></tr>`;
     }).join('');
 
     const headerCells = dates.map(d => `<th class="${(d.wd === 0 || d.wd === 6) ? 'wknd' : ''}">${d.ymd.slice(4,6)}/${d.ymd.slice(6,8)}<br><span style="font-weight:400;opacity:.75;">${WD[d.wd]}</span></th>`).join('');
     const totalRow = `<tr class="total-row">
         <td>전체 합계${errorCount ? ` <span style="font-weight:400;color:#e0895c;">(조회실패 ${errorCount}곳 제외)</span>` : ''}</td>
         <td></td>
+        <td style="font-weight:400;color:#5c7690;">(기간 ${dates.length}일)</td>
         ${dates.map(d => `<td>${totalByDate[d.ymd].toLocaleString()}</td>`).join('')}
         <td>${grandTotal.toLocaleString()}</td>
       </tr>`;
@@ -4951,7 +4955,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
         <div class="live-table-scroll">
           <table class="live-table">
             <thead><tr>
-              <th>매장명 (${rows.length}곳)</th><th style="text-align:left;">담당자</th>${headerCells}<th>합계</th>
+              <th>매장명 (${rows.length}곳)</th><th style="text-align:left;">담당자</th><th>영업일수</th>${headerCells}<th>합계</th>
             </tr></thead>
             <tbody>${totalRow}${bodyRows}</tbody>
           </table>
