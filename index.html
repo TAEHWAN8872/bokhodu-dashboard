@@ -378,6 +378,11 @@ body.hide-names .store-name:hover{
 .rc-table td.rc-name{text-align:left;color:#e0f0ff;font-weight:600;}
 
 /* LIVE 매출 */
+.live-subtabs{display:flex;gap:6px;margin-bottom:12px;}
+.live-subtab{font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:8px;cursor:pointer;border:1px solid #1e3347;color:#6b8fa8;background:#0d1b2a;transition:all .2s;}
+.live-subtab:hover{border-color:#2a5a8a;color:#aac4e0;}
+.live-subtab.active{background:#1a3a5c;border-color:#7eb8e8;color:#7eb8e8;}
+.live-today-label{font-size:12px;font-weight:700;color:#8fb8dd;background:#0a1628;border:1px solid #1e3347;border-radius:6px;padding:6px 12px;}
 .live-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#0d1b2a;border:0.5px solid #1e3347;border-radius:10px;padding:12px 14px;margin-bottom:12px;}
 .live-toolbar label{font-size:12px;color:#6b8fa8;font-weight:600;}
 .live-input{padding:6px 10px;background:#0a1628;border:1px solid #1e3347;border-radius:6px;color:#c8dff0;font-size:12px;color-scheme:dark;}
@@ -558,24 +563,51 @@ body.hide-names .store-name:hover{
 
   <!-- LIVE 매출 페이지 (tpay POS API 실시간 연동) -->
   <div id="livePage" style="display:none;">
-    <div class="live-toolbar">
-      <label>시작일</label>
-      <input id="liveStartDate" type="date" class="live-input">
-      <label>종료일</label>
-      <input id="liveEndDate" type="date" class="live-input">
-      <button class="live-refresh-btn" onclick="window.loadLiveSales()">🔄 조회</button>
-      <input id="liveSearch" type="text" placeholder="매장명 검색..." autocomplete="off" oninput="window.renderLiveTable()"
-        class="live-input" style="min-width:180px;">
-      <label>담당자</label>
-      <select id="liveManagerSel" class="live-input" onchange="window.renderLiveTable()">
-        <option value="all">전체</option>
-      </select>
-      <span id="liveUpdatedAt" class="live-updated-at"></span>
+    <div class="live-subtabs">
+      <div class="live-subtab active" id="liveSubTab-realtime" onclick="window.switchLiveSubTab('realtime')">⚡ 실시간 매출</div>
+      <div class="live-subtab" id="liveSubTab-period" onclick="window.switchLiveSubTab('period')">📅 기간별 매출</div>
     </div>
-    <div id="liveLoading" class="live-loading">
-      <span class="spin"></span>POS 서버에서 전체 매장 데이터를 가져오는 중입니다... (매장이 많아 1~2분 정도 걸릴 수 있어요)
+
+    <!-- ⚡ 실시간 매출: 오늘 하루 스냅샷, 서브탭 진입 시 자동 조회 -->
+    <div id="liveRealtimeSection">
+      <div class="live-toolbar">
+        <span class="live-today-label" id="liveRtDateLabel">오늘</span>
+        <button class="live-refresh-btn" onclick="window.loadLiveRealtime()">🔄 새로고침</button>
+        <input id="liveRtSearch" type="text" placeholder="매장명 검색..." autocomplete="off" oninput="window.renderLiveRealtimeTable()"
+          class="live-input" style="min-width:180px;">
+        <label>담당자</label>
+        <select id="liveRtManagerSel" class="live-input" onchange="window.renderLiveRealtimeTable()">
+          <option value="all">전체</option>
+        </select>
+        <span id="liveRtUpdatedAt" class="live-updated-at"></span>
+      </div>
+      <div id="liveRtLoading" class="live-loading">
+        <span class="spin"></span>POS 서버에서 오늘 매출 데이터를 가져오는 중입니다...
+      </div>
+      <div id="liveRtTableWrap"></div>
     </div>
-    <div id="liveTableWrap"></div>
+
+    <!-- 📅 기간별 매출: 기간 제한 없이 임의 구간 조회 -->
+    <div id="livePeriodSection" style="display:none;">
+      <div class="live-toolbar">
+        <label>시작일</label>
+        <input id="livePdStartDate" type="date" class="live-input">
+        <label>종료일</label>
+        <input id="livePdEndDate" type="date" class="live-input">
+        <button class="live-refresh-btn" onclick="window.loadLivePeriod()">🔄 조회</button>
+        <input id="livePdSearch" type="text" placeholder="매장명 검색..." autocomplete="off" oninput="window.renderLivePeriodTable()"
+          class="live-input" style="min-width:180px;">
+        <label>담당자</label>
+        <select id="livePdManagerSel" class="live-input" onchange="window.renderLivePeriodTable()">
+          <option value="all">전체</option>
+        </select>
+        <span id="livePdUpdatedAt" class="live-updated-at"></span>
+      </div>
+      <div id="livePdLoading" class="live-loading">
+        <span class="spin"></span>POS 서버에서 매출 데이터를 가져오는 중입니다... (최근 캐시 범위 밖 기간은 전체 매장을 순차 조회해서 1~2분 정도 걸릴 수 있어요)
+      </div>
+      <div id="livePdTableWrap"></div>
+    </div>
   </div>
 
   <!-- 재계약 현황판 페이지 -->
@@ -4640,7 +4672,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     if(page==='royalty'){ loadRoyaltyUnpaid(); }
     if(page==='realtime' && window.__RT_DATA){ window.renderRtTable(); }
     if(page==='office'){ window.initOfficePage && window.initOfficePage(); }
-    if(page==='live' && !window.__liveData){ window.loadLiveSales(); }
+    if(page==='live' && !window.__liveRtData){ window.loadLiveRealtime(); }
   };
 
   window.setRcFilter = function(status){
@@ -4833,46 +4865,28 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   function ymdToInputDate_(ymd){ return ymd ? `${ymd.slice(0,4)}-${ymd.slice(4,6)}-${ymd.slice(6,8)}` : ''; }
   function inputDateToYmd_(v){ return v ? v.replace(/-/g,'') : ''; }
 
-  window.__liveData = null;
-
-  window.loadLiveSales = async function(){
-    const startInput = document.getElementById('liveStartDate');
-    const endInput = document.getElementById('liveEndDate');
-    if(!startInput.value) startInput.value = '2026-08-01';
-    if(!endInput.value) endInput.value = ymdToInputDate_(todayYmd_());
-
-    const start = inputDateToYmd_(startInput.value);
-    const end = inputDateToYmd_(endInput.value);
-
-    if(!posApiConfigured()){
-      document.getElementById('liveTableWrap').innerHTML =
-        '<div style="padding:20px;color:#e05555;">⚠ 아직 연동 설정 전이에요. (POS_API_URL을 Apps Script 웹앱 주소로 교체해주세요)</div>';
-      return;
-    }
-
-    document.getElementById('liveLoading').style.display = 'block';
-    document.getElementById('liveTableWrap').innerHTML = '';
-
-    try {
-      const res = await fetch(`${POS_API_URL}?action=liveDaily&start=${start}&end=${end}`);
-      const data = await res.json();
-      if(data.RESPONSE_CODE !== '0000'){
-        throw new Error(data.RESPONSE_MSG || data.RESPONSE_CODE || '알 수 없는 오류');
+  // 서브탭 전환 (⚡ 실시간 매출 / 📅 기간별 매출)
+  window.switchLiveSubTab = function(sub){
+    document.getElementById('liveRealtimeSection').style.display = (sub==='realtime') ? '' : 'none';
+    document.getElementById('livePeriodSection').style.display = (sub==='period') ? '' : 'none';
+    document.getElementById('liveSubTab-realtime').classList.toggle('active', sub==='realtime');
+    document.getElementById('liveSubTab-period').classList.toggle('active', sub==='period');
+    if(sub==='realtime' && !window.__liveRtData){ window.loadLiveRealtime(); }
+    if(sub==='period' && !window.__livePdData){
+      // 기간별 매출 첫 진입 시 기본값: 이번 달 1일 ~ 오늘 (조회는 사용자가 직접 눌러야 실행)
+      const startInput = document.getElementById('livePdStartDate');
+      const endInput = document.getElementById('livePdEndDate');
+      if(!startInput.value){
+        const now = new Date();
+        startInput.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
       }
-      window.__liveData = data;
-      document.getElementById('liveUpdatedAt').textContent = '마지막 갱신: ' + new Date().toLocaleTimeString('ko-KR');
-      window.renderLiveTable();
-    } catch(err){
-      document.getElementById('liveTableWrap').innerHTML =
-        `<div style="padding:20px;color:#e05555;">불러오기 실패: ${err.message}</div>`;
-    } finally {
-      document.getElementById('liveLoading').style.display = 'none';
+      if(!endInput.value) endInput.value = ymdToInputDate_(todayYmd_());
     }
   };
 
   const LIVE_MANAGER_ORDER = ['김태환 과장','임도형 과장','이중섭 대리','박영태 대리','강동우 사원','이현민 사원'];
-  function livePopulateManagerSel(rows){
-    const sel = document.getElementById('liveManagerSel');
+  function livePopulateManagerSel(selId, rows){
+    const sel = document.getElementById(selId);
     if(!sel) return;
     const present = new Set(rows.map(r => r.manager).filter(Boolean));
     const wanted = ['all', ...LIVE_MANAGER_ORDER.filter(m=>present.has(m)), ...[...present].filter(m=>!LIVE_MANAGER_ORDER.includes(m)).sort()];
@@ -4881,12 +4895,20 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     sel.value = wanted.includes(current) ? current : 'all';
   }
 
-  window.renderLiveTable = function(){
-    const data = window.__liveData;
-    const wrap = document.getElementById('liveTableWrap');
+  // 두 서브탭이 공유하는 조회 함수: API를 호출해서 원본 데이터를 가져온다
+  async function fetchLiveDaily_(start, end){
+    if(!posApiConfigured()) throw new Error('아직 연동 설정 전이에요. (POS_API_URL을 Apps Script 웹앱 주소로 교체해주세요)');
+    const res = await fetch(`${POS_API_URL}?action=liveDaily&start=${start}&end=${end}`);
+    const data = await res.json();
+    if(data.RESPONSE_CODE !== '0000') throw new Error(data.RESPONSE_MSG || data.RESPONSE_CODE || '알 수 없는 오류');
+    return data;
+  }
+
+  // 두 서브탭이 공유하는 렌더 함수: (데이터, DOM id 세트)를 받아 표를 그린다
+  function renderLiveGenericTable_(data, ids){
+    const wrap = document.getElementById(ids.wrap);
     if(!data){ wrap.innerHTML = ''; return; }
 
-    // 날짜 목록 생성 (START ~ END, 하루 단위)
     const WD = ['일','월','화','수','목','금','토'];
     const dates = [];
     const sD = new Date(+data.START.slice(0,4), +data.START.slice(4,6)-1, +data.START.slice(6,8));
@@ -4901,11 +4923,11 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       manager: (typeof mkStoreManager === 'function') ? mkStoreManager(info.name) : null
     }));
 
-    livePopulateManagerSel(rows);
-    const managerVal = document.getElementById('liveManagerSel') ? document.getElementById('liveManagerSel').value : 'all';
+    livePopulateManagerSel(ids.managerSel, rows);
+    const managerVal = document.getElementById(ids.managerSel) ? document.getElementById(ids.managerSel).value : 'all';
     if(managerVal !== 'all') rows = rows.filter(r => r.manager === managerVal);
 
-    const q = (document.getElementById('liveSearch').value || '').trim();
+    const q = (document.getElementById(ids.search).value || '').trim();
     if(q) rows = rows.filter(r => (r.name||'').includes(q));
     rows.sort((a,b) => (a.name||'').localeCompare(b.name||'', 'ko'));
 
@@ -4961,6 +4983,68 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
           </table>
         </div>
       </div>`;
+  }
+
+  // ── ⚡ 실시간 매출: 항상 "오늘" 하루 스냅샷 ──────────────────────
+  window.__liveRtData = null;
+
+  window.loadLiveRealtime = async function(){
+    const today = todayYmd_();
+    document.getElementById('liveRtDateLabel').textContent =
+      `${today.slice(0,4)}.${today.slice(4,6)}.${today.slice(6,8)} (오늘)`;
+    document.getElementById('liveRtLoading').style.display = 'block';
+    document.getElementById('liveRtTableWrap').innerHTML = '';
+    try {
+      const data = await fetchLiveDaily_(today, today);
+      window.__liveRtData = data;
+      document.getElementById('liveRtUpdatedAt').textContent = '마지막 갱신: ' + new Date().toLocaleTimeString('ko-KR');
+      window.renderLiveRealtimeTable();
+    } catch(err){
+      document.getElementById('liveRtTableWrap').innerHTML =
+        `<div style="padding:20px;color:#e05555;">불러오기 실패: ${err.message}</div>`;
+    } finally {
+      document.getElementById('liveRtLoading').style.display = 'none';
+    }
+  };
+
+  window.renderLiveRealtimeTable = function(){
+    renderLiveGenericTable_(window.__liveRtData, { wrap:'liveRtTableWrap', search:'liveRtSearch', managerSel:'liveRtManagerSel' });
+  };
+
+  // ── 📅 기간별 매출: 기간 제한 없이 사용자가 지정한 구간 조회 ──────
+  window.__livePdData = null;
+
+  window.loadLivePeriod = async function(){
+    const startInput = document.getElementById('livePdStartDate');
+    const endInput = document.getElementById('livePdEndDate');
+    if(!startInput.value || !endInput.value){
+      alert('시작일과 종료일을 모두 선택해주세요.');
+      return;
+    }
+    const start = inputDateToYmd_(startInput.value);
+    const end = inputDateToYmd_(endInput.value);
+    if(start > end){
+      alert('시작일이 종료일보다 늦을 수 없어요.');
+      return;
+    }
+
+    document.getElementById('livePdLoading').style.display = 'block';
+    document.getElementById('livePdTableWrap').innerHTML = '';
+    try {
+      const data = await fetchLiveDaily_(start, end);
+      window.__livePdData = data;
+      document.getElementById('livePdUpdatedAt').textContent = '마지막 갱신: ' + new Date().toLocaleTimeString('ko-KR');
+      window.renderLivePeriodTable();
+    } catch(err){
+      document.getElementById('livePdTableWrap').innerHTML =
+        `<div style="padding:20px;color:#e05555;">불러오기 실패: ${err.message}</div>`;
+    } finally {
+      document.getElementById('livePdLoading').style.display = 'none';
+    }
+  };
+
+  window.renderLivePeriodTable = function(){
+    renderLiveGenericTable_(window.__livePdData, { wrap:'livePdTableWrap', search:'livePdSearch', managerSel:'livePdManagerSel' });
   };
 
   function royaltyApiConfigured(){
