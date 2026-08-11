@@ -376,6 +376,37 @@ body.hide-names .store-name:hover{
 .rc-table td{padding:8px 10px;text-align:center;border-bottom:0.5px solid #16283c;color:#c8dff0;}
 .rc-table tr:hover td{background:#152236;}
 .rc-table td.rc-name{text-align:left;color:#e0f0ff;font-weight:600;}
+
+/* LIVE 매출 */
+.live-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#0d1b2a;border:0.5px solid #1e3347;border-radius:10px;padding:12px 14px;margin-bottom:12px;}
+.live-toolbar label{font-size:12px;color:#6b8fa8;font-weight:600;}
+.live-input{padding:6px 10px;background:#0a1628;border:1px solid #1e3347;border-radius:6px;color:#c8dff0;font-size:12px;color-scheme:dark;}
+.live-input:focus{outline:none;border-color:#2a5a8a;}
+.live-input::placeholder{color:#4a6178;}
+.live-refresh-btn{font-size:12px;font-weight:700;padding:6px 14px;background:#1a3a5c;border:0.5px solid #2a5a8a;color:#7eb8e8;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;}
+.live-refresh-btn:hover{background:#1e4a70;}
+.live-updated-at{font-size:11px;color:#5c7690;margin-left:auto;}
+.live-loading{display:none;padding:28px 16px;text-align:center;color:#7eb8e8;background:#0d1b2a;border:0.5px solid #1e3347;border-radius:10px;font-size:12.5px;}
+.live-loading .spin{display:inline-block;width:14px;height:14px;border:2px solid #1e3347;border-top-color:#7eb8e8;border-radius:50%;margin-right:8px;vertical-align:-2px;animation:live-spin .8s linear infinite;}
+@keyframes live-spin{to{transform:rotate(360deg);}}
+.live-empty{padding:32px 16px;text-align:center;color:#5c7690;background:#0d1b2a;border:0.5px solid #1e3347;border-radius:10px;font-size:12.5px;}
+.live-table-card{background:#0d1b2a;border:0.5px solid #1e3347;border-radius:10px;overflow:hidden;}
+.live-table-scroll{overflow:auto;max-height:72vh;}
+.live-table{border-collapse:separate;border-spacing:0;font-size:12px;white-space:nowrap;width:100%;}
+.live-table th{position:sticky;top:0;background:#132540;color:#8fb8dd;font-weight:600;font-size:11px;padding:9px 12px;text-align:right;border-bottom:1px solid #1e3347;z-index:2;}
+.live-table th.wknd{color:#e0a05c;}
+.live-table th:first-child{text-align:left;position:sticky;left:0;top:0;z-index:4;background:#132540;box-shadow:1px 0 0 #1e3347;}
+.live-table td{padding:6px 12px;text-align:right;border-bottom:0.5px solid #16283c;color:#c8dff0;font-variant-numeric:tabular-nums;}
+.live-table td:first-child{position:sticky;left:0;z-index:1;background:#0d1b2a;text-align:left;color:#e0f0ff;font-weight:600;box-shadow:1px 0 0 #1e3347;}
+.live-table td.zero{color:#3c5066;}
+.live-table td.wknd{background:rgba(224,160,92,0.05);}
+.live-table tr:hover td{background:#152236;}
+.live-table tr:hover td:first-child{background:#182a40;}
+.live-table tr.total-row td{background:#132540;color:#8fb8dd;font-weight:700;border-bottom:1px solid #24405c;}
+.live-table tr.total-row td:first-child{background:#132540;}
+.live-table tr.err-row td{color:#e0895c;background:rgba(224,85,85,0.06);}
+.live-table tr.err-row td:first-child{background:#22161a;}
+.live-table td.grand-total{font-weight:700;color:#3db87a;}
 .rc-badge{font-size:10px;padding:3px 8px;border-radius:5px;font-weight:600;white-space:nowrap;}
 .rc-urgent{background:#3a0d0d;color:#e05555;}
 .rc-soon{background:#3a1f0a;color:#f0a04a;}
@@ -527,20 +558,20 @@ body.hide-names .store-name:hover{
 
   <!-- LIVE 매출 페이지 (tpay POS API 실시간 연동) -->
   <div id="livePage" style="display:none;">
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
-      <label style="font-size:12px;color:#6b8fa8;">시작일</label>
-      <input id="liveStartDate" type="date" style="padding:6px 8px;border:1px solid #cfe0ec;border-radius:6px;">
-      <label style="font-size:12px;color:#6b8fa8;">종료일</label>
-      <input id="liveEndDate" type="date" style="padding:6px 8px;border:1px solid #cfe0ec;border-radius:6px;">
-      <button class="upload-btn" onclick="window.loadLiveSales()">🔄 조회</button>
+    <div class="live-toolbar">
+      <label>시작일</label>
+      <input id="liveStartDate" type="date" class="live-input">
+      <label>종료일</label>
+      <input id="liveEndDate" type="date" class="live-input">
+      <button class="live-refresh-btn" onclick="window.loadLiveSales()">🔄 조회</button>
       <input id="liveSearch" type="text" placeholder="매장명 검색..." autocomplete="off" oninput="window.renderLiveTable()"
-        style="padding:6px 8px;border:1px solid #cfe0ec;border-radius:6px;min-width:160px;">
-      <span id="liveUpdatedAt" style="font-size:11px;color:#94a8b6;margin-left:auto;"></span>
+        class="live-input" style="min-width:180px;">
+      <span id="liveUpdatedAt" class="live-updated-at"></span>
     </div>
-    <div id="liveLoading" style="display:none;padding:20px;text-align:center;color:#6b8fa8;">
-      POS 서버에서 전체 매장 데이터를 가져오는 중입니다... (매장이 많아 1~2분 정도 걸릴 수 있어요)
+    <div id="liveLoading" class="live-loading">
+      <span class="spin"></span>POS 서버에서 전체 매장 데이터를 가져오는 중입니다... (매장이 많아 1~2분 정도 걸릴 수 있어요)
     </div>
-    <div id="liveTableWrap" style="overflow-x:auto;"></div>
+    <div id="liveTableWrap"></div>
   </div>
 
   <!-- 재계약 현황판 페이지 -->
@@ -4841,11 +4872,13 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     if(!data){ wrap.innerHTML = ''; return; }
 
     // 날짜 목록 생성 (START ~ END, 하루 단위)
+    const WD = ['일','월','화','수','목','금','토'];
     const dates = [];
     const sD = new Date(+data.START.slice(0,4), +data.START.slice(4,6)-1, +data.START.slice(6,8));
     const eD = new Date(+data.END.slice(0,4), +data.END.slice(4,6)-1, +data.END.slice(6,8));
     for(let d = new Date(sD); d <= eD; d.setDate(d.getDate()+1)){
-      dates.push(`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`);
+      const ymd = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+      dates.push({ ymd, wd: d.getDay() });
     }
 
     const q = (document.getElementById('liveSearch').value || '').trim();
@@ -4853,42 +4886,52 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     if(q) rows = rows.filter(r => (r.name||'').includes(q));
     rows.sort((a,b) => (a.name||'').localeCompare(b.name||'', 'ko'));
 
-    const totalByDate = {}; dates.forEach(dt => totalByDate[dt] = 0);
+    if(!rows.length){
+      wrap.innerHTML = `<div class="live-empty">${q ? `"${q}" 검색 결과가 없어요.` : '표시할 매장 데이터가 없어요.'}</div>`;
+      return;
+    }
+
+    const totalByDate = {}; dates.forEach(d => totalByDate[d.ymd] = 0);
     let grandTotal = 0;
     let errorCount = 0;
 
     const bodyRows = rows.map(r => {
       if(r.error){
         errorCount++;
-        return `<tr><td style="padding:4px 8px;">${r.name}</td><td colspan="${dates.length+1}" style="color:#e05555;padding:4px 8px;">조회 실패 (${r.error})</td></tr>`;
+        return `<tr class="err-row"><td>${r.name}</td><td colspan="${dates.length+1}" style="text-align:left;">⚠ 조회 실패 · ${r.error}</td></tr>`;
       }
       const byDate = {};
       (r.days||[]).forEach(day => { byDate[day.SDA_DT] = day.SA_AMT_TTL || 0; });
       let rowTotal = 0;
-      const cells = dates.map(dt => {
-        const v = byDate[dt] || 0;
+      const cells = dates.map(d => {
+        const v = byDate[d.ymd] || 0;
         rowTotal += v;
-        totalByDate[dt] += v;
-        return `<td style="text-align:right;padding:4px 8px;">${v.toLocaleString()}</td>`;
+        totalByDate[d.ymd] += v;
+        const cls = [v === 0 ? 'zero' : '', (d.wd === 0 || d.wd === 6) ? 'wknd' : ''].filter(Boolean).join(' ');
+        return `<td class="${cls}">${v.toLocaleString()}</td>`;
       }).join('');
       grandTotal += rowTotal;
-      return `<tr><td style="padding:4px 8px;">${r.name}</td>${cells}<td style="text-align:right;font-weight:700;padding:4px 8px;">${rowTotal.toLocaleString()}</td></tr>`;
+      return `<tr><td>${r.name}</td>${cells}<td class="grand-total">${rowTotal.toLocaleString()}</td></tr>`;
     }).join('');
 
-    const headerCells = dates.map(dt => `<th style="padding:4px 8px;">${dt.slice(4,6)}/${dt.slice(6,8)}</th>`).join('');
-    const totalRow = `<tr style="font-weight:700;background:#f0f6fc;position:sticky;top:0;">
-        <td style="padding:4px 8px;">전체 합계${errorCount ? ` (조회실패 ${errorCount}곳 제외)` : ''}</td>
-        ${dates.map(dt => `<td style="text-align:right;padding:4px 8px;">${totalByDate[dt].toLocaleString()}</td>`).join('')}
-        <td style="text-align:right;padding:4px 8px;">${grandTotal.toLocaleString()}</td>
+    const headerCells = dates.map(d => `<th class="${(d.wd === 0 || d.wd === 6) ? 'wknd' : ''}">${d.ymd.slice(4,6)}/${d.ymd.slice(6,8)}<br><span style="font-weight:400;opacity:.75;">${WD[d.wd]}</span></th>`).join('');
+    const totalRow = `<tr class="total-row">
+        <td>전체 합계${errorCount ? ` <span style="font-weight:400;color:#e0895c;">(조회실패 ${errorCount}곳 제외)</span>` : ''}</td>
+        ${dates.map(d => `<td>${totalByDate[d.ymd].toLocaleString()}</td>`).join('')}
+        <td>${grandTotal.toLocaleString()}</td>
       </tr>`;
 
     wrap.innerHTML = `
-      <table style="width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;">
-        <thead><tr style="background:#e8f2fa;">
-          <th style="text-align:left;padding:4px 8px;">매장명</th>${headerCells}<th style="padding:4px 8px;">합계</th>
-        </tr></thead>
-        <tbody>${totalRow}${bodyRows}</tbody>
-      </table>`;
+      <div class="live-table-card">
+        <div class="live-table-scroll">
+          <table class="live-table">
+            <thead><tr>
+              <th>매장명 (${rows.length}곳)</th>${headerCells}<th>합계</th>
+            </tr></thead>
+            <tbody>${totalRow}${bodyRows}</tbody>
+          </table>
+        </div>
+      </div>`;
   };
 
   function royaltyApiConfigured(){
