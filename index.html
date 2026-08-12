@@ -5062,7 +5062,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       return `<tr><td>${r.name}</td>${mgrCell}${openDaysCell}${r.cellsHtml}${totalCell}</tr>`;
     }).join('');
 
-    const headerCells = dates.map(d => `<th class="${(d.wd === 0 || d.wd === 6) ? 'wknd' : ''}" style="text-align:center;">${d.ymd.slice(4,6)}/${d.ymd.slice(6,8)}(${WD[d.wd]})</th>`).join('');
+    const headerCells = dates.map(d => `<th class="${(d.wd === 0 || d.wd === 6) ? 'wknd' : ''}" style="text-align:right;">${d.ymd.slice(4,6)}/${d.ymd.slice(6,8)}(${WD[d.wd]})</th>`).join('');
 
     const nameHeaderLabel = isPeriod
       ? `매장명 (${rows.length}개)`
@@ -5081,8 +5081,9 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       </tr>`;
 
     // 정렬 가능한 헤더: 클릭하면 liveSortBy(mode, key) 호출, 현재 정렬 컬럼엔 ▲/▼ 표시
-    const sortTh = (key, label) =>
-      `<th style="text-align:center;cursor:pointer;user-select:none;" onclick="window.liveSortBy('${ids.mode}','${key}')" title="클릭해서 정렬">${label}${liveSortArrow_(ids.mode, key)}</th>`;
+    // align: 텍스트 컬럼(매장명/담당자)은 'center', 숫자 컬럼(합계/평균매출/영업일수)은 'right'로 데이터와 일직선 맞춤
+    const sortTh = (key, label, align = 'right') =>
+      `<th style="text-align:${align};cursor:pointer;user-select:none;" onclick="window.liveSortBy('${ids.mode}','${key}')" title="클릭해서 정렬">${label}${liveSortArrow_(ids.mode, key)}</th>`;
 
     const headerMid = isPeriod
       ? `${sortTh('total','합계')}${sortTh('avg','평균매출')}${headerCells}`
@@ -5093,7 +5094,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
         <div class="live-table-scroll">
           <table class="live-table">
             <thead><tr>
-              ${sortTh('name', nameHeaderLabel)}${sortTh('manager','담당자')}${sortTh('openDays','영업일수')}${headerMid}
+              ${sortTh('name', nameHeaderLabel, 'center')}${sortTh('manager','담당자','center')}${sortTh('openDays','영업일수')}${headerMid}
             </tr></thead>
             <tbody>${totalRow}${bodyRows}</tbody>
           </table>
@@ -5274,8 +5275,8 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     rows.forEach(r => { totalQty += r.qty; totalAmount += r.amount; });
 
     const sortArrow = (key) => st.key === key ? (st.dir === 1 ? ' ▲' : ' ▼') : '';
-    const sortTh = (key, label) =>
-      `<th style="text-align:center;cursor:pointer;user-select:none;" onclick="window.livePrSortBy('${key}')" title="클릭해서 정렬">${label}${sortArrow(key)}</th>`;
+    const sortTh = (key, label, align = 'right') =>
+      `<th style="text-align:${align};cursor:pointer;user-select:none;" onclick="window.livePrSortBy('${key}')" title="클릭해서 정렬">${label}${sortArrow(key)}</th>`;
 
     const bodyRows = rows.map(r => `
       <tr>
@@ -5291,7 +5292,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
         <div class="live-table-scroll">
           <table class="live-table">
             <thead><tr>
-              ${sortTh('name', `매장명 (${rows.length}건)`)}${sortTh('manager','담당자')}${sortTh('product','상품명')}${sortTh('qty','수량')}${sortTh('amount','금액')}
+              ${sortTh('name', `매장명 (${rows.length}건)`, 'center')}${sortTh('manager','담당자','center')}${sortTh('product','상품명','center')}${sortTh('qty','수량')}${sortTh('amount','금액')}
             </tr></thead>
             <tbody>
               <tr class="total-row">
