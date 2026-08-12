@@ -4848,13 +4848,11 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
 
   // ══════════════════════════════════════════════════════════
   //  LIVE 매출 (tpay POS API 실시간 연동)
-  //  배포한 POS 프록시 Apps Script 웹앱의 /exec URL을 아래에 붙여넣으세요.
+  //  [2026-08-12] Apps Script + PropertiesService 캐시 방식에서
+  //  GitHub Actions가 30분마다 갱신하는 정적 data/live-daily.json 방식으로 전환.
+  //  raw.githubusercontent.com은 GitHub Pages보다 갱신 반영이 빠릅니다.
   // ══════════════════════════════════════════════════════════
-  const POS_API_URL = 'https://script.google.com/macros/s/AKfycbznl0J_PmUvCOcRJkayLbvShXE7tq-Lh-ciVklGEEQ4ZmQyrf-rB-MtqfNEBAWXQBiJ/exec';
-
-  function posApiConfigured(){
-    return POS_API_URL && POS_API_URL.indexOf('여기에_배포URL') === -1;
-  }
+  const LIVE_DATA_URL = 'https://raw.githubusercontent.com/TAEHWAN8872/bokhodu-dashboard/main/data/live-daily.json';
 
   function todayYmd_(){
     const d = new Date();
@@ -4895,13 +4893,19 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     sel.value = wanted.includes(current) ? current : 'all';
   }
 
-  // 두 서브탭이 공유하는 조회 함수: API를 호출해서 원본 데이터를 가져온다
+  // 두 서브탭이 공유하는 조회 함수: GitHub Actions가 갱신하는 정적 json에서 원본 데이터를 가져온다
   async function fetchLiveDaily_(start, end){
-    if(!posApiConfigured()) throw new Error('아직 연동 설정 전이에요. (POS_API_URL을 Apps Script 웹앱 주소로 교체해주세요)');
-    const res = await fetch(`${POS_API_URL}?action=liveDaily&start=${start}&end=${end}`);
-    const data = await res.json();
-    if(data.RESPONSE_CODE !== '0000') throw new Error(data.RESPONSE_MSG || data.RESPONSE_CODE || '알 수 없는 오류');
-    return data;
+    const res = await fetch(`${LIVE_DATA_URL}?_=${Date.now()}`); // 쿼리스트링으로 캐시 우회
+    if(!res.ok) throw new Error('데이터 파일을 불러오지 못했어요 (HTTP ' + res.status + ')');
+    const raw = await res.json();
+
+    const stores = {};
+    Object.entries(raw.STORES || {}).forEach(([code, s]) => {
+      if(s.error){ stores[code] = s; return; }
+      stores[code] = { name: s.name, days: (s.days||[]).filter(d => d.SDA_DT >= start && d.SDA_DT <= end) };
+    });
+
+    return { RESPONSE_CODE: '0000', START: start, END: end, STORES: stores, CACHED_AT: raw.updatedAt };
   }
 
   // 두 서브탭이 공유하는 렌더 함수: (데이터, DOM id 세트)를 받아 표를 그린다
