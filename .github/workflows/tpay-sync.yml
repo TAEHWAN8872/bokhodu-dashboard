@@ -12,18 +12,22 @@ on:
         options:
           - daily
           - backfill
+          - product-backfill
           - debug
-          - debug_product
       rolling_days:
         description: 'backfill 모드일 때 조회할 일수'
         required: false
         default: '90'
+      product_rolling_days:
+        description: 'product-backfill 모드일 때 조회할 일수 (용량 문제로 기본 90일 권장)'
+        required: false
+        default: '90'
       debug_shop_no:
-        description: 'debug/debug_product 모드일 때 테스트할 매장코드'
+        description: 'debug 모드일 때 테스트할 매장코드'
         required: false
         default: 'BHD055'
       debug_days:
-        description: 'debug/debug_product 모드일 때 조회할 일수 (범위 제한 테스트용)'
+        description: 'debug 모드일 때 조회할 일수 (범위 제한 테스트용)'
         required: false
         default: '7'
 permissions:
@@ -46,12 +50,23 @@ jobs:
         env:
           TPAY_TOKEN: ${{ secrets.TPAY_TOKEN }}
         run: node scripts/daily-update.js
+      - name: 상품별 일일 갱신 실행 (스케줄 or 수동-daily)
+        if: github.event_name == 'schedule' || github.event.inputs.mode == 'daily'
+        env:
+          TPAY_TOKEN: ${{ secrets.TPAY_TOKEN }}
+        run: node scripts/product-daily-update.js
       - name: 백필 실행 (수동-backfill)
         if: github.event.inputs.mode == 'backfill'
         env:
           TPAY_TOKEN: ${{ secrets.TPAY_TOKEN }}
           ROLLING_DAYS: ${{ github.event.inputs.rolling_days }}
         run: node scripts/backfill.js
+      - name: 상품별 백필 실행 (수동-product-backfill)
+        if: github.event.inputs.mode == 'product-backfill'
+        env:
+          TPAY_TOKEN: ${{ secrets.TPAY_TOKEN }}
+          PRODUCT_ROLLING_DAYS: ${{ github.event.inputs.product_rolling_days }}
+        run: node scripts/product-backfill.js
       - name: 진단 실행 (수동-debug, 원본 응답 확인용)
         if: github.event.inputs.mode == 'debug'
         env:
@@ -59,19 +74,12 @@ jobs:
           DEBUG_SHOP_NO: ${{ github.event.inputs.debug_shop_no }}
           DEBUG_DAYS: ${{ github.event.inputs.debug_days }}
         run: node scripts/debug-single-store.js
-      - name: 상품별 진단 실행 (수동-debug_product, REQ_CODE 5 원본 응답 확인용)
-        if: github.event.inputs.mode == 'debug_product'
-        env:
-          TPAY_TOKEN: ${{ secrets.TPAY_TOKEN }}
-          DEBUG_SHOP_NO: ${{ github.event.inputs.debug_shop_no }}
-          DEBUG_DAYS: ${{ github.event.inputs.debug_days }}
-        run: node scripts/debug-product-sales.js
       - name: 변경사항 커밋 & 푸시
-        if: github.event.inputs.mode != 'debug' && github.event.inputs.mode != 'debug_product'
+        if: github.event.inputs.mode != 'debug'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/live-daily.json
+          git add data/live-daily.json data/product-daily.json
           if git diff --cached --quiet; then
             echo "변경 없음, 커밋 생략"
           else
