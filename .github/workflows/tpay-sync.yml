@@ -14,10 +14,15 @@ on:
         options:
           - daily
           - backfill
+          - debug
       rolling_days:
         description: 'backfill 모드일 때 조회할 일수'
         required: false
         default: '90'
+      debug_shop_no:
+        description: 'debug 모드일 때 테스트할 매장코드'
+        required: false
+        default: 'BHD055'
 
 permissions:
   contents: write
@@ -51,7 +56,15 @@ jobs:
           ROLLING_DAYS: ${{ github.event.inputs.rolling_days }}
         run: node scripts/backfill.js
 
+      - name: 진단 실행 (수동-debug, 원본 응답 확인용)
+        if: github.event.inputs.mode == 'debug'
+        env:
+          TPAY_TOKEN: ${{ secrets.TPAY_TOKEN }}
+          DEBUG_SHOP_NO: ${{ github.event.inputs.debug_shop_no }}
+        run: node scripts/debug-single-store.js
+
       - name: 변경사항 커밋 & 푸시
+        if: github.event.inputs.mode != 'debug'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
