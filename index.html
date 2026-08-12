@@ -5410,11 +5410,19 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   }
 
   // 패널 바깥을 클릭하면 자동으로 닫기
+  // ※ e.target 기준으로 검사하면 문제가 생김: 카테고리 탭이나 체크박스를 클릭하면
+  //   그 클릭 처리 중에 패널 내부를 다시 그리면서 방금 클릭한 요소 자체가 DOM에서
+  //   사라지므로, 이벤트가 document까지 버블링될 때는 panel.contains(e.target)이
+  //   false가 되어 패널이 즉시 닫혀버렸다. composedPath()는 클릭이 처음 발생한
+  //   시점의 경로를 그대로 담고 있어 이후 DOM이 바뀌어도 안전하게 판단할 수 있다.
   document.addEventListener('click', function(e){
     const panel = document.getElementById('livePrProductPanel');
     const btn = document.getElementById('livePrProductPanelBtn');
     if(!panel || panel.style.display === 'none') return;
-    if(panel.contains(e.target) || (btn && btn.contains(e.target))) return;
+    const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+    const clickedInsidePanel = path.length ? path.includes(panel) : panel.contains(e.target);
+    const clickedBtn = path.length ? (btn && path.includes(btn)) : (btn && btn.contains(e.target));
+    if(clickedInsidePanel || clickedBtn) return;
     panel.style.display = 'none';
   });
 
