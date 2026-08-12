@@ -4908,6 +4908,35 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     return { RESPONSE_CODE: '0000', START: start, END: end, STORES: stores, CACHED_AT: raw.updatedAt };
   }
 
+  // 헤더 클릭 정렬 상태 (서브탭별로 별도 유지)
+  window.__liveSortState = window.__liveSortState || {
+    realtime: { key: 'name', dir: 1 },
+    period: { key: 'name', dir: 1 }
+  };
+
+  window.liveSortBy = function(mode, key){
+    const st = window.__liveSortState[mode];
+    if(st.key === key){ st.dir *= -1; } else { st.key = key; st.dir = 1; }
+    if(mode === 'realtime') window.renderLiveRealtimeTable();
+    else window.renderLivePeriodTable();
+  };
+
+  function liveSortArrow_(mode, key){
+    const st = window.__liveSortState[mode];
+    if(st.key !== key) return '';
+    return st.dir === 1 ? ' ▲' : ' ▼';
+  }
+
+  function liveSortCompare_(a, b, key){
+    switch(key){
+      case 'manager': return (a.manager||'').localeCompare(b.manager||'', 'ko');
+      case 'openDays': return (a.openDays||0) - (b.openDays||0);
+      case 'total': return (a.rowTotal||0) - (b.rowTotal||0);
+      case 'avg': return (a.avgAmt||0) - (b.avgAmt||0);
+      case 'name': default: return (a.name||'').localeCompare(b.name||'', 'ko');
+    }
+  }
+
   // 두 서브탭이 공유하는 렌더 함수: (데이터, DOM id 세트)를 받아 표를 그린다
   // ids.mode: 'realtime' | 'period' — 서브탭별로 헤더/컬럼 배치가 다름
   //  - realtime: 헤더에 "전체 매장 수" 대신 "오늘 매출이 발생한 매장 수"를 표시
@@ -4916,6 +4945,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     const wrap = document.getElementById(ids.wrap);
     if(!data){ wrap.innerHTML = ''; return; }
     const isPeriod = ids.mode === 'period';
+    const sortState = window.__liveSortState[ids.mode] || { key: 'name', dir: 1 };
 
     const WD = ['일','월','화','수','목','금','토'];
     const dates = [];
@@ -4937,7 +4967,6 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
 
     const q = (document.getElementById(ids.search).value || '').trim();
     if(q) rows = rows.filter(r => (r.name||'').includes(q));
-    rows.sort((a,b) => (a.name||'').localeCompare(b.name||'', 'ko'));
 
     if(!rows.length){
       wrap.innerHTML = `<div class="live-empty">${q ? `"${q}" 검색 결과가 없어요.` : '표시할 매장 데이터가 없어요.'}</div>`;
@@ -4950,18 +4979,14 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     let salesStoreCount = 0; // 매출(>0)이 하루라도 있었던 매장 수
     let totalOpenDays = 0;   // 평균매출 계산용 (전 매장 영업일수 합)
 
-    const bodyRows = rows.map(r => {
-      const mgrCell = `<td style="text-align:left;color:#8fb8dd;">${r.manager || '-'}</td>`;
-      if(r.error){
-        errorCount++;
-        const errColspan = dates.length + (isPeriod ? 2 : 1);
-        return `<tr class="err-row"><td>${r.name}</td>${mgrCell}<td>-</td><td colspan="${errColspan}" style="text-align:left;">⚠ 조회 실패 · ${r.error}</td></tr>`;
-      }
+    // 1단계: 정렬 가능한 필드(rowTotal, openDays, avgAmt 등)를 미리 계산
+    const computed = rows.map(r => {
+      if(r.error) return { ...r, isError: true, rowTotal: 0, openDays: 0, avgAmt: 0, cellsHtml: '' };
       const byDate = {};
       (r.days||[]).forEach(day => { byDate[day.SDA_DT] = day.SA_AMT_TTL || 0; });
       let rowTotal = 0;
       let openDays = 0;
-      const cells = dates.map(d => {
+      const cellsHtml = dates.map(d => {
         const v = byDate[d.ymd] || 0;
         if(v > 0) openDays++;
         rowTotal += v;
@@ -4972,17 +4997,30 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       grandTotal += rowTotal;
       totalOpenDays += openDays;
       if(rowTotal > 0) salesStoreCount++;
-      const openDaysCell = `<td style="color:#8fb8dd;">${openDays}일</td>`;
-      const totalCell = `<td class="grand-total">${rowTotal.toLocaleString()}</td>`;
-      if(isPeriod){
-        const avgAmt = openDays > 0 ? Math.round(rowTotal / openDays) : 0;
-        const avgCell = `<td>${avgAmt.toLocaleString()}</td>`;
-        return `<tr><td>${r.name}</td>${mgrCell}${openDaysCell}${totalCell}${avgCell}${cells}</tr>`;
+      const avgAmt = openDays > 0 ? Math.round(rowTotal / openDays) : 0;
+      return { ...r, isError: false, rowTotal, openDays, avgAmt, cellsHtml };
+    });
+    if(computed.some(r => r.isError)) errorCount = computed.filter(r => r.isError).length;
+
+    // 2단계: 헤더 클릭으로 선택된 컬럼 기준 정렬
+    computed.sort((a, b) => sortState.dir * liveSortCompare_(a, b, sortState.key));
+
+    const bodyRows = computed.map(r => {
+      const mgrCell = `<td style="text-align:left;color:#8fb8dd;">${r.manager || '-'}</td>`;
+      if(r.isError){
+        const errColspan = dates.length + (isPeriod ? 2 : 1);
+        return `<tr class="err-row"><td>${r.name}</td>${mgrCell}<td>-</td><td colspan="${errColspan}" style="text-align:left;">⚠ 조회 실패 · ${r.error}</td></tr>`;
       }
-      return `<tr><td>${r.name}</td>${mgrCell}${openDaysCell}${cells}${totalCell}</tr>`;
+      const openDaysCell = `<td style="color:#8fb8dd;">${r.openDays}일</td>`;
+      const totalCell = `<td class="grand-total">${r.rowTotal.toLocaleString()}</td>`;
+      if(isPeriod){
+        const avgCell = `<td>${r.avgAmt.toLocaleString()}</td>`;
+        return `<tr><td>${r.name}</td>${mgrCell}${openDaysCell}${totalCell}${avgCell}${r.cellsHtml}</tr>`;
+      }
+      return `<tr><td>${r.name}</td>${mgrCell}${openDaysCell}${r.cellsHtml}${totalCell}</tr>`;
     }).join('');
 
-    const headerCells = dates.map(d => `<th class="${(d.wd === 0 || d.wd === 6) ? 'wknd' : ''}">${d.ymd.slice(4,6)}/${d.ymd.slice(6,8)}<br><span style="font-weight:400;opacity:.75;">${WD[d.wd]}</span></th>`).join('');
+    const headerCells = dates.map(d => `<th class="${(d.wd === 0 || d.wd === 6) ? 'wknd' : ''}" style="text-align:center;">${d.ymd.slice(4,6)}/${d.ymd.slice(6,8)}<br><span style="font-weight:400;opacity:.75;">${WD[d.wd]}</span></th>`).join('');
 
     const nameHeaderLabel = isPeriod
       ? `매장명 (${rows.length}곳)`
@@ -5000,16 +5038,20 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
         ${totalRowMid}
       </tr>`;
 
+    // 정렬 가능한 헤더: 클릭하면 liveSortBy(mode, key) 호출, 현재 정렬 컬럼엔 ▲/▼ 표시
+    const sortTh = (key, label) =>
+      `<th style="text-align:center;cursor:pointer;user-select:none;" onclick="window.liveSortBy('${ids.mode}','${key}')" title="클릭해서 정렬">${label}${liveSortArrow_(ids.mode, key)}</th>`;
+
     const headerMid = isPeriod
-      ? `<th>합계</th><th>평균매출</th>${headerCells}`
-      : `${headerCells}<th>합계</th>`;
+      ? `${sortTh('total','합계')}${sortTh('avg','평균매출')}${headerCells}`
+      : `${headerCells}${sortTh('total','합계')}`;
 
     wrap.innerHTML = `
       <div class="live-table-card">
         <div class="live-table-scroll">
           <table class="live-table">
             <thead><tr>
-              <th>${nameHeaderLabel}</th><th style="text-align:left;">담당자</th><th>영업일수</th>${headerMid}
+              ${sortTh('name', nameHeaderLabel)}${sortTh('manager','담당자')}${sortTh('openDays','영업일수')}${headerMid}
             </tr></thead>
             <tbody>${totalRow}${bodyRows}</tbody>
           </table>
