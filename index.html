@@ -407,7 +407,7 @@ body.hide-names .store-name:hover{
 .live-table th.wknd{color:#e0a05c;}
 .live-table th:first-child{text-align:left;position:sticky;left:0;top:0;z-index:4;background:#132540;box-shadow:1px 0 0 #1e3347;}
 .live-table td{padding:6px 12px;text-align:right;border-bottom:0.5px solid #16283c;color:#c8dff0;font-variant-numeric:tabular-nums;}
-.live-table td:first-child{position:sticky;left:0;z-index:1;background:#0d1b2a;text-align:left;color:#e0f0ff;font-weight:600;box-shadow:1px 0 0 #1e3347;}
+.live-table td:first-child{position:sticky;left:0;z-index:1;background:#0d1b2a;text-align:center;color:#e0f0ff;font-weight:600;box-shadow:1px 0 0 #1e3347;}
 .live-table td.zero{color:#3c5066;}
 .live-table td.wknd{background:rgba(224,160,92,0.05);}
 .live-table tr:hover td{background:#152236;}
@@ -5048,7 +5048,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     computed.sort((a, b) => sortState.dir * liveSortCompare_(a, b, sortState.key));
 
     const bodyRows = computed.map(r => {
-      const mgrCell = `<td style="text-align:left;color:#8fb8dd;">${r.manager || '-'}</td>`;
+      const mgrCell = `<td style="text-align:center;color:#8fb8dd;">${r.manager || '-'}</td>`;
       if(r.isError){
         const errColspan = dates.length + (isPeriod ? 2 : 1);
         return `<tr class="err-row"><td>${r.name}</td>${mgrCell}<td>-</td><td colspan="${errColspan}" style="text-align:left;">⚠ 조회 실패 · ${r.error}</td></tr>`;
@@ -5279,9 +5279,9 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
 
     const bodyRows = rows.map(r => `
       <tr>
-        <td style="text-align:left;">${r.name}</td>
-        <td style="text-align:left;color:#8fb8dd;">${r.manager || '-'}</td>
-        <td style="text-align:left;">${r.product}</td>
+        <td style="text-align:center;">${r.name}</td>
+        <td style="text-align:center;color:#8fb8dd;">${r.manager || '-'}</td>
+        <td style="text-align:center;">${r.product}</td>
         <td>${r.qty.toLocaleString()}</td>
         <td class="grand-total">${r.amount.toLocaleString()}</td>
       </tr>`).join('');
