@@ -2,6 +2,7 @@ name: tpay 매출 데이터 동기화
 on:
   schedule:
     - cron: '*/30 * * * *'
+    - cron: '0 18 * * *'   # 매일 KST 03:00(UTC 18:00) — 상품분류 매핑은 자주 안 바뀌므로 하루 1번만
   workflow_dispatch:
     inputs:
       mode:
@@ -13,6 +14,7 @@ on:
           - daily
           - backfill
           - product-backfill
+          - product-category
           - debug
       rolling_days:
         description: 'backfill 모드일 때 조회할 일수'
@@ -55,6 +57,11 @@ jobs:
         env:
           TPAY_TOKEN: ${{ secrets.TPAY_TOKEN }}
         run: node scripts/product-daily-update.js
+      - name: 상품분류 매핑 갱신 (매일 1회 스케줄 or 수동-product-category)
+        if: github.event.schedule == '0 18 * * *' || github.event.inputs.mode == 'product-category'
+        env:
+          TPAY_TOKEN: ${{ secrets.TPAY_TOKEN }}
+        run: node scripts/product-category.js
       - name: 백필 실행 (수동-backfill)
         if: github.event.inputs.mode == 'backfill'
         env:
@@ -80,6 +87,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/live-daily.json data/product-daily.json
+          if [ -f data/product-category.json ]; then git add data/product-category.json; fi
           if git diff --cached --quiet; then
             echo "변경 없음, 커밋 생략"
           else
