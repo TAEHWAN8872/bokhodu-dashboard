@@ -244,14 +244,9 @@ async function fetchOneStoreProductsRange(token, code, start, end, chunkDays = M
 
 /**
  * 상품정보(상품 마스터) 조회 (REQ_CODE 2) + 실패 시 재시도(3회+백오프).
- * 날짜 범위가 필요 없는 조회로 보여 SALE_START_DATE/SALE_END_DATE는 넘기지 않음.
+ * 날짜 범위가 필요 없는 조회로 확인됨(SALE_START_DATE/SALE_END_DATE 없이도 동일 응답).
  * 반환: { products: [...] } 또는 { error: '...' }
- *
- * ⚠ 주의: 실제 응답 필드명(현재 SALE_INFO로 추정)은 REQ_CODE 4/5와 동일한
- * 패턴을 그대로 가정한 것이라 확인이 필요함. 처음 호출해보고 실제 응답을
- * 콘솔에 찍어서(JSON.stringify(data)) 필드명이 다르면 아래 return 부분의
- * data.SALE_INFO 를 실제 필드명으로 바꿔주면 됨. 각 항목은 대략
- * { CMDTG_CD, CMDTG_NM, CMDT_CD, CMDT_NM, ... } 형태일 것으로 예상.
+ * 각 항목은 { CMDTG_CD, CMDTG_NM, CMDT_CD, CMDT_NM, CMDT_DEL_MK, ... } 형태로 확인됨.
  */
 async function fetchProductCategories(token, code) {
   const body = JSON.stringify({
@@ -278,8 +273,7 @@ async function fetchProductCategories(token, code) {
         try {
           const data = await res.json();
           if (data.RESPONSE_CODE === '0000') {
-            // TODO: 실제 응답 확인 후 필드명 검증/수정
-            return { products: data.SALE_INFO || [] };
+            return { products: data.ITEM_INFO || [] };
           }
           lastError = data.RESPONSE_MSG || data.RESPONSE_CODE;
         } catch (e) {
@@ -299,6 +293,10 @@ async function fetchProductCategories(token, code) {
 /**
  * fetchProductCategories 결과를 { [상품명]: 분류명 } 매핑 객체로 변환.
  * 같은 상품명이 여러 매장/여러 건 나와도 마지막 값으로 덮어써 정리됨.
+ * CMDT_DEL_MK가 'Y'인 상품은 일단 제외하지 않고 그대로 포함시킴 — 이 필드가
+ * 정확히 "삭제됨"을 뜻하는지, 아니면 다른 상태 플래그인지 확인 전이라 임의로
+ * 걸러내지 않았습니다. 실제 응답에서 이 필드의 의미가 확인되면 여기서 필터링을
+ * 추가하면 됩니다.
  */
 function buildProductCategoryMap(products) {
   const map = {};
