@@ -165,6 +165,83 @@ async function fetchOneStoreRange(token, code, start, end, chunkDays = MAX_RANGE
   return { days: allDays };
 }
 
+/**
+ * 단건 매장 상품별 정산 조회 (REQ_CODE 5) + 실패 시 재시도(3회+백오프).
+ * 반환: { rows: [...] } 또는 { error: '...' }
+ */
+async function fetchOneStoreProducts(token, code, start, end) {
+  const body = JSON.stringify({
+    REQ_CODE: '5',
+    FRANCHISE_CODE,
+    BRAND_CODE,
+    SHOP_NO: code,
+    SALE_START_DATE: start,
+    SALE_END_DATE: end,
+  });
+
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(TPAY_HOST + 'bridge/common/selectPos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token,
+          'Accept-Encoding': 'utf-8',
+        },
+        body,
+      });
+
+      if (res.ok) {
+        try {
+          const data = await res.json();
+          if (data.RESPONSE_CODE === '0000') return { rows: data.SALE_INFO || [] };
+          lastError = data.RESPONSE_MSG || data.RESPONSE_CODE;
+        } catch (e) {
+          lastError = 'parse error';
+        }
+      } else {
+        lastError = 'HTTP_' + res.status;
+      }
+    } catch (e) {
+      lastError = 'FETCH_EXCEPTION: ' + e.message;
+    }
+    if (attempt < 2) await sleep(500 * (attempt + 1));
+  }
+  return { error: lastError || 'unknown error' };
+}
+
+/**
+ * 상품별 정산 조회, [start, end]가 15일을 넘으면 자동으로 청크로 쪼개서 호출.
+ */
+async function fetchOneStoreProductsRange(token, code, start, end, chunkDays = MAX_RANGE_DAYS) {
+  const ranges = splitDateRange(start, end, chunkDays);
+
+  if (ranges.length === 1) {
+    return fetchOneStoreProducts(token, code, ranges[0][0], ranges[0][1]);
+  }
+
+  let allRows = [];
+  const errors = [];
+
+  for (let i = 0; i < ranges.length; i++) {
+    const [rStart, rEnd] = ranges[i];
+    const result = await fetchOneStoreProducts(token, code, rStart, rEnd);
+    if (result.error) {
+      errors.push(`${rStart}~${rEnd}: ${result.error}`);
+    } else {
+      allRows = allRows.concat(result.rows);
+    }
+    if (i < ranges.length - 1) await sleep(150);
+  }
+
+  if (errors.length > 0) {
+    if (allRows.length === 0) return { error: errors.join(' | ') };
+    return { rows: allRows, partialError: errors.join(' | ') };
+  }
+  return { rows: allRows };
+}
+
 module.exports = {
   TPAY_HOST,
   FRANCHISE_CODE,
