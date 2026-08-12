@@ -1,69 +1,73 @@
-// scripts/lib.js
-// tpay API 공통 함수 모음. Apps Script 버전의 fetchOneStore_/callTpay_ 로직을 그대로 이식.
+// scripts/backfill.js
+// 최초 1회(또는 필요시 수동으로) 90일치 전체 데이터를 새로 받아서
+// data/live-daily.json을 새로 만듭니다. 평소 자동 실행되는 스크립트가 아니라
+// GitHub Actions에서 workflow_dispatch로 수동 실행하는 용도입니다.
+//
+// tpay API는 조회 범위가 15일을 넘어가면 에러 없이 빈 배열을 반환하는 것으로
+// 확인되어(디버그 결과: 14일=정상, 31일 이상=전멸), fetchOneStoreRange()가
+// 요청 범위를 15일 단위로 자동으로 쪼개서 여러 번 호출한 뒤 합쳐준다.
+//
+// 사용법(로컬): TPAY_TOKEN=xxx node scripts/backfill.js
+// 사용법(Actions): workflow_dispatch 로 tpay-sync.yml의 backfill job 실행
 
-const TPAY_HOST = 'http://gw-api.tpay.co.kr/';
-const FRANCHISE_CODE = 'AF0076';
-const BRAND_CODE = 'BOKHD';
+const fs = require('fs');
+const path = require('path');
+const { kstDateString, sleep, fetchOneStoreRange } = require('./lib');
 
-/** KST 기준 yyyyMMdd 문자열 (오늘 또는 offsetDays만큼 이전 날짜) */
-function kstDateString(offsetDays = 0) {
-  const now = new Date();
-  // UTC 기준시각 + 9시간 = KST
-  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000 + offsetDays * 86400000);
-  const y = kst.getUTCFullYear();
-  const m = String(kst.getUTCMonth() + 1).padStart(2, '0');
-  const d = String(kst.getUTCDate()).padStart(2, '0');
-  return `${y}${m}${d}`;
-}
+const ROLLING_DAYS = Number(process.env.ROLLING_DAYS || 90);
+const DATA_PATH = path.join(__dirname, '..', 'data', 'live-daily.json');
+const STORE_MAP_PATH = path.join(__dirname, '..', 'data', 'store-map.json');
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+async function main() {
+  const token = process.env.TPAY_TOKEN;
+  if (!token) throw new Error('TPAY_TOKEN 환경변수가 없습니다.');
 
-/**
- * 단건 매장 조회 + 실패 시 재시도 (3회 + 백오프).
- * 반환: { days: [...] } 또는 { error: '...' }
- */
-async function fetchOneStore(token, code, start, end) {
-  const body = JSON.stringify({
-    REQ_CODE: '4',
-    FRANCHISE_CODE,
-    BRAND_CODE,
-    SHOP_NO: code,
-    SALE_START_DATE: start,
-    SALE_END_DATE: end,
-  });
+  const storeMap = JSON.parse(fs.readFileSync(STORE_MAP_PATH, 'utf8')); // [[name, code], ...]
 
-  let lastError = null;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const res = await fetch(TPAY_HOST + 'bridge/common/selectPos', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer ' + token,
-          'Accept-Encoding': 'utf-8',
-        },
-        body,
-      });
+  const end = kstDateString(0);
+  const start = kstDateString(-ROLLING_DAYS);
 
-      if (res.ok) {
-        try {
-          const data = await res.json();
-          if (data.RESPONSE_CODE === '0000') return { days: data.SALE_INFO || [] };
-          lastError = data.RESPONSE_MSG || data.RESPONSE_CODE;
-        } catch (e) {
-          lastError = 'parse error';
-        }
-      } else {
-        lastError = 'HTTP_' + res.status;
-      }
-    } catch (e) {
-      lastError = 'FETCH_EXCEPTION: ' + e.message;
+  console.log(`백필 시작: ${start} ~ ${end}, 매장 ${storeMap.length}개 (15일 단위 자동 분할 조회)`);
+
+  const stores = {};
+  const failed = [];
+  const partial = [];
+
+  for (let i = 0; i < storeMap.length; i++) {
+    const [name, code] = storeMap[i];
+    const result = await fetchOneStoreRange(token, code, start, end);
+    stores[code] = { name, ...result };
+
+    if (result.error) {
+      failed.push(`${code}(${name}): ${result.error}`);
+    } else if (result.partialError) {
+      partial.push(`${code}(${name}): ${result.partialError}`);
     }
-    if (attempt < 2) await sleep(500 * (attempt + 1));
+
+    if (i % 20 === 0) console.log(`진행: ${i + 1}/${storeMap.length}`);
+    if (i < storeMap.length - 1) await sleep(150);
   }
-  return { error: lastError || 'unknown error' };
+
+  const output = {
+    START: start,
+    END: end,
+    STORES: stores,
+    updatedAt: new Date().toISOString(),
+    lastRunType: 'backfill',
+  };
+
+  fs.mkdirSync(path.dirname(DATA_PATH), { recursive: true });
+  fs.writeFileSync(DATA_PATH, JSON.stringify(output));
+
+  console.log(
+    `백필 완료: 완전성공 ${storeMap.length - failed.length - partial.length}개 / ` +
+      `부분성공 ${partial.length}개 / 실패 ${failed.length}개`
+  );
+  if (partial.length) console.log('부분 실패 매장(일부 구간만 누락):\n' + partial.join('\n'));
+  if (failed.length) console.log('완전 실패 매장:\n' + failed.join('\n'));
 }
 
-module.exports = { TPAY_HOST, FRANCHISE_CODE, BRAND_CODE, kstDateString, sleep, fetchOneStore };
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
