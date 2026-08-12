@@ -242,6 +242,74 @@ async function fetchOneStoreProductsRange(token, code, start, end, chunkDays = M
   return { rows: allRows };
 }
 
+/**
+ * 상품정보(상품 마스터) 조회 (REQ_CODE 2) + 실패 시 재시도(3회+백오프).
+ * 날짜 범위가 필요 없는 조회로 보여 SALE_START_DATE/SALE_END_DATE는 넘기지 않음.
+ * 반환: { products: [...] } 또는 { error: '...' }
+ *
+ * ⚠ 주의: 실제 응답 필드명(현재 SALE_INFO로 추정)은 REQ_CODE 4/5와 동일한
+ * 패턴을 그대로 가정한 것이라 확인이 필요함. 처음 호출해보고 실제 응답을
+ * 콘솔에 찍어서(JSON.stringify(data)) 필드명이 다르면 아래 return 부분의
+ * data.SALE_INFO 를 실제 필드명으로 바꿔주면 됨. 각 항목은 대략
+ * { CMDTG_CD, CMDTG_NM, CMDT_CD, CMDT_NM, ... } 형태일 것으로 예상.
+ */
+async function fetchProductCategories(token, code) {
+  const body = JSON.stringify({
+    REQ_CODE: '2',
+    FRANCHISE_CODE,
+    BRAND_CODE,
+    SHOP_NO: code,
+  });
+
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(TPAY_HOST + 'bridge/common/selectPos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token,
+          'Accept-Encoding': 'utf-8',
+        },
+        body,
+      });
+
+      if (res.ok) {
+        try {
+          const data = await res.json();
+          if (data.RESPONSE_CODE === '0000') {
+            // TODO: 실제 응답 확인 후 필드명 검증/수정
+            return { products: data.SALE_INFO || [] };
+          }
+          lastError = data.RESPONSE_MSG || data.RESPONSE_CODE;
+        } catch (e) {
+          lastError = 'parse error';
+        }
+      } else {
+        lastError = 'HTTP_' + res.status;
+      }
+    } catch (e) {
+      lastError = 'FETCH_EXCEPTION: ' + e.message;
+    }
+    if (attempt < 2) await sleep(500 * (attempt + 1));
+  }
+  return { error: lastError || 'unknown error' };
+}
+
+/**
+ * fetchProductCategories 결과를 { [상품명]: 분류명 } 매핑 객체로 변환.
+ * 같은 상품명이 여러 매장/여러 건 나와도 마지막 값으로 덮어써 정리됨.
+ */
+function buildProductCategoryMap(products) {
+  const map = {};
+  for (const p of products) {
+    const name = p.CMDT_NM;
+    const category = p.CMDTG_NM;
+    if (name && category) map[name] = category;
+  }
+  return map;
+}
+
 module.exports = {
   TPAY_HOST,
   FRANCHISE_CODE,
@@ -257,4 +325,6 @@ module.exports = {
   fetchOneStoreRange,
   fetchOneStoreProducts,
   fetchOneStoreProductsRange,
+  fetchProductCategories,
+  buildProductCategoryMap,
 };
