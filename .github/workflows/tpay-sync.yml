@@ -28,7 +28,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: tpay-sync-${{ github.event.inputs.mode || 'daily' }}
+  group: tpay-sync
   cancel-in-progress: false
 jobs:
   sync:
@@ -68,5 +68,9 @@ jobs:
             echo "변경 없음, 커밋 생략"
           else
             git commit -m "chore: tpay 매출 데이터 갱신 ($(date -u +'%Y-%m-%d %H:%M UTC'))"
-            git push
+            for i in 1 2 3; do
+              git pull --rebase origin main && git push && break
+              echo "푸시 실패, 재시도 ($i/3)..."
+              sleep 5
+            done
           fi
