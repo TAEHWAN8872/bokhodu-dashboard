@@ -5020,10 +5020,10 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       return `<tr><td>${r.name}</td>${mgrCell}${openDaysCell}${r.cellsHtml}${totalCell}</tr>`;
     }).join('');
 
-    const headerCells = dates.map(d => `<th class="${(d.wd === 0 || d.wd === 6) ? 'wknd' : ''}" style="text-align:center;">${d.ymd.slice(4,6)}/${d.ymd.slice(6,8)}<br><span style="font-weight:400;opacity:.75;">${WD[d.wd]}</span></th>`).join('');
+    const headerCells = dates.map(d => `<th class="${(d.wd === 0 || d.wd === 6) ? 'wknd' : ''}" style="text-align:center;">${d.ymd.slice(4,6)}/${d.ymd.slice(6,8)}(${WD[d.wd]})</th>`).join('');
 
     const nameHeaderLabel = isPeriod
-      ? `매장명 (${rows.length}곳)`
+      ? `매장명 (${rows.length}개)`
       : `매장명 (오늘 매출 발생 ${salesStoreCount}개)`;
 
     const avgTotal = totalOpenDays > 0 ? Math.round(grandTotal / totalOpenDays) : 0;
@@ -5032,7 +5032,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       : `${dates.map(d => `<td>${totalByDate[d.ymd].toLocaleString()}</td>`).join('')}<td>${grandTotal.toLocaleString()}</td>`;
 
     const totalRow = `<tr class="total-row">
-        <td>전체 합계${errorCount ? ` <span style="font-weight:400;color:#e0895c;">(조회실패 ${errorCount}곳 제외)</span>` : ''}</td>
+        <td>전체 합계${errorCount ? ` <span style="font-weight:400;color:#e0895c;">(조회실패 ${errorCount}개 제외)</span>` : ''}</td>
         <td></td>
         <td style="font-weight:400;color:#5c7690;">(기간 ${dates.length}일)</td>
         ${totalRowMid}
