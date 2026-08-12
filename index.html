@@ -623,7 +623,13 @@ body.hide-names .store-name:hover{
         <label>종료일</label>
         <input id="livePrEndDate" type="date" class="live-input">
         <input id="livePrProductSearch" type="text" placeholder="상품명 검색... (비워두면 전체)" autocomplete="off"
-          class="live-input" style="min-width:200px;">
+          oninput="window.renderLiveProductTable()" class="live-input" style="min-width:200px;">
+        <div style="position:relative;display:inline-block;">
+          <button id="livePrProductPanelBtn" type="button" class="live-refresh-btn" style="padding:6px 12px;"
+            onclick="window.toggleLivePrProductPanel()">🏷️ 메뉴 선택</button>
+          <div id="livePrProductPanel" style="display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:20;
+            width:240px;background:#0d1b2a;border:1px solid #2a5a8a;border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,0.4);"></div>
+        </div>
         <button class="live-refresh-btn" onclick="window.loadLiveProduct()">🔄 조회</button>
         <input id="livePrStoreSearch" type="text" placeholder="매장명 검색..." autocomplete="off" oninput="window.renderLiveProductTable()"
           class="live-input" style="min-width:160px;">
@@ -5205,15 +5211,13 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
         return;
       }
 
-      const prodQ = (document.getElementById('livePrProductSearch').value || '').trim();
-
       // 매장 x 상품 조합으로 집계 (선택한 기간 내 수량/금액 합산)
+      // ※ 상품명 필터(텍스트 검색 + 메뉴 체크박스)는 렌더링 단계에서 적용한다 (재조회 없이 필터 변경 가능하도록)
       const agg = {}; // key: code|productName -> { code, name, product, qty, amount }
       Object.entries(raw.STORES || {}).forEach(([code, s]) => {
         (s.rows || []).forEach(row => {
           const [d, product, qty, amount] = row;
           if(d < start || d > end) return;
-          if(prodQ && !(product||'').includes(prodQ)) return;
           const key = code + '|' + product;
           if(!agg[key]) agg[key] = { code, name: s.name, product, qty: 0, amount: 0 };
           agg[key].qty += qty;
@@ -5232,6 +5236,106 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       document.getElementById('livePrLoading').style.display = 'none';
     }
   };
+
+  // ── 🏷️ 상품별 매출: 메뉴 다중 체크박스 선택 패널 ──
+  window.__livePrProductList = null;              // 전체 기간 기준 고유 상품명 목록 캐시
+  window.__livePrCheckedProducts = new Set();      // 체크된 상품명 집합 (중복 다중 선택)
+
+  async function ensureLivePrProductList_(){
+    if(window.__livePrProductList) return window.__livePrProductList;
+    const raw = await fetchProductDaily_();
+    const set = new Set();
+    Object.values(raw.STORES || {}).forEach(s => {
+      (s.rows || []).forEach(row => { if(row[1]) set.add(row[1]); });
+    });
+    window.__livePrProductList = Array.from(set).sort((a,b) => a.localeCompare(b, 'ko'));
+    return window.__livePrProductList;
+  }
+
+  window.toggleLivePrProductPanel = async function(){
+    const panel = document.getElementById('livePrProductPanel');
+    if(!panel) return;
+    const opening = panel.style.display === 'none' || !panel.style.display;
+    if(!opening){ panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+    panel.innerHTML = '<div style="padding:10px;color:#6b8fa8;font-size:12px;">불러오는 중...</div>';
+    try {
+      const list = await ensureLivePrProductList_();
+      renderLivePrProductPanel_(list);
+    } catch(err){
+      panel.innerHTML = `<div style="padding:10px;color:#e05555;font-size:12px;">불러오기 실패: ${err.message}</div>`;
+    }
+  };
+
+  function renderLivePrProductPanel_(list, filterQ){
+    const panel = document.getElementById('livePrProductPanel');
+    if(!panel) return;
+    const existingInput = document.getElementById('livePrProductPanelSearch');
+    const q = (filterQ !== undefined ? filterQ : (existingInput ? existingInput.value : '')).trim();
+    const filtered = q ? list.filter(p => p.includes(q)) : list;
+    const checked = window.__livePrCheckedProducts;
+    const esc = (s) => (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+
+    const itemsHtml = filtered.length
+      ? filtered.map(p => `
+          <label style="display:flex;align-items:center;gap:6px;padding:5px 8px;font-size:12px;color:#c8dff0;cursor:pointer;border-radius:4px;">
+            <input type="checkbox" value="${esc(p)}" ${checked.has(p) ? 'checked' : ''} onchange="window.toggleLivePrProductCheck(this.value, this.checked)">
+            <span>${p}</span>
+          </label>`).join('')
+      : `<div style="padding:8px;color:#5c7690;font-size:12px;">일치하는 메뉴가 없어요.</div>`;
+
+    panel.innerHTML = `
+      <div style="padding:8px;border-bottom:1px solid #1e3347;">
+        <input id="livePrProductPanelSearch" type="text" placeholder="메뉴 필터..." class="live-input"
+          style="width:100%;box-sizing:border-box;" oninput="window.filterLivePrProductPanel(this.value)" value="${esc(q)}">
+      </div>
+      <div style="max-height:260px;overflow:auto;padding:4px;">${itemsHtml}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-top:1px solid #1e3347;">
+        <button type="button" class="live-refresh-btn" style="padding:4px 10px;font-size:11px;" onclick="window.clearLivePrProductCheck()">전체 해제</button>
+        <span style="font-size:11px;color:#8fb8dd;">${checked.size}개 선택됨</span>
+      </div>`;
+
+    const newInput = document.getElementById('livePrProductPanelSearch');
+    if(newInput && filterQ !== undefined){
+      newInput.focus();
+      newInput.setSelectionRange(newInput.value.length, newInput.value.length);
+    }
+  }
+
+  window.filterLivePrProductPanel = function(q){
+    renderLivePrProductPanel_(window.__livePrProductList || [], q);
+  };
+
+  window.toggleLivePrProductCheck = function(name, isChecked){
+    if(isChecked) window.__livePrCheckedProducts.add(name);
+    else window.__livePrCheckedProducts.delete(name);
+    updateLivePrProductBtnLabel_();
+    renderLivePrProductPanel_(window.__livePrProductList || []);
+    window.renderLiveProductTable();
+  };
+
+  window.clearLivePrProductCheck = function(){
+    window.__livePrCheckedProducts.clear();
+    updateLivePrProductBtnLabel_();
+    renderLivePrProductPanel_(window.__livePrProductList || []);
+    window.renderLiveProductTable();
+  };
+
+  function updateLivePrProductBtnLabel_(){
+    const btn = document.getElementById('livePrProductPanelBtn');
+    if(!btn) return;
+    const n = window.__livePrCheckedProducts.size;
+    btn.textContent = n > 0 ? `🏷️ 메뉴 선택 (${n})` : '🏷️ 메뉴 선택';
+  }
+
+  // 패널 바깥을 클릭하면 자동으로 닫기
+  document.addEventListener('click', function(e){
+    const panel = document.getElementById('livePrProductPanel');
+    const btn = document.getElementById('livePrProductPanelBtn');
+    if(!panel || panel.style.display === 'none') return;
+    if(panel.contains(e.target) || (btn && btn.contains(e.target))) return;
+    panel.style.display = 'none';
+  });
 
   function livePrSortCompare_(a, b, key){
     switch(key){
@@ -5262,6 +5366,16 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
 
     const storeQ = (document.getElementById('livePrStoreSearch').value || '').trim();
     if(storeQ) rows = rows.filter(r => (r.name||'').includes(storeQ));
+
+    // 상품명 필터: 텍스트 검색과 메뉴 체크박스 선택을 함께(OR) 적용
+    // - 텍스트만 입력: 기존처럼 부분일치 검색
+    // - 체크박스만 선택: 체크한 메뉴들만 조회 (중복 체크 가능)
+    // - 둘 다 사용: 체크한 메뉴 + 텍스트에 일치하는 메뉴를 함께 표시
+    const prodQ = (document.getElementById('livePrProductSearch').value || '').trim();
+    const checkedProducts = window.__livePrCheckedProducts || new Set();
+    if(prodQ || checkedProducts.size){
+      rows = rows.filter(r => checkedProducts.has(r.product) || (prodQ && (r.product||'').includes(prodQ)));
+    }
 
     if(!rows.length){
       wrap.innerHTML = `<div class="live-empty">조건에 맞는 판매 내역이 없어요.</div>`;
