@@ -48,9 +48,9 @@ async function main() {
 
   if (allProducts.length === 0) {
     throw new Error(
-      '수집된 상품 데이터가 없습니다. REQ_CODE 2 응답 필드명이 SALE_INFO가 아닐 수 있으니 ' +
-        'lib.js의 fetchProductCategories 안에서 실제 응답(JSON.stringify(data))을 한 번 찍어보고 ' +
-        '필드명을 맞춰주세요.'
+      '수집된 상품 데이터가 없습니다. 대표 매장의 응답 자체가 비어있을 수 있으니 ' +
+        'REPRESENTATIVE_ONLY를 false로 바꿔서 전체 매장을 돌아보거나, ' +
+        'debug-single-store.js 등으로 해당 매장의 원본 응답을 확인해주세요.'
     );
   }
 
