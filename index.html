@@ -566,6 +566,7 @@ body.hide-names .store-name:hover{
     <div class="live-subtabs">
       <div class="live-subtab active" id="liveSubTab-realtime" onclick="window.switchLiveSubTab('realtime')">⚡ 실시간 매출</div>
       <div class="live-subtab" id="liveSubTab-period" onclick="window.switchLiveSubTab('period')">📅 기간별 매출</div>
+      <div class="live-subtab" id="liveSubTab-product" onclick="window.switchLiveSubTab('product')">🏷️ 상품별 매출</div>
     </div>
 
     <!-- ⚡ 실시간 매출: 오늘 하루 스냅샷, 서브탭 진입 시 자동 조회 -->
@@ -607,6 +608,30 @@ body.hide-names .store-name:hover{
         <span class="spin"></span>POS 서버에서 매출 데이터를 가져오는 중입니다... (최근 캐시 범위 밖 기간은 전체 매장을 순차 조회해서 1~2분 정도 걸릴 수 있어요)
       </div>
       <div id="livePdTableWrap"></div>
+    </div>
+
+    <!-- 🏷️ 상품별 매출: 기간 + 상품명으로 매장별 판매 내역 조회 -->
+    <div id="liveProductSection" style="display:none;">
+      <div class="live-toolbar">
+        <label>시작일</label>
+        <input id="livePrStartDate" type="date" class="live-input">
+        <label>종료일</label>
+        <input id="livePrEndDate" type="date" class="live-input">
+        <input id="livePrProductSearch" type="text" placeholder="상품명 검색... (비워두면 전체)" autocomplete="off"
+          class="live-input" style="min-width:200px;">
+        <button class="live-refresh-btn" onclick="window.loadLiveProduct()">🔄 조회</button>
+        <input id="livePrStoreSearch" type="text" placeholder="매장명 검색..." autocomplete="off" oninput="window.renderLiveProductTable()"
+          class="live-input" style="min-width:160px;">
+        <label>담당자</label>
+        <select id="livePrManagerSel" class="live-input" onchange="window.renderLiveProductTable()">
+          <option value="all">전체</option>
+        </select>
+        <span id="livePrUpdatedAt" class="live-updated-at"></span>
+      </div>
+      <div id="livePrLoading" class="live-loading" style="display:none;">
+        <span class="spin"></span>상품별 매출 데이터를 가져오는 중입니다...
+      </div>
+      <div id="livePrTableWrap"></div>
     </div>
   </div>
 
@@ -4867,13 +4892,25 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   window.switchLiveSubTab = function(sub){
     document.getElementById('liveRealtimeSection').style.display = (sub==='realtime') ? '' : 'none';
     document.getElementById('livePeriodSection').style.display = (sub==='period') ? '' : 'none';
+    document.getElementById('liveProductSection').style.display = (sub==='product') ? '' : 'none';
     document.getElementById('liveSubTab-realtime').classList.toggle('active', sub==='realtime');
     document.getElementById('liveSubTab-period').classList.toggle('active', sub==='period');
+    document.getElementById('liveSubTab-product').classList.toggle('active', sub==='product');
     if(sub==='realtime' && !window.__liveRtData){ window.loadLiveRealtime(); }
     if(sub==='period' && !window.__livePdData){
       // 기간별 매출 첫 진입 시 기본값: 이번 달 1일 ~ 오늘 (조회는 사용자가 직접 눌러야 실행)
       const startInput = document.getElementById('livePdStartDate');
       const endInput = document.getElementById('livePdEndDate');
+      if(!startInput.value){
+        const now = new Date();
+        startInput.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+      }
+      if(!endInput.value) endInput.value = ymdToInputDate_(todayYmd_());
+    }
+    if(sub==='product'){
+      // 상품별 매출 첫 진입 시 기본값: 이번 달 1일 ~ 오늘 (조회는 사용자가 직접 눌러야 실행)
+      const startInput = document.getElementById('livePrStartDate');
+      const endInput = document.getElementById('livePrEndDate');
       if(!startInput.value){
         const now = new Date();
         startInput.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
@@ -5119,6 +5156,149 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
 
   window.renderLivePeriodTable = function(){
     renderLiveGenericTable_(window.__livePdData, { wrap:'livePdTableWrap', search:'livePdSearch', managerSel:'livePdManagerSel', mode:'period' });
+  };
+
+  // ── 🏷️ 상품별 매출: 기간 + 상품명 검색으로 매장별 판매 내역(수량/금액) 조회 ──
+  // data/product-daily.json은 [날짜, 상품명, 수량, 금액] 압축 배열로 저장되어 있음(FORMAT 필드 참고)
+  const PRODUCT_DATA_URL = 'https://raw.githubusercontent.com/TAEHWAN8872/bokhodu-dashboard/main/data/product-daily.json';
+  window.__livePrRaw = null;   // 원본 캐시(재조회 없이 재필터링하기 위함)
+  window.__livePrRows = null;  // 현재 조회 결과(집계된 행)
+
+  window.__liveSortState.product = window.__liveSortState.product || { key: 'amount', dir: -1 };
+
+  async function fetchProductDaily_(){
+    if(window.__livePrRaw) return window.__livePrRaw;
+    const res = await fetch(`${PRODUCT_DATA_URL}?_=${Date.now()}`);
+    if(!res.ok) throw new Error('데이터 파일을 불러오지 못했어요 (HTTP ' + res.status + ')');
+    const raw = await res.json();
+    window.__livePrRaw = raw;
+    return raw;
+  }
+
+  window.loadLiveProduct = async function(){
+    const startInput = document.getElementById('livePrStartDate');
+    const endInput = document.getElementById('livePrEndDate');
+    if(!startInput.value || !endInput.value){
+      alert('시작일과 종료일을 모두 선택해주세요.');
+      return;
+    }
+    const start = inputDateToYmd_(startInput.value);
+    const end = inputDateToYmd_(endInput.value);
+    if(start > end){
+      alert('시작일이 종료일보다 늦을 수 없어요.');
+      return;
+    }
+
+    document.getElementById('livePrLoading').style.display = 'block';
+    document.getElementById('livePrTableWrap').innerHTML = '';
+    try {
+      const raw = await fetchProductDaily_();
+      if(start < raw.START || end > raw.END){
+        document.getElementById('livePrTableWrap').innerHTML =
+          `<div class="live-empty">데이터가 수집된 기간(${ymdToInputDate_(raw.START)} ~ ${ymdToInputDate_(raw.END)}) 밖이에요. 그 안의 날짜로 다시 조회해주세요.</div>`;
+        return;
+      }
+
+      const prodQ = (document.getElementById('livePrProductSearch').value || '').trim();
+
+      // 매장 x 상품 조합으로 집계 (선택한 기간 내 수량/금액 합산)
+      const agg = {}; // key: code|productName -> { code, name, product, qty, amount }
+      Object.entries(raw.STORES || {}).forEach(([code, s]) => {
+        (s.rows || []).forEach(row => {
+          const [d, product, qty, amount] = row;
+          if(d < start || d > end) return;
+          if(prodQ && !(product||'').includes(prodQ)) return;
+          const key = code + '|' + product;
+          if(!agg[key]) agg[key] = { code, name: s.name, product, qty: 0, amount: 0 };
+          agg[key].qty += qty;
+          agg[key].amount += amount;
+        });
+      });
+
+      window.__livePrRows = Object.values(agg);
+      document.getElementById('livePrUpdatedAt').textContent = '마지막 갱신: ' + new Date().toLocaleTimeString('ko-KR')
+        + ' (데이터 수집 범위: ' + ymdToInputDate_(raw.START) + ' ~ ' + ymdToInputDate_(raw.END) + ')';
+      window.renderLiveProductTable();
+    } catch(err){
+      document.getElementById('livePrTableWrap').innerHTML =
+        `<div style="padding:20px;color:#e05555;">불러오기 실패: ${err.message}</div>`;
+    } finally {
+      document.getElementById('livePrLoading').style.display = 'none';
+    }
+  };
+
+  function livePrSortCompare_(a, b, key){
+    switch(key){
+      case 'manager': return (a.manager||'').localeCompare(b.manager||'', 'ko');
+      case 'product': return (a.product||'').localeCompare(b.product||'', 'ko');
+      case 'qty': return (a.qty||0) - (b.qty||0);
+      case 'amount': return (a.amount||0) - (b.amount||0);
+      case 'name': default: return (a.name||'').localeCompare(b.name||'', 'ko');
+    }
+  }
+
+  window.livePrSortBy = function(key){
+    const st = window.__liveSortState.product;
+    if(st.key === key){ st.dir *= -1; } else { st.key = key; st.dir = (key==='name'||key==='manager'||key==='product') ? 1 : -1; }
+    window.renderLiveProductTable();
+  };
+
+  window.renderLiveProductTable = function(){
+    const wrap = document.getElementById('livePrTableWrap');
+    if(!window.__livePrRows){ wrap.innerHTML = ''; return; }
+    let rows = window.__livePrRows.map(r => ({
+      ...r, manager: (typeof mkStoreManager === 'function') ? mkStoreManager(r.name) : null
+    }));
+
+    livePopulateManagerSel('livePrManagerSel', rows);
+    const managerVal = document.getElementById('livePrManagerSel') ? document.getElementById('livePrManagerSel').value : 'all';
+    if(managerVal !== 'all') rows = rows.filter(r => r.manager === managerVal);
+
+    const storeQ = (document.getElementById('livePrStoreSearch').value || '').trim();
+    if(storeQ) rows = rows.filter(r => (r.name||'').includes(storeQ));
+
+    if(!rows.length){
+      wrap.innerHTML = `<div class="live-empty">조건에 맞는 판매 내역이 없어요.</div>`;
+      return;
+    }
+
+    const st = window.__liveSortState.product;
+    rows.sort((a,b) => st.dir * livePrSortCompare_(a, b, st.key));
+
+    let totalQty = 0, totalAmount = 0;
+    rows.forEach(r => { totalQty += r.qty; totalAmount += r.amount; });
+
+    const sortArrow = (key) => st.key === key ? (st.dir === 1 ? ' ▲' : ' ▼') : '';
+    const sortTh = (key, label) =>
+      `<th style="text-align:center;cursor:pointer;user-select:none;" onclick="window.livePrSortBy('${key}')" title="클릭해서 정렬">${label}${sortArrow(key)}</th>`;
+
+    const bodyRows = rows.map(r => `
+      <tr>
+        <td style="text-align:left;">${r.name}</td>
+        <td style="text-align:left;color:#8fb8dd;">${r.manager || '-'}</td>
+        <td style="text-align:left;">${r.product}</td>
+        <td>${r.qty.toLocaleString()}</td>
+        <td class="grand-total">${r.amount.toLocaleString()}</td>
+      </tr>`).join('');
+
+    wrap.innerHTML = `
+      <div class="live-table-card">
+        <div class="live-table-scroll">
+          <table class="live-table">
+            <thead><tr>
+              ${sortTh('name', `매장명 (${rows.length}건)`)}${sortTh('manager','담당자')}${sortTh('product','상품명')}${sortTh('qty','수량')}${sortTh('amount','금액')}
+            </tr></thead>
+            <tbody>
+              <tr class="total-row">
+                <td>전체 합계</td><td></td><td></td>
+                <td>${totalQty.toLocaleString()}</td>
+                <td>${totalAmount.toLocaleString()}</td>
+              </tr>
+              ${bodyRows}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
   };
 
   function royaltyApiConfigured(){
