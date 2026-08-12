@@ -5261,63 +5261,96 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     panel.innerHTML = '<div style="padding:10px;color:#6b8fa8;font-size:12px;">불러오는 중...</div>';
     try {
       const list = await ensureLivePrProductList_();
-      renderLivePrProductPanel_(list);
+      renderLivePrProductPanelShell_();
+      renderLivePrProductPanelItems_(list);
     } catch(err){
       panel.innerHTML = `<div style="padding:10px;color:#e05555;font-size:12px;">불러오기 실패: ${err.message}</div>`;
     }
   };
 
-  function renderLivePrProductPanel_(list, filterQ){
+  const escLivePr_ = (s) => (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+
+  // 패널의 틀(검색창 + 목록 컨테이너 + 하단바)은 패널을 열 때 딱 한 번만 그린다.
+  // 타이핑할 때마다 검색 input을 통째로 다시 그리면 한글 조합(IME)이 깨지므로
+  // (예: "청사과" 입력 중 "ㅊㅓㅇㅅ"처럼 낱자로 끊겨 보임), 목록 부분만 별도로 갱신한다.
+  function renderLivePrProductPanelShell_(){
     const panel = document.getElementById('livePrProductPanel');
     if(!panel) return;
-    const existingInput = document.getElementById('livePrProductPanelSearch');
-    const q = (filterQ !== undefined ? filterQ : (existingInput ? existingInput.value : '')).trim();
+    panel.innerHTML = `
+      <div style="padding:8px;border-bottom:1px solid #1e3347;">
+        <input id="livePrProductPanelSearch" type="text" placeholder="메뉴 필터..." class="live-input"
+          style="width:100%;box-sizing:border-box;">
+      </div>
+      <div id="livePrProductPanelItems" style="max-height:260px;overflow:auto;padding:4px;"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-top:1px solid #1e3347;">
+        <button type="button" class="live-refresh-btn" style="padding:4px 10px;font-size:11px;" onclick="window.clearLivePrProductCheck()">전체 해제</button>
+        <span id="livePrProductPanelCount" style="font-size:11px;color:#8fb8dd;"></span>
+      </div>`;
+    bindLivePrProductSearchInput_();
+  }
+
+  // 검색 input에 이벤트를 직접 바인딩한다 (oninput 속성 대신).
+  // 한글 등 조합형 입력(IME) 중에는 필터링을 미루고, 조합이 끝난 뒤(compositionend)
+  // 또는 조합 없는 일반 입력은 살짝 디바운스 후 필터링한다.
+  // → 매 키 입력마다 목록을 동기적으로 다시 그리면 조합 중인 한글이 끊겨서
+  //   "청사과" 입력 중 "ㅊㅓㅇㅅㅏㄱㅘ"처럼 낱자로 보이는 문제가 있었음.
+  function bindLivePrProductSearchInput_(){
+    const input = document.getElementById('livePrProductPanelSearch');
+    if(!input) return;
+    let debounceTimer = null;
+    const scheduleFilter = () => {
+      if(debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        renderLivePrProductPanelItems_(window.__livePrProductList || [], input.value);
+      }, 80);
+    };
+    input.addEventListener('input', (e) => {
+      if(e.isComposing) return; // 한글 등 조합 중에는 필터링하지 않음
+      scheduleFilter();
+    });
+    input.addEventListener('compositionend', () => {
+      scheduleFilter();
+    });
+  }
+
+  // 체크박스 목록 부분만 갱신 (검색 input DOM은 건드리지 않음 → 조합 중인 한글이 안 깨짐)
+  function renderLivePrProductPanelItems_(list, filterQ){
+    const itemsWrap = document.getElementById('livePrProductPanelItems');
+    const countEl = document.getElementById('livePrProductPanelCount');
+    if(!itemsWrap) return;
+    const searchInput = document.getElementById('livePrProductPanelSearch');
+    const q = (filterQ !== undefined ? filterQ : (searchInput ? searchInput.value : '')).trim();
     const filtered = q ? list.filter(p => p.includes(q)) : list;
     const checked = window.__livePrCheckedProducts;
-    const esc = (s) => (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 
-    const itemsHtml = filtered.length
+    itemsWrap.innerHTML = filtered.length
       ? filtered.map(p => `
           <label style="display:flex;align-items:center;gap:6px;padding:5px 8px;font-size:12px;color:#c8dff0;cursor:pointer;border-radius:4px;">
-            <input type="checkbox" value="${esc(p)}" ${checked.has(p) ? 'checked' : ''} onchange="window.toggleLivePrProductCheck(this.value, this.checked)">
+            <input type="checkbox" value="${escLivePr_(p)}" ${checked.has(p) ? 'checked' : ''} onchange="window.toggleLivePrProductCheck(this.value, this.checked)">
             <span>${p}</span>
           </label>`).join('')
       : `<div style="padding:8px;color:#5c7690;font-size:12px;">일치하는 메뉴가 없어요.</div>`;
 
-    panel.innerHTML = `
-      <div style="padding:8px;border-bottom:1px solid #1e3347;">
-        <input id="livePrProductPanelSearch" type="text" placeholder="메뉴 필터..." class="live-input"
-          style="width:100%;box-sizing:border-box;" oninput="window.filterLivePrProductPanel(this.value)" value="${esc(q)}">
-      </div>
-      <div style="max-height:260px;overflow:auto;padding:4px;">${itemsHtml}</div>
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-top:1px solid #1e3347;">
-        <button type="button" class="live-refresh-btn" style="padding:4px 10px;font-size:11px;" onclick="window.clearLivePrProductCheck()">전체 해제</button>
-        <span style="font-size:11px;color:#8fb8dd;">${checked.size}개 선택됨</span>
-      </div>`;
-
-    const newInput = document.getElementById('livePrProductPanelSearch');
-    if(newInput && filterQ !== undefined){
-      newInput.focus();
-      newInput.setSelectionRange(newInput.value.length, newInput.value.length);
-    }
+    if(countEl) countEl.textContent = `${checked.size}개 선택됨`;
   }
 
   window.filterLivePrProductPanel = function(q){
-    renderLivePrProductPanel_(window.__livePrProductList || [], q);
+    // (레거시 호환용, 현재는 bindLivePrProductSearchInput_의 이벤트 리스너가 필터링을 담당)
+    renderLivePrProductPanelItems_(window.__livePrProductList || [], q);
   };
 
   window.toggleLivePrProductCheck = function(name, isChecked){
     if(isChecked) window.__livePrCheckedProducts.add(name);
     else window.__livePrCheckedProducts.delete(name);
     updateLivePrProductBtnLabel_();
-    renderLivePrProductPanel_(window.__livePrProductList || []);
+    renderLivePrProductPanelItems_(window.__livePrProductList || []);
     window.renderLiveProductTable();
   };
 
   window.clearLivePrProductCheck = function(){
     window.__livePrCheckedProducts.clear();
     updateLivePrProductBtnLabel_();
-    renderLivePrProductPanel_(window.__livePrProductList || []);
+    renderLivePrProductPanelItems_(window.__livePrProductList || []);
     window.renderLiveProductTable();
   };
 
