@@ -5240,6 +5240,22 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   // ── 🏷️ 상품별 매출: 메뉴 다중 체크박스 선택 패널 ──
   window.__livePrProductList = null;              // 전체 기간 기준 고유 상품명 목록 캐시
   window.__livePrCheckedProducts = new Set();      // 체크된 상품명 집합 (중복 다중 선택)
+  window.__livePrPanelCategory = '전체';           // 패널에서 현재 선택된 카테고리 탭
+
+  // 상품명에 포함된 키워드로 카테고리를 자동 분류한다.
+  // (product-daily.json에는 카테고리 정보가 없어서, 상품명 키워드 기준으로 추정 분류)
+  const LIVE_PR_CATEGORIES = ['호두과자', '사이드', '답례품', '신메뉴', '커피', '음료'];
+  const LIVE_PR_SIDE_NAMES = ['호두강정', '호두육포', '치즈육포', '(신) 행복식혜', '행복식혜',
+    '넛티 요거트 볼', '(신)복 호두정과', '(신)복 호두육포', '(신)복 그래놀라'];
+  function classifyLiveProduct_(name){
+    const n = name || '';
+    if(n.includes('답례품')) return '답례품';
+    if(n.includes('아메리카노') || n.includes('라떼') || n.includes('커피') || n.includes('콜드브루')) return '커피';
+    if(n.includes('밀크티') || n.includes('음료')) return '음료';
+    if(n.includes('레드벨벳') || n.includes('쑥') || n.includes('청사과')) return '신메뉴';
+    if(LIVE_PR_SIDE_NAMES.includes(n) || n.includes('그래놀라') || n.includes('식혜') || n.includes('강정') || n.includes('육포')) return '사이드';
+    return '호두과자';
+  }
 
   async function ensureLivePrProductList_(){
     if(window.__livePrProductList) return window.__livePrProductList;
@@ -5261,8 +5277,14 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     panel.innerHTML = '<div style="padding:10px;color:#6b8fa8;font-size:12px;">불러오는 중...</div>';
     try {
       const list = await ensureLivePrProductList_();
-      renderLivePrProductPanelShell_();
-      renderLivePrProductPanelItems_(list);
+      // 이미 조회(🔄 조회)를 실행한 상태라면, 패널을 열 때 상단 상품명 검색창에 입력된
+      // 검색어를 그대로 이어받아 패널 검색창에 채워둔다. → "조회 후 다시 메뉴 선택을 열면
+      // 검색한 단어(또는 체크한 것)만 눈에 띄게 해달라"는 요청 반영. 카테고리 탭은 '전체'로 시작.
+      const mainSearchEl = document.getElementById('livePrProductSearch');
+      const carriedQ = mainSearchEl ? (mainSearchEl.value || '').trim() : '';
+      window.__livePrPanelCategory = '전체';
+      renderLivePrProductPanelShell_(carriedQ);
+      renderLivePrProductPanelItems_(list, carriedQ);
     } catch(err){
       panel.innerHTML = `<div style="padding:10px;color:#e05555;font-size:12px;">불러오기 실패: ${err.message}</div>`;
     }
@@ -5270,16 +5292,27 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
 
   const escLivePr_ = (s) => (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 
-  // 패널의 틀(검색창 + 목록 컨테이너 + 하단바)은 패널을 열 때 딱 한 번만 그린다.
+  // 패널의 틀(카테고리 탭 + 검색창 + 목록 컨테이너 + 하단바)은 패널을 열 때 딱 한 번만 그린다.
   // 타이핑할 때마다 검색 input을 통째로 다시 그리면 한글 조합(IME)이 깨지므로
   // (예: "청사과" 입력 중 "ㅊㅓㅇㅅ"처럼 낱자로 끊겨 보임), 목록 부분만 별도로 갱신한다.
-  function renderLivePrProductPanelShell_(){
+  function renderLivePrProductPanelShell_(initialSearchQ){
     const panel = document.getElementById('livePrProductPanel');
     if(!panel) return;
+    const cat = window.__livePrPanelCategory || '전체';
+    const tabDef = ['전체', ...LIVE_PR_CATEGORIES, '✅ 선택됨'];
+    const tabsHtml = tabDef.map(t => {
+      const active = t === cat;
+      return `<button type="button" onclick="window.setLivePrPanelCategory('${t}')"
+        style="font-size:10.5px;font-weight:700;padding:4px 8px;border-radius:6px;cursor:pointer;white-space:nowrap;
+        border:1px solid ${active ? '#7eb8e8' : '#1e3347'};color:${active ? '#7eb8e8' : '#6b8fa8'};
+        background:${active ? '#1a3a5c' : '#0a1628'};">${t}</button>`;
+    }).join('');
+
     panel.innerHTML = `
+      <div style="display:flex;flex-wrap:wrap;gap:4px;padding:8px;border-bottom:1px solid #1e3347;">${tabsHtml}</div>
       <div style="padding:8px;border-bottom:1px solid #1e3347;">
         <input id="livePrProductPanelSearch" type="text" placeholder="메뉴 필터..." class="live-input"
-          style="width:100%;box-sizing:border-box;">
+          style="width:100%;box-sizing:border-box;" value="${escLivePr_(initialSearchQ || '')}">
       </div>
       <div id="livePrProductPanelItems" style="max-height:260px;overflow:auto;padding:4px;"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-top:1px solid #1e3347;">
@@ -5288,6 +5321,13 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       </div>`;
     bindLivePrProductSearchInput_();
   }
+
+  window.setLivePrPanelCategory = function(cat){
+    window.__livePrPanelCategory = cat;
+    const input = document.getElementById('livePrProductPanelSearch');
+    renderLivePrProductPanelShell_(input ? input.value : '');
+    renderLivePrProductPanelItems_(window.__livePrProductList || [], input ? input.value : '');
+  };
 
   // 검색 input에 이벤트를 직접 바인딩한다 (oninput 속성 대신).
   // 한글 등 조합형 입력(IME) 중에는 필터링을 미루고, 조합이 끝난 뒤(compositionend)
@@ -5320,8 +5360,16 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     if(!itemsWrap) return;
     const searchInput = document.getElementById('livePrProductPanelSearch');
     const q = (filterQ !== undefined ? filterQ : (searchInput ? searchInput.value : '')).trim();
-    const filtered = q ? list.filter(p => p.includes(q)) : list;
     const checked = window.__livePrCheckedProducts;
+    const cat = window.__livePrPanelCategory || '전체';
+
+    let filtered = list;
+    if(cat === '✅ 선택됨'){
+      filtered = filtered.filter(p => checked.has(p));
+    } else if(cat !== '전체'){
+      filtered = filtered.filter(p => classifyLiveProduct_(p) === cat);
+    }
+    if(q) filtered = filtered.filter(p => p.includes(q));
 
     itemsWrap.innerHTML = filtered.length
       ? filtered.map(p => `
