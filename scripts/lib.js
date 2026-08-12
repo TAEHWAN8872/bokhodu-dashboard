@@ -255,4 +255,6 @@ module.exports = {
   sleep,
   fetchOneStore,
   fetchOneStoreRange,
+  fetchOneStoreProducts,
+  fetchOneStoreProductsRange,
 };
