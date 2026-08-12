@@ -4909,9 +4909,13 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   }
 
   // 두 서브탭이 공유하는 렌더 함수: (데이터, DOM id 세트)를 받아 표를 그린다
+  // ids.mode: 'realtime' | 'period' — 서브탭별로 헤더/컬럼 배치가 다름
+  //  - realtime: 헤더에 "전체 매장 수" 대신 "오늘 매출이 발생한 매장 수"를 표시
+  //  - period: 합계·평균매출 컬럼을 영업일수 바로 옆(날짜별 컬럼들보다 앞)에 배치
   function renderLiveGenericTable_(data, ids){
     const wrap = document.getElementById(ids.wrap);
     if(!data){ wrap.innerHTML = ''; return; }
+    const isPeriod = ids.mode === 'period';
 
     const WD = ['일','월','화','수','목','금','토'];
     const dates = [];
@@ -4943,12 +4947,15 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     const totalByDate = {}; dates.forEach(d => totalByDate[d.ymd] = 0);
     let grandTotal = 0;
     let errorCount = 0;
+    let salesStoreCount = 0; // 매출(>0)이 하루라도 있었던 매장 수
+    let totalOpenDays = 0;   // 평균매출 계산용 (전 매장 영업일수 합)
 
     const bodyRows = rows.map(r => {
       const mgrCell = `<td style="text-align:left;color:#8fb8dd;">${r.manager || '-'}</td>`;
       if(r.error){
         errorCount++;
-        return `<tr class="err-row"><td>${r.name}</td>${mgrCell}<td>-</td><td colspan="${dates.length+1}" style="text-align:left;">⚠ 조회 실패 · ${r.error}</td></tr>`;
+        const errColspan = dates.length + (isPeriod ? 2 : 1);
+        return `<tr class="err-row"><td>${r.name}</td>${mgrCell}<td>-</td><td colspan="${errColspan}" style="text-align:left;">⚠ 조회 실패 · ${r.error}</td></tr>`;
       }
       const byDate = {};
       (r.days||[]).forEach(day => { byDate[day.SDA_DT] = day.SA_AMT_TTL || 0; });
@@ -4963,25 +4970,46 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
         return `<td class="${cls}">${v.toLocaleString()}</td>`;
       }).join('');
       grandTotal += rowTotal;
+      totalOpenDays += openDays;
+      if(rowTotal > 0) salesStoreCount++;
       const openDaysCell = `<td style="color:#8fb8dd;">${openDays}일</td>`;
-      return `<tr><td>${r.name}</td>${mgrCell}${openDaysCell}${cells}<td class="grand-total">${rowTotal.toLocaleString()}</td></tr>`;
+      const totalCell = `<td class="grand-total">${rowTotal.toLocaleString()}</td>`;
+      if(isPeriod){
+        const avgAmt = openDays > 0 ? Math.round(rowTotal / openDays) : 0;
+        const avgCell = `<td>${avgAmt.toLocaleString()}</td>`;
+        return `<tr><td>${r.name}</td>${mgrCell}${openDaysCell}${totalCell}${avgCell}${cells}</tr>`;
+      }
+      return `<tr><td>${r.name}</td>${mgrCell}${openDaysCell}${cells}${totalCell}</tr>`;
     }).join('');
 
     const headerCells = dates.map(d => `<th class="${(d.wd === 0 || d.wd === 6) ? 'wknd' : ''}">${d.ymd.slice(4,6)}/${d.ymd.slice(6,8)}<br><span style="font-weight:400;opacity:.75;">${WD[d.wd]}</span></th>`).join('');
+
+    const nameHeaderLabel = isPeriod
+      ? `매장명 (${rows.length}곳)`
+      : `매장명 (오늘 매출 발생 ${salesStoreCount}개)`;
+
+    const avgTotal = totalOpenDays > 0 ? Math.round(grandTotal / totalOpenDays) : 0;
+    const totalRowMid = isPeriod
+      ? `<td>${grandTotal.toLocaleString()}</td><td>${avgTotal.toLocaleString()}</td>${dates.map(d => `<td>${totalByDate[d.ymd].toLocaleString()}</td>`).join('')}`
+      : `${dates.map(d => `<td>${totalByDate[d.ymd].toLocaleString()}</td>`).join('')}<td>${grandTotal.toLocaleString()}</td>`;
+
     const totalRow = `<tr class="total-row">
         <td>전체 합계${errorCount ? ` <span style="font-weight:400;color:#e0895c;">(조회실패 ${errorCount}곳 제외)</span>` : ''}</td>
         <td></td>
         <td style="font-weight:400;color:#5c7690;">(기간 ${dates.length}일)</td>
-        ${dates.map(d => `<td>${totalByDate[d.ymd].toLocaleString()}</td>`).join('')}
-        <td>${grandTotal.toLocaleString()}</td>
+        ${totalRowMid}
       </tr>`;
+
+    const headerMid = isPeriod
+      ? `<th>합계</th><th>평균매출</th>${headerCells}`
+      : `${headerCells}<th>합계</th>`;
 
     wrap.innerHTML = `
       <div class="live-table-card">
         <div class="live-table-scroll">
           <table class="live-table">
             <thead><tr>
-              <th>매장명 (${rows.length}곳)</th><th style="text-align:left;">담당자</th><th>영업일수</th>${headerCells}<th>합계</th>
+              <th>${nameHeaderLabel}</th><th style="text-align:left;">담당자</th><th>영업일수</th>${headerMid}
             </tr></thead>
             <tbody>${totalRow}${bodyRows}</tbody>
           </table>
@@ -5012,7 +5040,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   };
 
   window.renderLiveRealtimeTable = function(){
-    renderLiveGenericTable_(window.__liveRtData, { wrap:'liveRtTableWrap', search:'liveRtSearch', managerSel:'liveRtManagerSel' });
+    renderLiveGenericTable_(window.__liveRtData, { wrap:'liveRtTableWrap', search:'liveRtSearch', managerSel:'liveRtManagerSel', mode:'realtime' });
   };
 
   // ── 📅 기간별 매출: 기간 제한 없이 사용자가 지정한 구간 조회 ──────
@@ -5048,7 +5076,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   };
 
   window.renderLivePeriodTable = function(){
-    renderLiveGenericTable_(window.__livePdData, { wrap:'livePdTableWrap', search:'livePdSearch', managerSel:'livePdManagerSel' });
+    renderLiveGenericTable_(window.__livePdData, { wrap:'livePdTableWrap', search:'livePdSearch', managerSel:'livePdManagerSel', mode:'period' });
   };
 
   function royaltyApiConfigured(){
