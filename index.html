@@ -5187,6 +5187,37 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     return raw;
   }
 
+  // ── 상품분류 매핑 (scripts/product-category.js가 REQ_CODE 2로 수집해서 저장) ──
+  // { 상품명: POS 실제 분류명(CMDTG_NM) } 형태. 있으면 이걸 우선 쓰고,
+  // 없거나 파일을 못 불러오면 기존 키워드 추정(classifyLiveProduct_ 하단부)으로 폴백한다.
+  const PRODUCT_CATEGORY_URL = 'https://raw.githubusercontent.com/TAEHWAN8872/bokhodu-dashboard/main/data/product-category.json';
+  window.__livePrCategoryMap = null;
+
+  // POS 실제 분류명(CMDTG_NM) → 대시보드 UI 카테고리(LIVE_PR_CATEGORIES) 변환표.
+  // ⚠ data/product-category.json이 실제로 생성되면 그 안의 분류명들을 확인해서
+  // 아래 왼쪽 키를 채워주세요 (예: '호두과자류': '호두과자'). 여기 없는 분류명은
+  // 자동으로 기존 키워드 추정 로직으로 폴백하니 비워둔 채로 배포해도 안전합니다.
+  const RAW_CATEGORY_TO_UI = {
+    // '호두과자류': '호두과자',
+    // '사이드메뉴': '사이드',
+    // '음료': '음료',
+    // '커피': '커피',
+  };
+
+  async function fetchProductCategoryMap_(){
+    if(window.__livePrCategoryMap) return window.__livePrCategoryMap;
+    try {
+      const res = await fetch(`${PRODUCT_CATEGORY_URL}?_=${Date.now()}`);
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const raw = await res.json();
+      window.__livePrCategoryMap = raw.map || {};
+    } catch(err){
+      console.warn('상품분류 매핑을 불러오지 못해 키워드 추정으로 대체합니다:', err.message);
+      window.__livePrCategoryMap = {};
+    }
+    return window.__livePrCategoryMap;
+  }
+
   window.loadLiveProduct = async function(){
     const startInput = document.getElementById('livePrStartDate');
     const endInput = document.getElementById('livePrEndDate');
@@ -5249,6 +5280,13 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     '넛티 요거트 볼', '(신)복 호두정과', '(신)복 호두육포', '(신)복 그래놀라'];
   function classifyLiveProduct_(name){
     const n = name || '';
+    // 1순위: POS 실제 분류명 매핑 (product-category.js가 수집한 데이터)
+    const map = window.__livePrCategoryMap;
+    if(map && map[n]){
+      const uiCat = RAW_CATEGORY_TO_UI[map[n]];
+      if(uiCat) return uiCat;
+    }
+    // 2순위(폴백): 매핑에 없거나 아직 안 불러온 경우 상품명 키워드로 추정
     if(n.includes('답례품')) return '답례품';
     if(n.includes('아메리카노') || n.includes('라떼') || n.includes('커피') || n.includes('콜드브루')) return '커피';
     if(n.includes('밀크티') || n.includes('음료')) return '음료';
@@ -5259,7 +5297,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
 
   async function ensureLivePrProductList_(){
     if(window.__livePrProductList) return window.__livePrProductList;
-    const raw = await fetchProductDaily_();
+    const [raw] = await Promise.all([fetchProductDaily_(), fetchProductCategoryMap_()]);
     const set = new Set();
     Object.values(raw.STORES || {}).forEach(s => {
       (s.rows || []).forEach(row => { if(row[1]) set.add(row[1]); });
