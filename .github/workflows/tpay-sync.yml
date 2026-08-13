@@ -16,6 +16,7 @@ on:
           - product-backfill
           - product-category
           - debug
+          - compare
       rolling_days:
         description: 'backfill 모드일 때 조회할 일수'
         required: false
@@ -25,17 +26,21 @@ on:
         required: false
         default: '90'
       debug_shop_no:
-        description: 'debug 모드일 때 테스트할 매장코드'
+        description: 'debug/compare 모드일 때 테스트할 매장코드'
         required: false
         default: 'BHD055'
       debug_days:
         description: 'debug 모드일 때 조회할 일수 (범위 제한 테스트용)'
         required: false
         default: '7'
+      debug_date:
+        description: 'compare 모드일 때 비교할 날짜 (yyyymmdd, 정산 끝난 과거 날짜 권장)'
+        required: false
+        default: ''
 permissions:
   contents: write
 concurrency:
-  group: tpay-sync
+  group: tpay-sync-${{ github.event.inputs.mode || 'daily' }}
   cancel-in-progress: false
 jobs:
   sync:
@@ -81,8 +86,15 @@ jobs:
           DEBUG_SHOP_NO: ${{ github.event.inputs.debug_shop_no }}
           DEBUG_DAYS: ${{ github.event.inputs.debug_days }}
         run: node scripts/debug-single-store.js
+      - name: 실시간 소스 검증 실행 (수동-compare, REQ_CODE 3 vs 4 비교)
+        if: github.event.inputs.mode == 'compare'
+        env:
+          TPAY_TOKEN: ${{ secrets.TPAY_TOKEN }}
+          DEBUG_SHOP_NO: ${{ github.event.inputs.debug_shop_no }}
+          DEBUG_DATE: ${{ github.event.inputs.debug_date }}
+        run: node scripts/debug-realtime-compare.js
       - name: 변경사항 커밋 & 푸시
-        if: github.event.inputs.mode != 'debug'
+        if: github.event.inputs.mode != 'debug' && github.event.inputs.mode != 'compare'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
