@@ -3,10 +3,16 @@
 // 기존 data/product-daily.json에 병합합니다. (daily-update.js의 상품버전)
 //
 // 저장 포맷은 용량을 줄이기 위해 [날짜, 상품명, 수량, 금액] 배열로 압축 저장합니다.
+//
+// [실시간 소스] "오늘"은 REQ_CODE 5(일상품정산매출, 정산 배치가 끝나야 채워짐) 대신
+// fetchOneStoreProductsRealtime()으로 REQ_CODE 6(주문내역, 상품별 건별 원본)을 조회해서
+// 직접 합산합니다. 확정값과 합산값이 완전히 일치함을 검증 완료(2026-08-13, BHD055/8월12일,
+// scripts/product-realtime-compare.js). 과거 날짜는 이미 정산 확정된 값이 그대로
+// 저장되어 있으므로 건드리지 않습니다.
 
 const fs = require('fs');
 const path = require('path');
-const { kstDateString, sleep, fetchOneStoreProducts } = require('./lib');
+const { kstDateString, sleep, fetchOneStoreProductsRealtime } = require('./lib');
 
 const DATA_PATH = path.join(__dirname, '..', 'data', 'product-daily.json');
 const STORE_MAP_PATH = path.join(__dirname, '..', 'data', 'store-map.json');
@@ -43,7 +49,7 @@ async function main() {
 
   for (let i = 0; i < storeMap.length; i++) {
     const [name, code] = storeMap[i];
-    const result = await fetchOneStoreProducts(token, code, today, today);
+    const result = await fetchOneStoreProductsRealtime(token, code, today);
 
     if (result.error) {
       failed.push(`${code}(${name}): ${result.error}`);
