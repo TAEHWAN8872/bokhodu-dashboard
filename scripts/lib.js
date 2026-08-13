@@ -165,6 +165,102 @@ async function fetchOneStoreRange(token, code, start, end, chunkDays = MAX_RANGE
   return { days: allDays };
 }
 
+// REQ_CODE 3(매출정보 마스터, 주문 건별 원본)을 합산할 때 쓰는 금액/인원 필드.
+// REQ_CODE 4(일정산매출, 정산 확정값)의 필드명과 1:1 동일 — debug-realtime-compare.js로
+// 확정값과 합산값이 완전히 일치함을 검증 완료(2026-08-13).
+const REALTIME_SUM_FIELDS = [
+  'SA_AMOUNT', 'SA_DEL_AMT', 'SA_DC_AMT', 'SA_AMT_TTL', 'SA_ADD_AMT',
+  'SA_GET_AMT', 'SA_RL_AMT', 'SA_VAT_AMT', 'SA_TF_AMT', 'SA_CASH_AMT',
+  'SA_CARD_AMT', 'SA_CPN_AMT', 'SA_ON_AMT', 'SA_RCV_AMT', 'SA_LC_AMT',
+  'SA_RSV_AMT', 'SA_PREPAID_AMT', 'SA_CASH_BILL_AMT', 'SA_CXL_AMT',
+  'SA_GUEST_M', 'SA_GUEST_F',
+];
+
+/**
+ * 매출정보 마스터(REQ_CODE 3) 주문 건별 원본을 SDA_DT(영업일) 기준으로 합산해서
+ * 일정산매출(REQ_CODE 4)과 동일한 모양의 day 객체 배열로 변환한다.
+ * 각 day 객체에는 STR_NO/STR_NM/BRD_CD/FRC_CD와 REALTIME_SUM_FIELDS 합계가 들어간다.
+ */
+function aggregateOrdersToDays(orders) {
+  const byDay = {};
+  for (const o of orders) {
+    const day = o.SDA_DT;
+    if (!byDay[day]) {
+      byDay[day] = {
+        SDA_DT: day,
+        STR_NO: o.STR_NO,
+        STR_NM: o.STR_NM,
+        BRD_CD: o.BRD_CD,
+        FRC_CD: o.FRC_CD,
+      };
+      for (const f of REALTIME_SUM_FIELDS) byDay[day][f] = 0;
+    }
+    for (const f of REALTIME_SUM_FIELDS) {
+      byDay[day][f] += Number(o[f] || 0);
+    }
+  }
+  return Object.values(byDay);
+}
+
+/**
+ * 매출정보 마스터(REQ_CODE 3)로 단일 날짜를 조회해서 합산한 실시간 매출을 반환.
+ * "오늘"처럼 아직 정산(REQ_CODE 4)이 안 끝난 날짜의 실시간 값을 보려 할 때 사용.
+ * 반환: { days: [...] } (주문이 0건이면 금액 0으로 채워진 day 1개) 또는 { error: '...' }
+ * 주의: fetchOneStore와 달리 REQ_CODE 3은 날짜 범위 제한을 확인하지 않았으므로
+ * 반드시 단일 날짜(start === end, 오늘자)로만 호출할 것.
+ */
+async function fetchOneStoreRealtime(token, code, date) {
+  const body = JSON.stringify({
+    REQ_CODE: '3',
+    FRANCHISE_CODE,
+    BRAND_CODE,
+    SHOP_NO: code,
+    SALE_START_DATE: date,
+    SALE_END_DATE: date,
+  });
+
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(TPAY_HOST + 'bridge/common/selectPos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token,
+          'Accept-Encoding': 'utf-8',
+        },
+        body,
+      });
+
+      if (res.ok) {
+        try {
+          const data = await res.json();
+          if (data.RESPONSE_CODE === '0000') {
+            const orders = data.SALE_INFO || [];
+            const days = aggregateOrdersToDays(orders);
+            // 주문이 0건이면 그날짜 항목 자체가 안 나오므로, 0원 상태를 명시적으로 채워서 반환
+            if (days.length === 0) {
+              const zero = { SDA_DT: date, STR_NO: code };
+              for (const f of REALTIME_SUM_FIELDS) zero[f] = 0;
+              days.push(zero);
+            }
+            return { days };
+          }
+          lastError = data.RESPONSE_MSG || data.RESPONSE_CODE;
+        } catch (e) {
+          lastError = 'parse error';
+        }
+      } else {
+        lastError = 'HTTP_' + res.status;
+      }
+    } catch (e) {
+      lastError = 'FETCH_EXCEPTION: ' + e.message;
+    }
+    if (attempt < 2) await sleep(500 * (attempt + 1));
+  }
+  return { error: lastError || 'unknown error' };
+}
+
 /**
  * 단건 매장 상품별 정산 조회 (REQ_CODE 5) + 실패 시 재시도(3회+백오프).
  * 반환: { rows: [...] } 또는 { error: '...' }
@@ -320,6 +416,7 @@ module.exports = {
   sleep,
   fetchOneStore,
   fetchOneStoreRange,
+  fetchOneStoreRealtime,
   fetchOneStoreProducts,
   fetchOneStoreProductsRange,
   fetchProductCategories,
