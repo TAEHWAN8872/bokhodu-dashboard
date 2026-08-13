@@ -17,6 +17,7 @@ on:
           - product-category
           - debug
           - compare
+          - product-compare
       rolling_days:
         description: 'backfill 모드일 때 조회할 일수'
         required: false
@@ -93,8 +94,15 @@ jobs:
           DEBUG_SHOP_NO: ${{ github.event.inputs.debug_shop_no }}
           DEBUG_DATE: ${{ github.event.inputs.debug_date }}
         run: node scripts/debug-realtime-compare.js
+      - name: 상품별 실시간 소스 검증 실행 (수동-product-compare, REQ_CODE 5 vs 6 비교)
+        if: github.event.inputs.mode == 'product-compare'
+        env:
+          TPAY_TOKEN: ${{ secrets.TPAY_TOKEN }}
+          DEBUG_SHOP_NO: ${{ github.event.inputs.debug_shop_no }}
+          DEBUG_DATE: ${{ github.event.inputs.debug_date }}
+        run: node scripts/product-realtime-compare.js
       - name: 변경사항 커밋 & 푸시
-        if: github.event.inputs.mode != 'debug' && github.event.inputs.mode != 'compare'
+        if: github.event.inputs.mode != 'debug' && github.event.inputs.mode != 'compare' && github.event.inputs.mode != 'product-compare'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
