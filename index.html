@@ -5316,19 +5316,25 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     const n = name || '';
     // 0순위: 위에서 지정한 호두과자 고정 목록 — POS 분류/키워드 추정보다 항상 우선
     if(LIVE_PR_WALNUT_NAMES.has(n)) return '호두과자';
-    // 1순위: POS 실제 분류명 매핑 (product-category.js가 수집한 데이터)
+    // 1순위: POS 실제 분류명 매핑 (product-category.js가 수집한 데이터).
+    // 단, POS 원본 데이터가 "1", "3색버터", "넛티 요거트 볼"처럼 실제로는 호두과자가
+    // 아닌 상품을 '호두과자'로 잘못 태깅해둔 경우가 있어서, 화이트리스트에 없는 상품이
+    // 맵 상으로 '호두과자'로 나오면 그 결과는 무시하고 2순위 키워드 추정으로 넘어간다.
+    // (호두과자 탭에는 오직 LIVE_PR_WALNUT_NAMES에 지정된 상품만 뜨도록 하기 위함)
     const map = window.__livePrCategoryMap;
     if(map && map[n]){
       const uiCat = RAW_CATEGORY_TO_UI[map[n]];
-      if(uiCat) return uiCat;
+      if(uiCat && uiCat !== '호두과자') return uiCat;
     }
-    // 2순위(폴백): 매핑에 없거나 아직 안 불러온 경우 상품명 키워드로 추정
+    // 2순위(폴백): 매핑에 없거나(또는 위에서 무시된 경우) 상품명 키워드로 추정
     if(n.includes('답례품')) return '답례품';
     if(n.includes('아메리카노') || n.includes('라떼') || n.includes('커피') || n.includes('콜드브루')) return '커피';
     if(n.includes('밀크티') || n.includes('음료')) return '음료';
     if(n.includes('레드벨벳') || n.includes('쑥') || n.includes('청사과')) return '신메뉴';
     if(LIVE_PR_SIDE_NAMES.includes(n) || n.includes('그래놀라') || n.includes('식혜') || n.includes('강정') || n.includes('육포')) return '사이드';
-    return '호두과자';
+    // 3순위: 위 어디에도 해당하지 않으면 '기타'로 분류 — 화이트리스트에 없는 이상
+    // '호두과자' 탭에는 노출되지 않는다 (전체 탭/검색에서는 그대로 노출됨).
+    return '기타';
   }
   
 const LIVE_PR_EXCLUDED_CATEGORIES = ['커피', '음료', '신메뉴', '포장류'];
