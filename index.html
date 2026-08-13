@@ -5199,18 +5199,15 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   // 일부러 매핑하지 않았습니다 — 여기 없는 분류는 자동으로 기존 키워드 추정 로직으로
   // 폴백되니, 지금까지와 동일하게 분류됩니다(회귀 없음).
   const RAW_CATEGORY_TO_UI = {
-    '호두과자': '호두과자',
-    '커피': '커피',
-    '음료': '음료',
-    '사이드': '사이드',
-    '신메뉴': '신메뉴',
-    '답례품': '답례품',
-    '답례품&선물세트': '답례품',
-    // '커피&음료': 커피/음료가 섞여있어 미매핑 → 상품별 키워드 추정으로 폴백
-    // '기타': 호두강정/호두육포 등 사이드성 상품이지만 이름이 모호해 미매핑 → 키워드 추정(이미 사이드로 분류됨)
-    // '테스트메뉴': 실제 판매 메뉴가 아닐 가능성이 높아 미매핑
-    // '포장류': 택배/봉투 등 상품이 아닌 부자재라 UI 탭에 대응 카테고리 없음 → 미매핑
-  };
+  '호두과자': '호두과자',
+  '커피': '커피',
+  '음료': '음료',
+  '사이드': '사이드',
+  '신메뉴': '신메뉴',
+  '답례품': '답례품',
+  '답례품&선물세트': '답례품',
+  '포장류': '포장류',   // ← 신규 추가
+};
 
   async function fetchProductCategoryMap_(){
     if(window.__livePrCategoryMap) return window.__livePrCategoryMap;
@@ -5243,20 +5240,19 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     document.getElementById('livePrLoading').style.display = 'block';
     document.getElementById('livePrTableWrap').innerHTML = '';
     try {
-      const raw = await fetchProductDaily_();
+      const [raw] = await Promise.all([fetchProductDaily_(), fetchProductCategoryMap_()]); // ← fetchProductCategoryMap_() 추가
       if(start < raw.START || end > raw.END){
         document.getElementById('livePrTableWrap').innerHTML =
           `<div class="live-empty">데이터가 수집된 기간(${ymdToInputDate_(raw.START)} ~ ${ymdToInputDate_(raw.END)}) 밖이에요. 그 안의 날짜로 다시 조회해주세요.</div>`;
         return;
       }
 
-      // 매장 x 상품 조합으로 집계 (선택한 기간 내 수량/금액 합산)
-      // ※ 상품명 필터(텍스트 검색 + 메뉴 체크박스)는 렌더링 단계에서 적용한다 (재조회 없이 필터 변경 가능하도록)
-      const agg = {}; // key: code|productName -> { code, name, product, qty, amount }
+      const agg = {};
       Object.entries(raw.STORES || {}).forEach(([code, s]) => {
         (s.rows || []).forEach(row => {
           const [d, product, qty, amount] = row;
           if(d < start || d > end) return;
+          if(isLivePrExcluded_(product)) return; // ← 추가
           const key = code + '|' + product;
           if(!agg[key]) agg[key] = { code, name: s.name, product, qty: 0, amount: 0 };
           agg[key].qty += qty;
@@ -5274,7 +5270,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     } finally {
       document.getElementById('livePrLoading').style.display = 'none';
     }
-  };
+};
 
   // ── 🏷️ 상품별 매출: 메뉴 다중 체크박스 선택 패널 ──
   window.__livePrProductList = null;              // 전체 기간 기준 고유 상품명 목록 캐시
@@ -5302,18 +5298,23 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     if(LIVE_PR_SIDE_NAMES.includes(n) || n.includes('그래놀라') || n.includes('식혜') || n.includes('강정') || n.includes('육포')) return '사이드';
     return '호두과자';
   }
-
+  
+const LIVE_PR_EXCLUDED_CATEGORIES = ['커피', '음료', '신메뉴', '포장류'];
+function isLivePrExcluded_(name){
+  return LIVE_PR_EXCLUDED_CATEGORIES.includes(classifyLiveProduct_(name));
+}
   async function ensureLivePrProductList_(){
-    if(window.__livePrProductList) return window.__livePrProductList;
-    const [raw] = await Promise.all([fetchProductDaily_(), fetchProductCategoryMap_()]);
-    const set = new Set();
-    Object.values(raw.STORES || {}).forEach(s => {
-      (s.rows || []).forEach(row => { if(row[1]) set.add(row[1]); });
+  if(window.__livePrProductList) return window.__livePrProductList;
+  const [raw] = await Promise.all([fetchProductDaily_(), fetchProductCategoryMap_()]);
+  const set = new Set();
+  Object.values(raw.STORES || {}).forEach(s => {
+    (s.rows || []).forEach(row => {
+      if(row[1] && !isLivePrExcluded_(row[1])) set.add(row[1]);
     });
-    window.__livePrProductList = Array.from(set).sort((a,b) => a.localeCompare(b, 'ko'));
-    return window.__livePrProductList;
-  }
-
+  });
+  window.__livePrProductList = Array.from(set).sort((a,b) => a.localeCompare(b, 'ko'));
+  return window.__livePrProductList;
+}
   window.toggleLivePrProductPanel = async function(){
     const panel = document.getElementById('livePrProductPanel');
     if(!panel) return;
