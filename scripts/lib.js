@@ -388,6 +388,35 @@ async function fetchOneStoreProductsRange(token, code, start, end, chunkDays = M
 }
 
 /**
+ * 매출정보 주문내역(REQ_CODE 6) 건별 라인을 (SDA_DT, CMDT_NM) 기준으로 합산해서
+ * 일상품정산매출(REQ_CODE 5)과 동일한 필드명(SDA_DT, CMDT_NM, SDC_QTY, SDC_AMT_TTL)으로
+ * 반환한다. product-realtime-compare.js로 확정값과 합산값이 완전히 일치함을
+ * 검증 완료(2026-08-13, BHD055/8월12일, 상품 15종 전부 일치).
+ */
+function aggregateOrderDetailToProducts(rows) {
+  const byKey = {};
+  for (const r of rows) {
+    const key = r.SDA_DT + '|' + r.CMDT_NM;
+    if (!byKey[key]) byKey[key] = { SDA_DT: r.SDA_DT, CMDT_NM: r.CMDT_NM, SDC_QTY: 0, SDC_AMT_TTL: 0 };
+    byKey[key].SDC_QTY += Number(r.SC_QTY || 0);
+    byKey[key].SDC_AMT_TTL += Number(r.SC_AMT_TTL || 0);
+  }
+  return Object.values(byKey);
+}
+
+/**
+ * 매출정보 주문내역(REQ_CODE 6)으로 단일 날짜를 조회해서 상품별로 합산한 실시간
+ * 판매를 반환한다. "오늘"처럼 아직 정산(REQ_CODE 5)이 안 끝난 날짜에 사용.
+ * 반환: { rows: [...] } (일상품정산매출과 동일한 필드 모양) 또는 { error: '...' }
+ * 주의: 스펙상 REQ_CODE 6은 하루치만 조회 가능 — 반드시 date 하나만 넘길 것.
+ */
+async function fetchOneStoreProductsRealtime(token, code, date) {
+  const result = await fetchOneStoreOrderDetail(token, code, date);
+  if (result.error) return result;
+  return { rows: aggregateOrderDetailToProducts(result.rows) };
+}
+
+/**
  * 상품정보(상품 마스터) 조회 (REQ_CODE 2) + 실패 시 재시도(3회+백오프).
  * 날짜 범위가 필요 없는 조회로 확인됨(SALE_START_DATE/SALE_END_DATE 없이도 동일 응답).
  * 반환: { products: [...] } 또는 { error: '...' }
@@ -469,6 +498,7 @@ module.exports = {
   fetchOneStoreProducts,
   fetchOneStoreProductsRange,
   fetchOneStoreOrderDetail,
+  fetchOneStoreProductsRealtime,
   fetchProductCategories,
   buildProductCategoryMap,
 };
