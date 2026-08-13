@@ -5279,13 +5279,14 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
 
   // 상품명에 포함된 키워드로 카테고리를 자동 분류한다.
   // (product-daily.json에는 카테고리 정보가 없어서, 상품명 키워드 기준으로 추정 분류)
-  const LIVE_PR_CATEGORIES = ['호두과자', '사이드', '답례품', '신메뉴', '커피', '음료'];
+  const LIVE_PR_CATEGORIES = ['호두과자', '선물세트', '사이드', '답례품', '신메뉴', '커피', '음료'];
   const LIVE_PR_SIDE_NAMES = ['호두강정', '호두육포', '치즈육포', '(신) 행복식혜', '행복식혜',
     '넛티 요거트 볼', '(신)복 호두정과', '(신)복 호두육포', '(신)복 그래놀라'];
-  // 호두과자 카테고리로 항상 고정 분류할 상품명 목록 (요청에 따라 명시 지정).
-  // POS 실제 분류나 키워드 추정(레드벨벳/쑥 등 신메뉴 키워드 오분류 등)과 무관하게
-  // 이 목록에 있는 상품명은 무조건 '호두과자' 탭에 노출된다.
-  // 배열 순서 = 목록에 표시될 순서(요청하신 순서 그대로) — 아래에서 정렬 시 사용.
+
+  // ── 아래 4개 카테고리는 요청에 따라 상품명을 직접 지정한 고정 목록이다.
+  // POS 실제 분류나 키워드 추정(레드벨벳/쑥/청사과 등으로 인한 오분류)과 무관하게
+  // 이 목록에 있는 상품명은 무조건 지정된 카테고리로 분류되며, 목록에 적힌 순서
+  // 그대로 화면에 표시된다(정렬은 아래 LIVE_PR_EXPLICIT_ORDER에서 처리).
   const LIVE_PR_WALNUT_ORDER = [
     '팥 20개',
     '팥/앙버터(20개)',
@@ -5301,28 +5302,84 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     '딸기버터 호두과자',
     '쑥 호두과자',
     '쑥&앙버터 호두과자',
+    '청사과 호두과자',
+    '팥/청사과 호두과자',
+    '앙버터/청사과 호두과자',
+    '레몬버터/청사과 호두과자',
+  ];
+  const LIVE_PR_GIFT_ORDER = [
     '선물세트(검은색)',
     '복호두 선물세트(앙버터)',
     '복호두 선물세트(쑥)',
     '복호두 선물세트(레드벨벳)',
     '복호두 선물세트(딸기버터)',
-    '(신)앙버터 선물세트(그래놀라)',
     '(신)선물세트(호두정과)',
     '(신)선물세트(그래놀라)',
+    '(신)앙버터 선물세트(그래놀라)',
     '(신)딸기 선물세트(그래놀라)',
     '(신) 앙버터 선물세트(호두정과)',
+    '(신)청사과 선물세트(그래놀라)',
+    '(신)청사과 선물세트(호두정과)',
   ];
-  const LIVE_PR_WALNUT_NAMES = new Set(LIVE_PR_WALNUT_ORDER);
+  const LIVE_PR_THANKS_ORDER = [
+    '답례품(팥앙금)',
+    '답례품(팥/앙버터)',
+    '답례품(팥/레몬)',
+    '답례품(앙버터)',
+    '답례품(앙버터/레몬)',
+    '답례품(레몬)',
+    '답례품(청사과)',
+    '답례품(팥/청사과)',
+    '답례품(앙버터/청사과)',
+    '답례품(레몬/청사과)',
+    '답례품(앙버터/딸기)',
+    '답례품(레몬/딸기)',
+    '답례품(앙버터/레드벨벳)',
+    '답례품(팥/딸기)',
+    '답례품(딸기)',
+    '답례품(레드벨벳)',
+    '답례품(쑥 호두과자)',
+    '답례품(쑥&앙버터 호두과자)',
+    '콜드브루 라떼(ICE)',
+    '콜드브루 아메리카노(ICE)',
+    '팥 밀크티(ICE)',
+  ];
+  const LIVE_PR_SIDE_ORDER = [
+    '팥 간식용 11개',
+    '(신)복 호두정과',
+    '(신)복 호두육포',
+    '(신)복 그래놀라',
+    '(신) 행복식혜',
+    '호두육포',
+    '행복식혜',
+    '호두강정',
+    '치즈육포',
+  ];
+
+  // 상품명 → 지정 카테고리 조회용 맵 (O(1) 조회, 0순위 분류에 사용)
+  const LIVE_PR_EXPLICIT_CATEGORY_MAP = new Map();
+  LIVE_PR_WALNUT_ORDER.forEach(n => LIVE_PR_EXPLICIT_CATEGORY_MAP.set(n, '호두과자'));
+  LIVE_PR_GIFT_ORDER.forEach(n => LIVE_PR_EXPLICIT_CATEGORY_MAP.set(n, '선물세트'));
+  LIVE_PR_THANKS_ORDER.forEach(n => LIVE_PR_EXPLICIT_CATEGORY_MAP.set(n, '답례품'));
+  LIVE_PR_SIDE_ORDER.forEach(n => LIVE_PR_EXPLICIT_CATEGORY_MAP.set(n, '사이드'));
+
+  // 목록 정렬용 순서 배열 (지정 카테고리 순서대로 이어붙임 — 목록/전체 탭에서 이 순서로 노출)
+  const LIVE_PR_EXPLICIT_ORDER = [
+    ...LIVE_PR_WALNUT_ORDER,
+    ...LIVE_PR_GIFT_ORDER,
+    ...LIVE_PR_THANKS_ORDER,
+    ...LIVE_PR_SIDE_ORDER,
+  ];
 
   function classifyLiveProduct_(name){
     const n = name || '';
-    // 0순위: 위에서 지정한 호두과자 고정 목록 — POS 분류/키워드 추정보다 항상 우선
-    if(LIVE_PR_WALNUT_NAMES.has(n)) return '호두과자';
+    // 0순위: 위에서 지정한 고정 목록(호두과자/선물세트/답례품/사이드) — POS 분류/키워드 추정보다 항상 우선
+    if(LIVE_PR_EXPLICIT_CATEGORY_MAP.has(n)) return LIVE_PR_EXPLICIT_CATEGORY_MAP.get(n);
     // 1순위: POS 실제 분류명 매핑 (product-category.js가 수집한 데이터).
     // 단, POS 원본 데이터가 "1", "3색버터", "넛티 요거트 볼"처럼 실제로는 호두과자가
-    // 아닌 상품을 '호두과자'로 잘못 태깅해둔 경우가 있어서, 화이트리스트에 없는 상품이
+    // 아닌 상품을 '호두과자'로 잘못 태깅해둔 경우가 있어서, 위 고정 목록에 없는 상품이
     // 맵 상으로 '호두과자'로 나오면 그 결과는 무시하고 2순위 키워드 추정으로 넘어간다.
-    // (호두과자 탭에는 오직 LIVE_PR_WALNUT_NAMES에 지정된 상품만 뜨도록 하기 위함)
+    // (호두과자 탭에는 오직 LIVE_PR_WALNUT_ORDER에 지정된 상품만 뜨도록 하기 위함)
     const map = window.__livePrCategoryMap;
     if(map && map[n]){
       const uiCat = RAW_CATEGORY_TO_UI[map[n]];
@@ -5334,7 +5391,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     if(n.includes('밀크티') || n.includes('음료')) return '음료';
     if(n.includes('레드벨벳') || n.includes('쑥') || n.includes('청사과')) return '신메뉴';
     if(LIVE_PR_SIDE_NAMES.includes(n) || n.includes('그래놀라') || n.includes('식혜') || n.includes('강정') || n.includes('육포')) return '사이드';
-    // 3순위: 위 어디에도 해당하지 않으면 '기타'로 분류 — 화이트리스트에 없는 이상
+    // 3순위: 위 어디에도 해당하지 않으면 '기타'로 분류 — 고정 목록에 없는 이상
     // '호두과자' 탭에는 노출되지 않는다 (전체 탭/검색에서는 그대로 노출됨).
     return '기타';
   }
@@ -5353,9 +5410,10 @@ function isLivePrExcluded_(name){
     });
   });
   window.__livePrProductList = Array.from(set).sort((a,b) => {
-    // 호두과자 고정 목록에 있는 상품은 지정한 순서대로, 그 외 상품은 그 뒤에 가나다순으로 정렬
-    const ai = LIVE_PR_WALNUT_ORDER.indexOf(a);
-    const bi = LIVE_PR_WALNUT_ORDER.indexOf(b);
+    // 지정 카테고리(호두과자/선물세트/답례품/사이드) 상품은 지정한 순서대로,
+    // 그 외 상품은 그 뒤에 가나다순으로 정렬
+    const ai = LIVE_PR_EXPLICIT_ORDER.indexOf(a);
+    const bi = LIVE_PR_EXPLICIT_ORDER.indexOf(b);
     if(ai !== -1 && bi !== -1) return ai - bi;
     if(ai !== -1) return -1;
     if(bi !== -1) return 1;
