@@ -293,14 +293,13 @@ async function fetchProductCategories(token, code) {
 /**
  * fetchProductCategories 결과를 { [상품명]: 분류명 } 매핑 객체로 변환.
  * 같은 상품명이 여러 매장/여러 건 나와도 마지막 값으로 덮어써 정리됨.
- * CMDT_DEL_MK가 'Y'인 상품은 일단 제외하지 않고 그대로 포함시킴 — 이 필드가
- * 정확히 "삭제됨"을 뜻하는지, 아니면 다른 상태 플래그인지 확인 전이라 임의로
- * 걸러내지 않았습니다. 실제 응답에서 이 필드의 의미가 확인되면 여기서 필터링을
- * 추가하면 됩니다.
+ * CMDT_DEL_MK(사용여부, Y:사용/N:중지)가 'N'인 상품은 매핑에서 제외한다.
+ * (스펙문서 확인 완료 — POS_매출연동규격서 '2.상품정보조회' 응답 항목)
  */
 function buildProductCategoryMap(products) {
   const map = {};
   for (const p of products) {
+    if (p.CMDT_DEL_MK === 'N') continue; // 중지된 상품은 제외
     const name = p.CMDT_NM;
     const category = p.CMDTG_NM;
     if (name && category) map[name] = category;
