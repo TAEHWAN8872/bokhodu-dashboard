@@ -5,10 +5,16 @@
 //
 // 실패한 매장은 이번 회차 데이터로 덮어쓰지 않고 "직전 성공값"을 그대로
 // 유지합니다 (매출 0원과 조회 실패가 섞이지 않도록).
+//
+// [실시간 소스] "오늘"은 REQ_CODE 4(일정산매출, 정산 배치가 끝나야 채워짐) 대신
+// fetchOneStoreRealtime()으로 REQ_CODE 3(매출정보 마스터, 주문 건별 원본)을 조회해서
+// 직접 합산합니다. 확정값과 합산값이 완전히 일치함을 검증 완료(2026-08-13,
+// scripts/debug-realtime-compare.js). 과거 날짜는 이미 정산 확정된 값이 그대로
+// 저장되어 있으므로 건드리지 않습니다.
 
 const fs = require('fs');
 const path = require('path');
-const { kstDateString, sleep, fetchOneStore } = require('./lib');
+const { kstDateString, sleep, fetchOneStoreRealtime } = require('./lib');
 
 const DATA_PATH = path.join(__dirname, '..', 'data', 'live-daily.json');
 const STORE_MAP_PATH = path.join(__dirname, '..', 'data', 'store-map.json');
@@ -40,7 +46,7 @@ async function main() {
 
   for (let i = 0; i < storeMap.length; i++) {
     const [name, code] = storeMap[i];
-    const result = await fetchOneStore(token, code, today, today);
+    const result = await fetchOneStoreRealtime(token, code, today);
 
     if (result.error) {
       failed.push(`${code}(${name}): ${result.error}`);
