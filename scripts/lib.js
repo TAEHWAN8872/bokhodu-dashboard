@@ -262,6 +262,55 @@ async function fetchOneStoreRealtime(token, code, date) {
 }
 
 /**
+ * 매출정보 주문내역(REQ_CODE 6) 조회 + 실패 시 재시도(3회+백오프).
+ * 상품별 판매의 "건별" 원본(SC_QTY, SC_AMT_TTL 등)을 반환한다. 스펙상 하루치만 조회 가능.
+ * 취소(SC_FORM='D')/반품(SC_FORM='C') 라인이 별도로 섞여 나올 수 있어, 정산값(REQ_CODE 5)과
+ * 맞는지는 product-realtime-compare.js로 검증 후 사용할 것.
+ * 반환: { rows: [...] } 또는 { error: '...' }
+ */
+async function fetchOneStoreOrderDetail(token, code, date) {
+  const body = JSON.stringify({
+    REQ_CODE: '6',
+    FRANCHISE_CODE,
+    BRAND_CODE,
+    SHOP_NO: code,
+    SALE_START_DATE: date,
+    SALE_END_DATE: date,
+  });
+
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(TPAY_HOST + 'bridge/common/selectPos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token,
+          'Accept-Encoding': 'utf-8',
+        },
+        body,
+      });
+
+      if (res.ok) {
+        try {
+          const data = await res.json();
+          if (data.RESPONSE_CODE === '0000') return { rows: data.SALE_INFO || [] };
+          lastError = data.RESPONSE_MSG || data.RESPONSE_CODE;
+        } catch (e) {
+          lastError = 'parse error';
+        }
+      } else {
+        lastError = 'HTTP_' + res.status;
+      }
+    } catch (e) {
+      lastError = 'FETCH_EXCEPTION: ' + e.message;
+    }
+    if (attempt < 2) await sleep(500 * (attempt + 1));
+  }
+  return { error: lastError || 'unknown error' };
+}
+
+/**
  * 단건 매장 상품별 정산 조회 (REQ_CODE 5) + 실패 시 재시도(3회+백오프).
  * 반환: { rows: [...] } 또는 { error: '...' }
  */
@@ -419,6 +468,7 @@ module.exports = {
   fetchOneStoreRealtime,
   fetchOneStoreProducts,
   fetchOneStoreProductsRange,
+  fetchOneStoreOrderDetail,
   fetchProductCategories,
   buildProductCategoryMap,
 };
