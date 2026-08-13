@@ -5469,7 +5469,10 @@ function isLivePrExcluded_(name){
       </div>
       <div id="livePrProductPanelItems" style="max-height:260px;overflow:auto;padding:4px;"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-top:1px solid #1e3347;">
-        <button type="button" class="live-refresh-btn" style="padding:4px 10px;font-size:11px;" onclick="window.clearLivePrProductCheck()">전체 해제</button>
+        <div style="display:flex;gap:6px;">
+          <button type="button" class="live-refresh-btn" style="padding:4px 10px;font-size:11px;" onclick="window.selectAllLivePrProductCheck()">전체 선택</button>
+          <button type="button" class="live-refresh-btn" style="padding:4px 10px;font-size:11px;" onclick="window.clearLivePrProductCheck()">전체 해제</button>
+        </div>
         <span id="livePrProductPanelCount" style="font-size:11px;color:#8fb8dd;"></span>
       </div>`;
     bindLivePrProductSearchInput_();
@@ -5506,11 +5509,8 @@ function isLivePrExcluded_(name){
     });
   }
 
-  // 체크박스 목록 부분만 갱신 (검색 input DOM은 건드리지 않음 → 조합 중인 한글이 안 깨짐)
-  function renderLivePrProductPanelItems_(list, filterQ){
-    const itemsWrap = document.getElementById('livePrProductPanelItems');
-    const countEl = document.getElementById('livePrProductPanelCount');
-    if(!itemsWrap) return;
+  // 현재 카테고리 탭 + 검색어 필터가 적용된 목록을 반환 (렌더링과 전체선택에서 공용으로 사용)
+  function getLivePrFilteredList_(list, filterQ){
     const searchInput = document.getElementById('livePrProductPanelSearch');
     const q = (filterQ !== undefined ? filterQ : (searchInput ? searchInput.value : '')).trim();
     const checked = window.__livePrCheckedProducts;
@@ -5523,6 +5523,16 @@ function isLivePrExcluded_(name){
       filtered = filtered.filter(p => classifyLiveProduct_(p) === cat);
     }
     if(q) filtered = filtered.filter(p => p.includes(q));
+    return filtered;
+  }
+
+  // 체크박스 목록 부분만 갱신 (검색 input DOM은 건드리지 않음 → 조합 중인 한글이 안 깨짐)
+  function renderLivePrProductPanelItems_(list, filterQ){
+    const itemsWrap = document.getElementById('livePrProductPanelItems');
+    const countEl = document.getElementById('livePrProductPanelCount');
+    if(!itemsWrap) return;
+    const checked = window.__livePrCheckedProducts;
+    const filtered = getLivePrFilteredList_(list, filterQ);
 
     itemsWrap.innerHTML = filtered.length
       ? filtered.map(p => `
@@ -5545,6 +5555,15 @@ function isLivePrExcluded_(name){
     else window.__livePrCheckedProducts.delete(name);
     updateLivePrProductBtnLabel_();
     renderLivePrProductPanelItems_(window.__livePrProductList || []);
+    window.renderLiveProductTable();
+  };
+
+  window.selectAllLivePrProductCheck = function(){
+    const list = window.__livePrProductList || [];
+    const filtered = getLivePrFilteredList_(list);
+    filtered.forEach(p => window.__livePrCheckedProducts.add(p));
+    updateLivePrProductBtnLabel_();
+    renderLivePrProductPanelItems_(list);
     window.renderLiveProductTable();
   };
 
