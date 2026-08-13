@@ -5285,7 +5285,8 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   // 호두과자 카테고리로 항상 고정 분류할 상품명 목록 (요청에 따라 명시 지정).
   // POS 실제 분류나 키워드 추정(레드벨벳/쑥 등 신메뉴 키워드 오분류 등)과 무관하게
   // 이 목록에 있는 상품명은 무조건 '호두과자' 탭에 노출된다.
-  const LIVE_PR_WALNUT_NAMES = new Set([
+  // 배열 순서 = 목록에 표시될 순서(요청하신 순서 그대로) — 아래에서 정렬 시 사용.
+  const LIVE_PR_WALNUT_ORDER = [
     '팥 20개',
     '팥/앙버터(20개)',
     '팥/레몬버터(20개)',
@@ -5310,7 +5311,8 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     '(신)선물세트(그래놀라)',
     '(신)딸기 선물세트(그래놀라)',
     '(신) 앙버터 선물세트(호두정과)',
-  ]);
+  ];
+  const LIVE_PR_WALNUT_NAMES = new Set(LIVE_PR_WALNUT_ORDER);
 
   function classifyLiveProduct_(name){
     const n = name || '';
@@ -5350,7 +5352,15 @@ function isLivePrExcluded_(name){
       if(row[1] && !isLivePrExcluded_(row[1])) set.add(row[1]);
     });
   });
-  window.__livePrProductList = Array.from(set).sort((a,b) => a.localeCompare(b, 'ko'));
+  window.__livePrProductList = Array.from(set).sort((a,b) => {
+    // 호두과자 고정 목록에 있는 상품은 지정한 순서대로, 그 외 상품은 그 뒤에 가나다순으로 정렬
+    const ai = LIVE_PR_WALNUT_ORDER.indexOf(a);
+    const bi = LIVE_PR_WALNUT_ORDER.indexOf(b);
+    if(ai !== -1 && bi !== -1) return ai - bi;
+    if(ai !== -1) return -1;
+    if(bi !== -1) return 1;
+    return a.localeCompare(b, 'ko');
+  });
   return window.__livePrProductList;
 }
   window.toggleLivePrProductPanel = async function(){
