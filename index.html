@@ -4943,6 +4943,15 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     sel.value = wanted.includes(current) ? current : 'all';
   }
 
+  // GitHub Actions가 tpay POS에서 실제로 데이터를 가져와 json을 갱신한 시각(ISO)을
+  // "오전/오후 h:mm:ss" 형태로 변환. 값이 없으면 조회 버튼을 누른 브라우저 시각으로 대체.
+  function formatSyncTime_(iso){
+    if(!iso) return new Date().toLocaleTimeString('ko-KR');
+    const d = new Date(iso);
+    if(isNaN(d.getTime())) return new Date().toLocaleTimeString('ko-KR');
+    return d.toLocaleTimeString('ko-KR');
+  }
+
   // 두 서브탭이 공유하는 조회 함수: GitHub Actions가 갱신하는 정적 json에서 원본 데이터를 가져온다
   async function fetchLiveDaily_(start, end){
     const res = await fetch(`${LIVE_DATA_URL}?_=${Date.now()}`); // 쿼리스트링으로 캐시 우회
@@ -5168,7 +5177,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     try {
       const data = await fetchLiveDaily_(today, today);
       window.__liveRtData = data;
-      document.getElementById('liveRtUpdatedAt').textContent = '마지막 갱신: ' + new Date().toLocaleTimeString('ko-KR');
+      document.getElementById('liveRtUpdatedAt').textContent = 'tpay 동기화: ' + formatSyncTime_(data.CACHED_AT);
       window.renderLiveRealtimeTable();
     } catch(err){
       document.getElementById('liveRtTableWrap').innerHTML =
@@ -5204,7 +5213,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     try {
       const data = await fetchLiveDaily_(start, end);
       window.__livePdData = data;
-      document.getElementById('livePdUpdatedAt').textContent = '마지막 갱신: ' + new Date().toLocaleTimeString('ko-KR');
+      document.getElementById('livePdUpdatedAt').textContent = 'tpay 동기화: ' + formatSyncTime_(data.CACHED_AT);
       window.renderLivePeriodTable();
     } catch(err){
       document.getElementById('livePdTableWrap').innerHTML =
@@ -5309,7 +5318,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       });
 
       window.__livePrRows = Object.values(agg);
-      document.getElementById('livePrUpdatedAt').textContent = '마지막 갱신: ' + new Date().toLocaleTimeString('ko-KR')
+      document.getElementById('livePrUpdatedAt').textContent = 'tpay 동기화: ' + formatSyncTime_(raw.updatedAt)
         + ' (데이터 수집 범위: ' + ymdToInputDate_(raw.START) + ' ~ ' + ymdToInputDate_(raw.END) + ')';
       window.renderLiveProductTable();
     } catch(err){
