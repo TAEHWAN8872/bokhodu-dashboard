@@ -1,1 +1,1 @@
-{"DATE":"20260815","ORDERS":[],"updatedAt":"2026-08-14T21:55:45.699Z","lastRunFailedCount":0}
+{"DATE":"20260815","ORDERS":[{"STR_NM":"대구칠곡점","SA_NO":101,"SA_DT":"2026-08-15 07:18:06","SA_DEL_MK":"L","SA_GET_AMT":8000,"SA_CASH_AMT":0,"SA_CARD_AMT":8000,"SA_DISCOUNT":0}],"updatedAt":"2026-08-14T22:19:06.464Z","lastRunFailedCount":0}
