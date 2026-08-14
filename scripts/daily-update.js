@@ -14,10 +14,25 @@
 
 const fs = require('fs');
 const path = require('path');
-const { kstDateString, sleep, fetchOneStoreRealtime } = require('./lib');
+const { kstDateString, sleep, fetchOneStoreRealtimeWithOrders } = require('./lib');
 
 const DATA_PATH = path.join(__dirname, '..', 'data', 'live-daily.json');
 const STORE_MAP_PATH = path.join(__dirname, '..', 'data', 'store-map.json');
+const RECEIPT_PATH = path.join(__dirname, '..', 'data', 'receipt-today.json');
+
+// 영수증(일판매 매출) 탭에 필요한 필드만 추려서 저장 (용량 절약)
+function trimOrder_(o) {
+  return {
+    STR_NM: o.STR_NM,
+    SA_NO: o.SA_NO,
+    SA_DT: o.SA_DT,
+    SA_DEL_MK: o.SA_DEL_MK, // L: 정상(완료), D: 취소
+    SA_GET_AMT: Number(o.SA_GET_AMT || 0),   // 판매금액(결제금액)
+    SA_CASH_AMT: Number(o.SA_CASH_AMT || 0), // 현금
+    SA_CARD_AMT: Number(o.SA_CARD_AMT || 0), // 카드
+    SA_DISCOUNT: Number(o.SA_DC_AMT || 0) + Number(o.SA_ADD_AMT || 0), // 단품할인+전체할인
+  };
+}
 
 function loadExisting() {
   if (!fs.existsSync(DATA_PATH)) return { STORES: {} };
@@ -43,10 +58,11 @@ async function main() {
   const stores = { ...prevStores };
   const failed = [];
   let successCount = 0;
+  const allOrders = []; // 오늘자 전 매장 영수증(주문) 원본 — 일판매 매출 탭용
 
   for (let i = 0; i < storeMap.length; i++) {
     const [name, code] = storeMap[i];
-    const result = await fetchOneStoreRealtime(token, code, today);
+    const result = await fetchOneStoreRealtimeWithOrders(token, code, today);
 
     if (result.error) {
       failed.push(`${code}(${name}): ${result.error}`);
@@ -57,6 +73,7 @@ async function main() {
       const prevDays = (prev.days || []).filter((d) => d.SDA_DT !== today);
       stores[code] = { name, days: [...prevDays, ...result.days] };
       successCount++;
+      for (const o of result.orders) allOrders.push(trimOrder_(o));
     }
 
     if (i < storeMap.length - 1) await sleep(150);
@@ -74,7 +91,17 @@ async function main() {
   fs.mkdirSync(path.dirname(DATA_PATH), { recursive: true });
   fs.writeFileSync(DATA_PATH, JSON.stringify(output));
 
-  console.log(`갱신 완료: 성공 ${successCount}개 / 실패 ${failed.length}개`);
+  // 일판매 매출(영수증) 탭용 파일: "오늘" 스냅샷이라 매회 완전히 새로 씀(누적 아님, 취소건 포함)
+  allOrders.sort((a, b) => (a.SA_DT < b.SA_DT ? 1 : a.SA_DT > b.SA_DT ? -1 : 0)); // 최신순
+  const receiptOutput = {
+    DATE: today,
+    ORDERS: allOrders,
+    updatedAt: new Date().toISOString(),
+    lastRunFailedCount: failed.length,
+  };
+  fs.writeFileSync(RECEIPT_PATH, JSON.stringify(receiptOutput));
+
+  console.log(`갱신 완료: 성공 ${successCount}개 / 실패 ${failed.length}개 / 영수증 ${allOrders.length}건`);
   if (failed.length) console.log('실패 매장:\n' + failed.join('\n'));
 }
 
