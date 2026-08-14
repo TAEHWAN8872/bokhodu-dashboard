@@ -262,6 +262,65 @@ async function fetchOneStoreRealtime(token, code, date) {
 }
 
 /**
+ * REQ_CODE 3(매출정보 마스터, 주문 건별 원본)으로 단일 날짜를 조회해서
+ * 매장별 합산 day 데이터와 원본 주문(영수증) 배열을 함께 반환한다.
+ * fetchOneStoreRealtime과 동일한 API 호출 1번으로 두 가지를 모두 얻는다
+ * (일판매 매출/영수증 조회 탭에서 사용, API 호출량 추가 없음).
+ * 반환: { days: [...], orders: [...] } 또는 { error: '...' }
+ */
+async function fetchOneStoreRealtimeWithOrders(token, code, date) {
+  const body = JSON.stringify({
+    REQ_CODE: '3',
+    FRANCHISE_CODE,
+    BRAND_CODE,
+    SHOP_NO: code,
+    SALE_START_DATE: date,
+    SALE_END_DATE: date,
+  });
+
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(TPAY_HOST + 'bridge/common/selectPos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token,
+          'Accept-Encoding': 'utf-8',
+        },
+        body,
+      });
+
+      if (res.ok) {
+        try {
+          const data = await res.json();
+          if (data.RESPONSE_CODE === '0000') {
+            const orders = data.SALE_INFO || [];
+            const days = aggregateOrdersToDays(orders);
+            // 주문이 0건이면 그날짜 항목 자체가 안 나오므로, 0원 상태를 명시적으로 채워서 반환
+            if (days.length === 0) {
+              const zero = { SDA_DT: date, STR_NO: code };
+              for (const f of REALTIME_SUM_FIELDS) zero[f] = 0;
+              days.push(zero);
+            }
+            return { days, orders };
+          }
+          lastError = data.RESPONSE_MSG || data.RESPONSE_CODE;
+        } catch (e) {
+          lastError = 'parse error';
+        }
+      } else {
+        lastError = 'HTTP_' + res.status;
+      }
+    } catch (e) {
+      lastError = 'FETCH_EXCEPTION: ' + e.message;
+    }
+    if (attempt < 2) await sleep(500 * (attempt + 1));
+  }
+  return { error: lastError || 'unknown error' };
+}
+
+/**
  * 매출정보 주문내역(REQ_CODE 6) 조회 + 실패 시 재시도(3회+백오프).
  * 상품별 판매의 "건별" 원본(SC_QTY, SC_AMT_TTL 등)을 반환한다. 스펙상 하루치만 조회 가능.
  * 취소(SC_FORM='D')/반품(SC_FORM='C') 라인이 별도로 섞여 나올 수 있어, 정산값(REQ_CODE 5)과
@@ -495,6 +554,7 @@ module.exports = {
   fetchOneStore,
   fetchOneStoreRange,
   fetchOneStoreRealtime,
+  fetchOneStoreRealtimeWithOrders,
   fetchOneStoreProducts,
   fetchOneStoreProductsRange,
   fetchOneStoreOrderDetail,
