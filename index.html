@@ -632,6 +632,7 @@ body.hide-names .store-name:hover{
             width:240px;background:#0d1b2a;border:1px solid #2a5a8a;border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,0.4);"></div>
         </div>
         <button class="live-refresh-btn" onclick="window.loadLiveProduct()">🔄 조회</button>
+        <button class="live-refresh-btn" onclick="window.loadLiveProduct(true)" title="원본 데이터를 다시 받아와서 최신 동기화 시각으로 갱신합니다 (66MB, 시간이 조금 더 걸려요)">🔃 최신 데이터로 새로고침</button>
         <button class="live-refresh-btn" onclick="window.downloadLiveProductExcel()">⬇️ 엑셀 다운로드</button>
         <input id="livePrStoreSearch" type="text" placeholder="매장명 검색..." autocomplete="off" oninput="window.renderLiveProductTable()"
           class="live-input" style="min-width:160px;">
@@ -5213,7 +5214,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     try {
       const data = await fetchLiveDaily_(start, end);
       window.__livePdData = data;
-      document.getElementById('livePdUpdatedAt').textContent = 'tpay 동기화: ' + formatSyncTime_(data.CACHED_AT);
+      document.getElementById('livePdUpdatedAt').textContent = 'OKPOS 동기화: ' + formatSyncTime_(data.CACHED_AT);
       window.renderLivePeriodTable();
     } catch(err){
       document.getElementById('livePdTableWrap').innerHTML =
@@ -5235,8 +5236,8 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
 
   window.__liveSortState.product = window.__liveSortState.product || { key: 'amount', dir: -1 };
 
-  async function fetchProductDaily_(){
-    if(window.__livePrRaw) return window.__livePrRaw;
+  async function fetchProductDaily_(forceRefresh){
+    if(window.__livePrRaw && !forceRefresh) return window.__livePrRaw;
     const res = await fetch(`${PRODUCT_DATA_URL}?_=${Date.now()}`);
     if(!res.ok) throw new Error('데이터 파일을 불러오지 못했어요 (HTTP ' + res.status + ')');
     const raw = await res.json();
@@ -5280,7 +5281,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     return window.__livePrCategoryMap;
   }
 
-  window.loadLiveProduct = async function(){
+  window.loadLiveProduct = async function(forceRefresh){
     const startInput = document.getElementById('livePrStartDate');
     const endInput = document.getElementById('livePrEndDate');
     if(!startInput.value || !endInput.value){
@@ -5295,9 +5296,10 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     }
 
     document.getElementById('livePrLoading').style.display = 'block';
+    document.getElementById('livePrLoading').textContent = forceRefresh ? '최신 데이터 받아오는 중... (66MB, 잠시만요)' : '불러오는 중...';
     document.getElementById('livePrTableWrap').innerHTML = '';
     try {
-      const [raw] = await Promise.all([fetchProductDaily_(), fetchProductCategoryMap_()]); // ← fetchProductCategoryMap_() 추가
+      const [raw] = await Promise.all([fetchProductDaily_(forceRefresh), fetchProductCategoryMap_()]); // ← fetchProductCategoryMap_() 추가
       if(start < raw.START || end > raw.END){
         document.getElementById('livePrTableWrap').innerHTML =
           `<div class="live-empty">데이터가 수집된 기간(${ymdToInputDate_(raw.START)} ~ ${ymdToInputDate_(raw.END)}) 밖이에요. 그 안의 날짜로 다시 조회해주세요.</div>`;
