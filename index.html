@@ -570,6 +570,7 @@ body.hide-names .store-name:hover{
   <div id="livePage" style="display:none;">
     <div class="live-subtabs">
       <div class="live-subtab active" id="liveSubTab-realtime" onclick="window.switchLiveSubTab('realtime')">⚡ 실시간 매출</div>
+      <div class="live-subtab" id="liveSubTab-receipt" onclick="window.switchLiveSubTab('receipt')">🧾 일판매 매출</div>
       <div class="live-subtab" id="liveSubTab-period" onclick="window.switchLiveSubTab('period')">📅 기간별 매출</div>
       <div class="live-subtab" id="liveSubTab-product" onclick="window.switchLiveSubTab('product')">🏷️ 상품별 매출</div>
     </div>
@@ -591,6 +592,21 @@ body.hide-names .store-name:hover{
         <span class="spin"></span>POS 서버에서 오늘 매출 데이터를 가져오는 중입니다...
       </div>
       <div id="liveRtTableWrap"></div>
+    </div>
+
+    <!-- 🧾 일판매 매출: 오늘 결제건을 영수증(주문) 단위로 조회 -->
+    <div id="liveReceiptSection" style="display:none;">
+      <div class="live-toolbar">
+        <span class="live-today-label" id="liveRcDateLabel">오늘</span>
+        <button class="live-refresh-btn" onclick="window.loadLiveReceipt()">🔄 새로고침</button>
+        <input id="liveRcSearch" type="text" placeholder="매장명 검색..." autocomplete="off" oninput="window.renderLiveReceiptTable()"
+          class="live-input" style="min-width:180px;">
+        <span id="liveRcUpdatedAt" class="live-updated-at"></span>
+      </div>
+      <div id="liveRcLoading" class="live-loading" style="display:none;">
+        <span class="spin"></span>POS 서버에서 오늘 영수증 데이터를 가져오는 중입니다...
+      </div>
+      <div id="liveRcTableWrap"></div>
     </div>
 
     <!-- 📅 기간별 매출: 기간 제한 없이 임의 구간 조회 -->
@@ -4905,12 +4921,15 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   // 서브탭 전환 (⚡ 실시간 매출 / 📅 기간별 매출)
   window.switchLiveSubTab = function(sub){
     document.getElementById('liveRealtimeSection').style.display = (sub==='realtime') ? '' : 'none';
+    document.getElementById('liveReceiptSection').style.display = (sub==='receipt') ? '' : 'none';
     document.getElementById('livePeriodSection').style.display = (sub==='period') ? '' : 'none';
     document.getElementById('liveProductSection').style.display = (sub==='product') ? '' : 'none';
     document.getElementById('liveSubTab-realtime').classList.toggle('active', sub==='realtime');
+    document.getElementById('liveSubTab-receipt').classList.toggle('active', sub==='receipt');
     document.getElementById('liveSubTab-period').classList.toggle('active', sub==='period');
     document.getElementById('liveSubTab-product').classList.toggle('active', sub==='product');
     if(sub==='realtime' && !window.__liveRtData){ window.loadLiveRealtime(); }
+    if(sub==='receipt' && !window.__liveRcData){ window.loadLiveReceipt(); }
     if(sub==='period' && !window.__livePdData){
       // 기간별 매출 첫 진입 시 기본값: 이번 달 1일 ~ 오늘 (조회는 사용자가 직접 눌러야 실행)
       const startInput = document.getElementById('livePdStartDate');
@@ -5190,6 +5209,82 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
 
   window.renderLiveRealtimeTable = function(){
     renderLiveGenericTable_(window.__liveRtData, { wrap:'liveRtTableWrap', search:'liveRtSearch', managerSel:'liveRtManagerSel', mode:'realtime' });
+  };
+
+  // ── 🧾 일판매 매출: 오늘 결제건을 영수증(주문) 단위로 조회 ──────────
+  const RECEIPT_DATA_URL = 'https://raw.githubusercontent.com/TAEHWAN8872/bokhodu-dashboard/main/data/receipt-today.json';
+  window.__liveRcData = null;
+
+  window.loadLiveReceipt = async function(){
+    const today = todayYmd_();
+    document.getElementById('liveRcDateLabel').textContent =
+      `${today.slice(0,4)}.${today.slice(4,6)}.${today.slice(6,8)} (오늘)`;
+    document.getElementById('liveRcLoading').style.display = 'block';
+    document.getElementById('liveRcTableWrap').innerHTML = '';
+    try {
+      const res = await fetch(`${RECEIPT_DATA_URL}?_=${Date.now()}`);
+      const data = await res.json();
+      window.__liveRcData = data;
+      document.getElementById('liveRcUpdatedAt').textContent = 'OKPOS 동기화: ' + formatSyncTime_(data.updatedAt);
+      window.renderLiveReceiptTable();
+    } catch(err){
+      document.getElementById('liveRcTableWrap').innerHTML =
+        `<div style="padding:20px;color:#e05555;">불러오기 실패: ${err.message}</div>`;
+    } finally {
+      document.getElementById('liveRcLoading').style.display = 'none';
+    }
+  };
+
+  window.renderLiveReceiptTable = function(){
+    const wrap = document.getElementById('liveRcTableWrap');
+    const data = window.__liveRcData;
+    if(!data){ wrap.innerHTML = ''; return; }
+
+    const q = (document.getElementById('liveRcSearch').value || '').trim();
+    let orders = data.ORDERS || [];
+    if(q) orders = orders.filter(o => (o.STR_NM||'').includes(q));
+
+    if(!orders.length){
+      wrap.innerHTML = `<div class="live-empty">${q ? `"${q}" 검색 결과가 없어요.` : '오늘 결제 내역이 아직 없어요.'}</div>`;
+      return;
+    }
+
+    const rowsHtml = orders.map((o, i) => {
+      const time = (o.SA_DT || '').slice(11) || o.SA_DT || '-';
+      const isCancel = o.SA_DEL_MK === 'D';
+      const statusHtml = isCancel
+        ? `<span style="color:#e05555;font-weight:600;">취소</span>`
+        : `<span style="color:#4ec98a;font-weight:600;">완료</span>`;
+      return `<tr>
+          <td style="text-align:center;color:#5c7690;">${i+1}</td>
+          <td>${o.STR_NM || '-'}</td>
+          <td style="text-align:center;">${time}</td>
+          <td>${(o.SA_GET_AMT||0).toLocaleString()}</td>
+          <td style="text-align:center;">${statusHtml}</td>
+          <td>${(o.SA_CASH_AMT||0).toLocaleString()}</td>
+          <td>${(o.SA_CARD_AMT||0).toLocaleString()}</td>
+          <td>${(o.SA_DISCOUNT||0).toLocaleString()}</td>
+        </tr>`;
+    }).join('');
+
+    wrap.innerHTML = `
+      <div class="live-table-card">
+        <div class="live-table-scroll">
+          <table class="live-table">
+            <thead><tr>
+              <th style="text-align:center;">No.</th>
+              <th style="text-align:center;">매장명 (${orders.length}건)</th>
+              <th style="text-align:center;">주문시간</th>
+              <th style="text-align:right;">판매금액</th>
+              <th style="text-align:center;">상태</th>
+              <th style="text-align:right;">현금</th>
+              <th style="text-align:right;">카드</th>
+              <th style="text-align:right;">할인</th>
+            </tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+      </div>`;
   };
 
   // ── 📅 기간별 매출: 기간 제한 없이 사용자가 지정한 구간 조회 ──────
