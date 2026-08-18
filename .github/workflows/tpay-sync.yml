@@ -28,7 +28,7 @@ on:
         required: false
         default: '90'
       debug_shop_no:
-        description: 'debug/debug-order/compare 모드일 때 테스트할 매장코드'
+        description: 'debug/compare 모드일 때 테스트할 매장코드'
         required: false
         default: 'BHD055'
       debug_days:
@@ -36,7 +36,11 @@ on:
         required: false
         default: '7'
       debug_date:
-        description: 'debug-order/compare 모드일 때 조회할 날짜 (yyyymmdd, 정산 끝난 과거 날짜 권장)'
+        description: 'compare 모드일 때 비교할 날짜 (yyyymmdd, 정산 끝난 과거 날짜 권장)'
+        required: false
+        default: ''
+      debug_store_names:
+        description: 'debug-order 모드일 때 매장명 여러 개 지정 (콤마구분, 비워두면 debug_shop_no 1개만 사용)'
         required: false
         default: ''
 permissions:
@@ -88,12 +92,13 @@ jobs:
           DEBUG_SHOP_NO: ${{ github.event.inputs.debug_shop_no }}
           DEBUG_DAYS: ${{ github.event.inputs.debug_days }}
         run: node scripts/debug-single-store.js
-      - name: 주문내역 진단 실행 (수동-debug-order, REQ_CODE 6 원본 확인용)
+      - name: 주문-품목 매칭 진단 실행 (수동-debug-order, SA_NO ↔ SC_NO 매칭 검증)
         if: github.event.inputs.mode == 'debug-order'
         env:
           TPAY_TOKEN: ${{ secrets.TPAY_TOKEN }}
           DEBUG_SHOP_NO: ${{ github.event.inputs.debug_shop_no }}
           DEBUG_DATE: ${{ github.event.inputs.debug_date }}
+          DEBUG_STORE_NAMES: ${{ github.event.inputs.debug_store_names }}
         run: node scripts/debug-order-detail.js
       - name: 실시간 소스 검증 실행 (수동-compare, REQ_CODE 3 vs 4 비교)
         if: github.event.inputs.mode == 'compare'
