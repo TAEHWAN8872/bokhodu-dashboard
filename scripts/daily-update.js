@@ -41,6 +41,13 @@ function trimOrder_(o, items) {
   };
 }
 
+// SA_NO(예: 101,102...)와 SC_NO(예: 1,2...)는 값 체계가 다름 — SA_NO 앞자리는
+// 단말기 번호로 추정되어, 뒤 두 자리(일별 카운터)만 떼어내면 SC_NO와 일치함.
+// (2026-08-18 daily-update.js 실행 로그로 확인: SA_NO 101~108 <-> SC_NO 1~8)
+function matchKey_(saNo) {
+  return String(Number(saNo) % 100);
+}
+
 // REQ_CODE 6 원본 라인을 SC_NO(주문번호) 기준으로 그룹핑.
 // 반환: { [SC_NO]: [{CMDT_NM, SC_QTY, SC_AMT_TTL, SC_FORM}, ...] }
 function groupItemsBySaNo_(rows) {
@@ -112,7 +119,9 @@ async function main() {
           }
         } else {
           itemsByNo = groupItemsBySaNo_(detail.rows);
-          const matchedCount = result.orders.filter((o) => itemsByNo[String(o.SA_NO)]).length;
+          const matchedCount = result.orders.filter(
+            (o) => itemsByNo[matchKey_(o.SA_NO)] || itemsByNo[String(o.SA_NO)]
+          ).length;
           if (matchedCount === 0 && detail.rows.length > 0 && itemFetchErrors.length < 10) {
             // 응답은 성공했는데 SA_NO와 SC_NO가 하나도 안 맞은 경우 — 매칭 로직 문제일 수 있음
             itemFetchErrors.push(
@@ -127,7 +136,8 @@ async function main() {
       }
 
       for (const o of result.orders) {
-        allOrders.push(trimOrder_(o, itemsByNo[String(o.SA_NO)]));
+        const items = itemsByNo[matchKey_(o.SA_NO)] || itemsByNo[String(o.SA_NO)];
+        allOrders.push(trimOrder_(o, items));
       }
     }
 
