@@ -14,9 +14,14 @@
 //
 // [품목별 상세] 일판매 매출(영수증) 탭에서 주문 클릭 시 품목 내역을 보여주기 위해,
 // 주문이 있는 매장에 한해 REQ_CODE 6(매출정보 주문내역)도 함께 조회합니다.
-// REQ_CODE 6의 SC_NO 필드가 REQ_CODE 3의 SA_NO(주문번호)와 1:1로 매칭됨을
-// 확인했습니다(2026-08-18, scripts/debug-order-detail.js). 주문이 없는 매장은
-// 이 호출을 건너뛰어 API 부하를 줄입니다.
+// REQ_CODE 6의 각 라인에는 SA_NO 필드가 그대로 들어있고, 이 값이 REQ_CODE 3의
+// SA_NO(주문번호)와 정확히 일치함을 확인했습니다(2026-08-19, scripts/debug-order-detail.js,
+// 다산점/부천중동점 실측). SC_NO는 주문번호가 아니라 "그 주문 안에서 몇 번째
+// 품목인가"를 나타내는 라인 인덱스라서(같은 주문에 품목이 여러 개면 1,2,3...으로
+// 늘어남), 하루치 전체를 SC_NO로 묶으면 서로 다른 주문의 "1번째 품목"들이 한
+// 그룹으로 뭉개져 버립니다. 따라서 매칭은 SA_NO 필드로 직접 그룹핑합니다
+// (과거에 썼던 "SA_NO % 100 = SC_NO" 방식은 틀린 가정이었음, 폐기).
+// 주문이 없는 매장은 이 호출을 건너뛰어 API 부하를 줄입니다.
 
 const fs = require('fs');
 const path = require('path');
@@ -42,7 +47,8 @@ function trimOrder_(o, items) {
 }
 
 // 매칭된 품목의 합계가 실제 주문금액(SA_GET_AMT)과 맞는지 검증.
-// 취소+재결제 등으로 SC_NO 그룹이 다른 주문의 라인과 뒤섞여 있는 경우가 있어서,
+// SA_NO로 직접 매칭하므로 평소엔 거의 항상 일치하지만, 할인 처리 방식 차이나
+// 취소/재결제 등 예외 케이스에서 어긋날 수 있어 안전장치로 남겨둠.
 // 금액이 안 맞으면 잘못된 매칭으로 보고 차라리 빈 배열(품목 없음)을 반환한다.
 // (틀린 품목을 보여주는 것보다 "데이터 없음"이 훨씬 안전함)
 function validateItems_(order, items, errorLog) {
@@ -58,19 +64,14 @@ function validateItems_(order, items, errorLog) {
   return [];
 }
 
-// SA_NO(예: 101,102...)와 SC_NO(예: 1,2...)는 값 체계가 다름 — SA_NO 앞자리는
-// 단말기 번호로 추정되어, 뒤 두 자리(일별 카운터)만 떼어내면 SC_NO와 일치함.
-// (2026-08-18 daily-update.js 실행 로그로 확인: SA_NO 101~108 <-> SC_NO 1~8)
-function matchKey_(saNo) {
-  return String(Number(saNo) % 100);
-}
-
-// REQ_CODE 6 원본 라인을 SC_NO(주문번호) 기준으로 그룹핑.
-// 반환: { [SC_NO]: [{CMDT_NM, SC_QTY, SC_AMT_TTL, SC_FORM}, ...] }
+// REQ_CODE 6 원본 라인을 SA_NO(주문번호) 기준으로 그룹핑.
+// (SC_NO는 주문번호가 아니라 "그 주문 안에서 몇 번째 품목인가"를 나타내는
+// 라인 인덱스라서 그룹핑 키로 쓰면 안 됨 — 위 상단 주석 참고)
+// 반환: { [SA_NO]: [{CMDT_NM, SC_QTY, SC_AMT_TTL, SC_FORM}, ...] }
 function groupItemsBySaNo_(rows) {
   const byNo = {};
   for (const r of rows) {
-    const key = String(r.SC_NO);
+    const key = String(r.SA_NO);
     if (!byNo[key]) byNo[key] = [];
     byNo[key].push({
       CMDT_NM: r.CMDT_NM,                 // 상품명
@@ -137,14 +138,15 @@ async function main() {
         } else {
           itemsByNo = groupItemsBySaNo_(detail.rows);
           const matchedCount = result.orders.filter(
-            (o) => itemsByNo[matchKey_(o.SA_NO)] || itemsByNo[String(o.SA_NO)]
+            (o) => itemsByNo[String(o.SA_NO)]
           ).length;
           if (matchedCount === 0 && detail.rows.length > 0 && itemFetchErrors.length < 10) {
-            // 응답은 성공했는데 SA_NO와 SC_NO가 하나도 안 맞은 경우 — 매칭 로직 문제일 수 있음
+            // 응답은 성공했는데 REQ_CODE 3 주문의 SA_NO와 REQ_CODE 6 라인의 SA_NO가
+            // 하나도 안 맞은 경우 — API 응답 형식이 예상과 달라졌을 수 있음
             itemFetchErrors.push(
               `${code}(${name}): 매칭 0건 (라인 ${detail.rows.length}건, 주문 ${result.orders.length}건, ` +
-              `SA_NO 예시=${result.orders.slice(0, 3).map((o) => o.SA_NO).join(',')}, ` +
-              `SC_NO 예시=${detail.rows.slice(0, 3).map((r) => r.SC_NO).join(',')})`
+              `주문 SA_NO 예시=${result.orders.slice(0, 3).map((o) => o.SA_NO).join(',')}, ` +
+              `라인 SA_NO 예시=${detail.rows.slice(0, 3).map((r) => r.SA_NO).join(',')})`
             );
           } else if (matchedCount > 0) {
             itemFetchOkCount++;
@@ -153,7 +155,7 @@ async function main() {
       }
 
       for (const o of result.orders) {
-        const items = itemsByNo[matchKey_(o.SA_NO)] || itemsByNo[String(o.SA_NO)];
+        const items = itemsByNo[String(o.SA_NO)];
         allOrders.push(trimOrder_(o, validateItems_(o, items, itemFetchErrors)));
       }
     }
