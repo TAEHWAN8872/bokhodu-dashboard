@@ -1611,6 +1611,16 @@ body.hide-names .store-name:hover{
   </div>
 </div>
 
+<!-- 일판매 매출: 주문 클릭 시 품목 상세 모달 -->
+<div class="modal-overlay" id="liveRcItemModal" style="z-index:4600;">
+  <div class="modal-box" style="max-width:480px;">
+    <button class="modal-close" onclick="window.closeLiveRcItemModal()">✕</button>
+    <div class="modal-title store-name" id="liveRcItemModalTitle">-</div>
+    <div class="modal-sub" id="liveRcItemModalSub" style="margin-bottom:14px;">품목별 상세</div>
+    <div id="liveRcItemModalBody" style="display:flex;flex-direction:column;gap:8px;"></div>
+  </div>
+</div>
+
 <!-- 누적 매출 모달 -->
 <div class="modal-overlay" id="cumulModal">
   <div class="modal-box" style="max-width:1100px;">
@@ -3243,6 +3253,9 @@ document.getElementById('branchModal').addEventListener('click',function(e){
 });
 document.getElementById('storeInfoModal').addEventListener('click',function(e){
   if(e.target===this) window.closeStoreInfoModal();
+});
+document.getElementById('liveRcItemModal').addEventListener('click',function(e){
+  if(e.target===this) window.closeLiveRcItemModal();
 });
 
 // ── 누적 모달 ────────────────────────────────────────────────
@@ -5249,17 +5262,20 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       return;
     }
 
+    window.__liveRcFilteredOrders = orders; // 클릭 시 품목 상세 모달에서 인덱스로 조회하기 위해 보관
+
     const rowsHtml = orders.map((o, i) => {
       const time = (o.SA_DT || '').slice(11) || o.SA_DT || '-';
       const isCancel = o.SA_DEL_MK === 'D';
       const statusHtml = isCancel
         ? `<span style="color:#e05555;font-weight:600;">취소</span>`
         : `<span style="color:#4ec98a;font-weight:600;">완료</span>`;
-      return `<tr>
+      const hasItems = Array.isArray(o.ITEMS) && o.ITEMS.length > 0;
+      return `<tr onclick="window.showLiveRcItemModal(${i})" style="cursor:pointer;" title="클릭하면 품목별 상세를 볼 수 있어요">
           <td style="text-align:center;color:#5c7690;">${i+1}</td>
           <td style="text-align:center;">${o.STR_NM || '-'}</td>
           <td style="text-align:center;">${time}</td>
-          <td>${(o.SA_GET_AMT||0).toLocaleString()}</td>
+          <td>${(o.SA_GET_AMT||0).toLocaleString()}${hasItems ? ' <span style="color:#5c7690;font-size:11px;">🔍</span>' : ''}</td>
           <td style="text-align:center;">${statusHtml}</td>
           <td>${(o.SA_CASH_AMT||0).toLocaleString()}</td>
           <td>${(o.SA_CARD_AMT||0).toLocaleString()}</td>
@@ -5285,6 +5301,47 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
           </table>
         </div>
       </div>`;
+  };
+
+  // ── 🧾 일판매 매출: 주문 클릭 시 품목별 상세 모달 ──────────────
+  window.showLiveRcItemModal = function(i){
+    const o = (window.__liveRcFilteredOrders || [])[i];
+    if(!o) return;
+
+    const time = (o.SA_DT || '').slice(11) || o.SA_DT || '-';
+    document.getElementById('liveRcItemModalTitle').textContent = o.STR_NM || '-';
+    document.getElementById('liveRcItemModalSub').textContent =
+      `${time} · 판매금액 ${(o.SA_GET_AMT||0).toLocaleString()}원`;
+
+    const items = Array.isArray(o.ITEMS) ? o.ITEMS : [];
+    const body = document.getElementById('liveRcItemModalBody');
+
+    if(!items.length){
+      body.innerHTML = `<div style="color:#6b8fa8;font-size:13px;padding:8px 0;">
+        품목별 상세 데이터가 없어요. (수집 시점 이전 주문이거나 일시적으로 못 가져온 경우일 수 있어요)
+      </div>`;
+    } else {
+      const formLabel = { O:'', A:'(추가)', D:'(취소)', C:'(반품)' };
+      const rowsHtml = items.map(it => {
+        const isVoid = it.SC_FORM === 'D' || it.SC_FORM === 'C';
+        return `<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 12px;
+            background:#0d1b2a;border-radius:8px;border:0.5px solid #1a2f44;
+            ${isVoid ? 'opacity:0.6;' : ''}">
+          <div style="font-size:13px;color:#dbe8f5;">
+            ${it.CMDT_NM || '-'} ${formLabel[it.SC_FORM] || ''}
+            <span style="color:#6b8fa8;">× ${it.SC_QTY}</span>
+          </div>
+          <div style="font-size:13px;color:#dbe8f5;font-weight:600;">${(it.SC_AMT_TTL||0).toLocaleString()}원</div>
+        </div>`;
+      }).join('');
+      body.innerHTML = rowsHtml;
+    }
+
+    document.getElementById('liveRcItemModal').classList.add('open');
+  };
+
+  window.closeLiveRcItemModal = function(){
+    document.getElementById('liveRcItemModal').classList.remove('open');
   };
 
   // ── 📅 기간별 매출: 기간 제한 없이 사용자가 지정한 구간 조회 ──────
