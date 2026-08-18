@@ -601,6 +601,10 @@ body.hide-names .store-name:hover{
         <button class="live-refresh-btn" onclick="window.loadLiveReceipt()">🔄 새로고침</button>
         <input id="liveRcSearch" type="text" placeholder="매장명 검색..." autocomplete="off" oninput="window.renderLiveReceiptTable()"
           class="live-input" style="min-width:180px;">
+        <label>담당자</label>
+        <select id="liveRcManagerSel" class="live-input" onchange="window.renderLiveReceiptTable()">
+          <option value="all">전체</option>
+        </select>
         <span id="liveRcUpdatedAt" class="live-updated-at"></span>
       </div>
       <div id="liveRcLoading" class="live-loading" style="display:none;">
@@ -5253,8 +5257,16 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     const data = window.__liveRcData;
     if(!data){ wrap.innerHTML = ''; return; }
 
+    let orders = (data.ORDERS || []).map(o => ({
+      ...o,
+      manager: (typeof mkStoreManager === 'function') ? mkStoreManager(o.STR_NM) : null
+    }));
+
+    livePopulateManagerSel('liveRcManagerSel', orders);
+    const managerVal = document.getElementById('liveRcManagerSel') ? document.getElementById('liveRcManagerSel').value : 'all';
+    if(managerVal !== 'all') orders = orders.filter(o => o.manager === managerVal);
+
     const q = (document.getElementById('liveRcSearch').value || '').trim();
-    let orders = data.ORDERS || [];
     if(q) orders = orders.filter(o => (o.STR_NM||'').includes(q));
 
     if(!orders.length){
@@ -5274,6 +5286,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       return `<tr onclick="window.showLiveRcItemModal(${i})" style="cursor:pointer;" title="클릭하면 품목별 상세를 볼 수 있어요">
           <td style="text-align:center;color:#5c7690;">${i+1}</td>
           <td style="text-align:center;">${o.STR_NM || '-'}</td>
+          <td style="text-align:center;">${o.manager || '-'}</td>
           <td style="text-align:center;">${time}</td>
           <td>${(o.SA_GET_AMT||0).toLocaleString()}${hasItems ? ' <span style="color:#5c7690;font-size:11px;">🔍</span>' : ''}</td>
           <td style="text-align:center;">${statusHtml}</td>
@@ -5290,6 +5303,7 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
             <thead><tr>
               <th style="text-align:center;">No.</th>
               <th style="text-align:center;">매장명 (${orders.length}건)</th>
+              <th style="text-align:center;">담당자</th>
               <th style="text-align:center;">주문시간</th>
               <th style="text-align:right;">판매금액</th>
               <th style="text-align:center;">상태</th>
