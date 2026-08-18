@@ -83,6 +83,8 @@ async function main() {
   const failed = [];
   let successCount = 0;
   let itemFetchFailedCount = 0;
+  let itemFetchOkCount = 0;
+  const itemFetchErrors = []; // 진단용: 어떤 매장에서 왜 실패했는지 (최대 10개만 기록)
   const allOrders = []; // 오늘자 전 매장 영수증(주문) 원본 — 일판매 매출 탭용
 
   for (let i = 0; i < storeMap.length; i++) {
@@ -105,8 +107,22 @@ async function main() {
         const detail = await fetchOneStoreOrderDetail(token, code, today);
         if (detail.error) {
           itemFetchFailedCount++; // 품목상세만 실패 — 주문 자체(금액 등)는 그대로 살림
+          if (itemFetchErrors.length < 10) {
+            itemFetchErrors.push(`${code}(${name}): ${detail.error}`);
+          }
         } else {
           itemsByNo = groupItemsBySaNo_(detail.rows);
+          const matchedCount = result.orders.filter((o) => itemsByNo[String(o.SA_NO)]).length;
+          if (matchedCount === 0 && detail.rows.length > 0 && itemFetchErrors.length < 10) {
+            // 응답은 성공했는데 SA_NO와 SC_NO가 하나도 안 맞은 경우 — 매칭 로직 문제일 수 있음
+            itemFetchErrors.push(
+              `${code}(${name}): 매칭 0건 (라인 ${detail.rows.length}건, 주문 ${result.orders.length}건, ` +
+              `SA_NO 예시=${result.orders.slice(0, 3).map((o) => o.SA_NO).join(',')}, ` +
+              `SC_NO 예시=${detail.rows.slice(0, 3).map((r) => r.SC_NO).join(',')})`
+            );
+          } else if (matchedCount > 0) {
+            itemFetchOkCount++;
+          }
         }
       }
 
@@ -140,8 +156,9 @@ async function main() {
   };
   fs.writeFileSync(RECEIPT_PATH, JSON.stringify(receiptOutput));
 
-  console.log(`갱신 완료: 성공 ${successCount}개 / 실패 ${failed.length}개 / 영수증 ${allOrders.length}건 / 품목상세 실패 ${itemFetchFailedCount}개`);
+  console.log(`갱신 완료: 성공 ${successCount}개 / 실패 ${failed.length}개 / 영수증 ${allOrders.length}건 / 품목상세 매칭성공 ${itemFetchOkCount}개 / 품목상세 실패 ${itemFetchFailedCount}개`);
   if (failed.length) console.log('실패 매장:\n' + failed.join('\n'));
+  if (itemFetchErrors.length) console.log('품목상세 실패/매칭0건 상세(최대10개):\n' + itemFetchErrors.join('\n'));
 }
 
 main().catch((e) => {
