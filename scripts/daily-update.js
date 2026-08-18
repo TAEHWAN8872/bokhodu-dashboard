@@ -41,6 +41,23 @@ function trimOrder_(o, items) {
   };
 }
 
+// 매칭된 품목의 합계가 실제 주문금액(SA_GET_AMT)과 맞는지 검증.
+// 취소+재결제 등으로 SC_NO 그룹이 다른 주문의 라인과 뒤섞여 있는 경우가 있어서,
+// 금액이 안 맞으면 잘못된 매칭으로 보고 차라리 빈 배열(품목 없음)을 반환한다.
+// (틀린 품목을 보여주는 것보다 "데이터 없음"이 훨씬 안전함)
+function validateItems_(order, items, errorLog) {
+  if (!items || !items.length) return items;
+  const sum = items.reduce((s, it) => s + (it.SC_AMT_TTL || 0), 0);
+  const target = Number(order.SA_GET_AMT || 0);
+  if (sum === target) return items;
+  if (errorLog.length < 10) {
+    errorLog.push(
+      `${order.STR_NM} SA_NO=${order.SA_NO}(${order.SA_DT}): 품목합계 ${sum}원 ≠ 주문금액 ${target}원 — 매칭 취소, 품목 비움`
+    );
+  }
+  return [];
+}
+
 // SA_NO(예: 101,102...)와 SC_NO(예: 1,2...)는 값 체계가 다름 — SA_NO 앞자리는
 // 단말기 번호로 추정되어, 뒤 두 자리(일별 카운터)만 떼어내면 SC_NO와 일치함.
 // (2026-08-18 daily-update.js 실행 로그로 확인: SA_NO 101~108 <-> SC_NO 1~8)
@@ -137,7 +154,7 @@ async function main() {
 
       for (const o of result.orders) {
         const items = itemsByNo[matchKey_(o.SA_NO)] || itemsByNo[String(o.SA_NO)];
-        allOrders.push(trimOrder_(o, items));
+        allOrders.push(trimOrder_(o, validateItems_(o, items, itemFetchErrors)));
       }
     }
 
