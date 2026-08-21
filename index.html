@@ -4316,12 +4316,24 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
       .replace(/\s+/g, '')
       .trim();
   }
+  // data26(ALL)은 "월 매출이 하나라도 있는 매장"만 포함하므로(ALL=data26.filter(...months.some(v>0))),
+  // 신규 오픈 매장은 완결된 월 매출이 쌓이기 전까지 ALL에 안 잡혀서 담당자 매칭이 안 됨.
+  // data26을 직접 건드리지 않고, 그런 신규 매장만 여기에 수동으로 추가해서 임시 보완.
+  // [2026-08-21] 전주삼천점: 8/3 오픈, 담당 이중섭 대리. 월 매출 데이터가 쌓여서
+  // data26에 정식으로 반영되면 여기서 제거할 것.
+  const MK_MANAGER_OVERRIDES = {
+    '전주삼천점': '이중섭 대리',
+  };
   // 매장별 담당자(ALL 26년 데이터 기준) 조회 - 마케팅 데이터/로열티 데이터엔 담당자가 비어있어서 매장명으로 매칭
   function mkStoreManager(name){
     if(!window.__mkManagerMap){
       window.__mkManagerMap = {};
       (window.ALL || (typeof ALL !== 'undefined' ? ALL : [])).forEach(b=>{
         window.__mkManagerMap[normalizeStoreNameForManagerMatch(b.name)] = b.manager || null;
+      });
+      Object.entries(MK_MANAGER_OVERRIDES).forEach(([n, m])=>{
+        const k = normalizeStoreNameForManagerMatch(n);
+        if(!window.__mkManagerMap[k]) window.__mkManagerMap[k] = m; // data26에 이미 있으면 그 값을 우선함
       });
     }
     const key = normalizeStoreNameForManagerMatch(name);
@@ -5500,12 +5512,12 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   // ── 🏷️ 상품별 매출: 메뉴 다중 체크박스 선택 패널 ──
   window.__livePrProductList = null;              // 전체 기간 기준 고유 상품명 목록 캐시
   window.__livePrCheckedProducts = new Set();      // 체크된 상품명 집합 (중복 다중 선택)
-  window.__livePrPanelCategory = '전체';           // 패널에서 현재 선택된 카테고리 탭
+  window.__livePrPanelCategory = '호두과자';       // 패널에서 현재 선택된 카테고리 탭 ('전체' 탭 제거로 기본값을 첫 카테고리로 변경)
 
   // 상품명에 포함된 키워드로 카테고리를 자동 분류한다.
   // (product-daily.json에는 카테고리 정보가 없어서, 상품명 키워드 기준으로 추정 분류)
   const LIVE_PR_CATEGORIES = ['호두과자', '선물세트', '사이드', '답례품', '신메뉴', '커피', '음료'];
-  const LIVE_PR_SIDE_NAMES = ['호두강정', '호두육포', '치즈육포', '(신) 행복식혜', '행복식혜',
+  const LIVE_PR_SIDE_NAMES = ['호두강정', '(구)호두육포', '치즈육포', '(신) 행복식혜', '(구)행복식혜',
     '넛티 요거트 볼', '(신)복 호두정과', '(신)복 호두육포', '(신)복 그래놀라'];
 
   // ── 아래 4개 카테고리는 요청에 따라 상품명을 직접 지정한 고정 목록이다.
@@ -5513,24 +5525,28 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
   // 이 목록에 있는 상품명은 무조건 지정된 카테고리로 분류되며, 목록에 적힌 순서
   // 그대로 화면에 표시된다(정렬은 아래 LIVE_PR_EXPLICIT_ORDER에서 처리).
   const LIVE_PR_WALNUT_ORDER = [
-    '팥 20개',
-    '팥/앙버터(20개)',
-    '팥/레몬버터(20개)',
+    // [2026-08-21] POS 상품명 변경 반영: 'OO 20개'/'OO(20개)' 형식 → '20개입(OO)' 형식으로 통일
+    '20개입(팥)',
+    '20개입(팥/앙버터)',
+    '20개입(팥/레몬버터)',
     '팥앙금/딸기버터 호두과자',
-    '앙버터 20개',
-    '앙버터/레몬버터(20개)',
+    '20개입(앙버터)',
+    '20개입(앙버터/레몬버터)',
     '앙버터/레드벨벳(20개)',
     '앙버터/딸기버터 호두과자',
-    '레몬버터 20개',
+    '20개입(레몬버터)',
     '레몬버터/딸기버터 호두과자',
     '레드벨벳 호두과자',
     '딸기버터 호두과자',
     '쑥 호두과자',
     '쑥&앙버터 호두과자',
-    '청사과 호두과자',
-    '팥/청사과 호두과자',
-    '앙버터/청사과 호두과자',
-    '레몬버터/청사과 호두과자',
+    '20개입(청사과버터)',
+    '20개입(팥/청사과버터)',
+    '20개입(앙버터/청사과버터)',
+    '20개입(레몬버터/청사과버터)',
+    // 신메뉴(출시 예정, POS 등록 전 미리 반영)
+    '20개입(밤)',
+    '20개입(앙버터/밤)',
   ];
   const LIVE_PR_GIFT_ORDER = [
     '선물세트(검은색)',
@@ -5545,18 +5561,22 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     '(신) 앙버터 선물세트(호두정과)',
     '(신)청사과 선물세트(그래놀라)',
     '(신)청사과 선물세트(호두정과)',
+    // 신메뉴(출시 예정, POS 등록 전 미리 반영)
+    '추석선물세트 1(행복식혜)',
+    '추석선물세트 2(호두정과)',
   ];
   const LIVE_PR_THANKS_ORDER = [
-    '답례품(팥앙금)',
+    // [2026-08-21] POS 상품명 변경 반영: '팥앙금'→'팥', '레몬'→'레몬버터', '청사과'→'청사과버터' 등 통일
+    '답례품(팥)',
     '답례품(팥/앙버터)',
-    '답례품(팥/레몬)',
+    '답례품(팥/레몬버터)',
     '답례품(앙버터)',
-    '답례품(앙버터/레몬)',
-    '답례품(레몬)',
-    '답례품(청사과)',
-    '답례품(팥/청사과)',
-    '답례품(앙버터/청사과)',
-    '답례품(레몬/청사과)',
+    '답례품(앙버터/레몬버터)',
+    '답례품(레몬버터)',
+    '답례품(청사과버터)',
+    '답례품(팥/청사과버터)',
+    '답례품(앙버터/청사과버터)',
+    '답례품(레몬버터/청사과버터)',
     '답례품(앙버터/딸기)',
     '답례품(레몬/딸기)',
     '답례품(앙버터/레드벨벳)',
@@ -5565,6 +5585,9 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     '답례품(레드벨벳)',
     '답례품(쑥 호두과자)',
     '답례품(쑥&앙버터 호두과자)',
+    // 신메뉴(출시 예정, POS 등록 전 미리 반영)
+    '답례품(밤)',
+    '답례품(앙버터/밤)',
     '콜드브루 라떼(ICE)',
     '콜드브루 아메리카노(ICE)',
     '팥 밀크티(ICE)',
@@ -5575,8 +5598,9 @@ document.getElementById('logBucketModal').addEventListener('click',function(e){
     '(신)복 호두육포',
     '(신)복 그래놀라',
     '(신) 행복식혜',
-    '호두육포',
-    '행복식혜',
+    // [2026-08-21] POS 상품명 변경 반영: 기존 상품과 구분 위해 '(구)' 접두어 추가
+    '(구)호두육포',
+    '(구)행복식혜',
     '호두강정',
     '치즈육포',
   ];
@@ -5660,7 +5684,7 @@ function isLivePrExcluded_(name){
       // 검색한 단어(또는 체크한 것)만 눈에 띄게 해달라"는 요청 반영. 카테고리 탭은 '전체'로 시작.
       const mainSearchEl = document.getElementById('livePrProductSearch');
       const carriedQ = mainSearchEl ? (mainSearchEl.value || '').trim() : '';
-      window.__livePrPanelCategory = '전체';
+      window.__livePrPanelCategory = '호두과자';
       renderLivePrProductPanelShell_(carriedQ);
       renderLivePrProductPanelItems_(list, carriedQ);
     } catch(err){
@@ -5676,8 +5700,8 @@ function isLivePrExcluded_(name){
   function renderLivePrProductPanelShell_(initialSearchQ){
     const panel = document.getElementById('livePrProductPanel');
     if(!panel) return;
-    const cat = window.__livePrPanelCategory || '전체';
-    const tabDef = ['전체', ...LIVE_PR_CATEGORIES, '✅ 선택됨'];
+    const cat = window.__livePrPanelCategory || LIVE_PR_CATEGORIES[0];
+    const tabDef = [...LIVE_PR_CATEGORIES, '✅ 선택됨'];
     const tabsHtml = tabDef.map(t => {
       const active = t === cat;
       return `<button type="button" onclick="window.setLivePrPanelCategory('${t}')"
@@ -5739,12 +5763,12 @@ function isLivePrExcluded_(name){
     const searchInput = document.getElementById('livePrProductPanelSearch');
     const q = (filterQ !== undefined ? filterQ : (searchInput ? searchInput.value : '')).trim();
     const checked = window.__livePrCheckedProducts;
-    const cat = window.__livePrPanelCategory || '전체';
+    const cat = window.__livePrPanelCategory || LIVE_PR_CATEGORIES[0];
 
     let filtered = list;
     if(cat === '✅ 선택됨'){
       filtered = filtered.filter(p => checked.has(p));
-    } else if(cat !== '전체'){
+    } else {
       filtered = filtered.filter(p => classifyLiveProduct_(p) === cat);
     }
     if(q) filtered = filtered.filter(p => p.includes(q));
