@@ -13,6 +13,7 @@ on:
         options:
           - daily
           - backfill
+          - patch
           - product-backfill
           - product-category
           - debug
@@ -27,6 +28,18 @@ on:
         description: 'product-backfill 모드일 때 조회할 일수 (용량 문제로 기본 90일 권장)'
         required: false
         default: '90'
+      patch_store_codes:
+        description: 'patch 모드일 때 대상 매장코드 (콤마구분, 예: BHD106,BHD087)'
+        required: false
+        default: ''
+      patch_start:
+        description: 'patch 모드일 때 시작일 (yyyymmdd)'
+        required: false
+        default: ''
+      patch_end:
+        description: 'patch 모드일 때 종료일 (yyyymmdd)'
+        required: false
+        default: ''
       debug_shop_no:
         description: 'debug/compare 모드일 때 테스트할 매장코드'
         required: false
@@ -85,6 +98,14 @@ jobs:
           TPAY_TOKEN: ${{ secrets.TPAY_TOKEN }}
           PRODUCT_ROLLING_DAYS: ${{ github.event.inputs.product_rolling_days }}
         run: node scripts/product-backfill.js
+      - name: 특정 매장·구간 패치 실행 (수동-patch, 기존 데이터는 유지하고 지정 구간만 재조회+병합)
+        if: github.event.inputs.mode == 'patch'
+        env:
+          TPAY_TOKEN: ${{ secrets.TPAY_TOKEN }}
+          STORE_CODES: ${{ github.event.inputs.patch_store_codes }}
+          START: ${{ github.event.inputs.patch_start }}
+          END: ${{ github.event.inputs.patch_end }}
+        run: node scripts/patch-missing-days.js
       - name: 진단 실행 (수동-debug, 원본 응답 확인용)
         if: github.event.inputs.mode == 'debug'
         env:
